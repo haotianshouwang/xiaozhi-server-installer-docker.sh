@@ -6,7 +6,7 @@ trap exit_confirm SIGINT
 # 作者@昊天兽王
 # 因为看到很多新手都不会手动部署小智的服务器，所以通宵了一个晚上写了第一个版本。
 # 第一次写脚本，使用了minimax和豆包来写的，可能写的不是很好，请见谅。（minimax和豆包是mvp）
-# 如果遇到了bug，请及时联系我！ QQ 1484475153 GitHub https://github.com/haotianshouwnag 邮箱 1484475153@qq.com
+#我只在Ubuntu上测试过这个脚本，没有在其他系统上测试过，也没有测试大于4G使用本地模型的选项，也没有大规模测试，如果遇到了bug，请及时联系我！ QQ 1484475153 GitHub https://github.com/haotianshouwnag 邮箱 1484475153@qq.com
 
 AUTHOR="昊天兽王"
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
@@ -109,6 +109,7 @@ show_start_ui() {
   echo -e "${PURPLE}==================================================${RESET}"
   echo -e "${BLUE}作者：$AUTHOR${RESET}"
   echo -e "${BLUE}功能：$SCRIPT_DESC${RESET}"
+  echo -e "${BLUE}版本：v1.0.0"
   echo -e "${PURPLE}==================================================${RESET}"
   HITOKOTO=$(curl -s https://v1.hitokoto.cn?c=a | jq -r '.hitokoto') || HITOKOTO="欢迎使用小智服务器部署脚本！"
   echo -e "${YELLOW}📜 一言：$HITOKOTO${RESET}"
