@@ -2047,9 +2047,12 @@ show_connection_info() {
   
   # 先显示所有可用地址
   echo -e "${GREEN}OTA接口（内网）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+  echo -e ""
   echo -e "${GREEN}OTA接口（公网）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-  echo -e "${GREEN}Websocket接口：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
-  echo -e "${GREEN}Websocket接口：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+  echo -e ""
+  echo -e "${GREEN}Websocket接口（内网）：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+  echo -e ""
+  echo -e "${GREEN}Websocket接口（公网）：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
   echo -e "${PURPLE}--------------------------------------------------${RESET}"
   
   # 显示当前部署类型和推荐地址
