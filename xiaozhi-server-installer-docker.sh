@@ -278,7 +278,8 @@ main_menu() {
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
-                read -r -p "按回车键继续..."
+                echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
                 break  # 修复：添加break退出循环
             fi
             ;;
@@ -291,7 +292,8 @@ main_menu() {
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
-                read -r -p "按回车键继续..."
+                echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
                 break  # 修复：添加break退出循环
             fi
             ;;
@@ -304,7 +306,8 @@ main_menu() {
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
-                read -r -p "按回车键继续..."
+                echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
                 break  # 修复：添加break退出循环
             fi
             ;;
@@ -317,7 +320,8 @@ main_menu() {
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
-                read -r -p "按回车键继续..."
+                echo -e "${YELLOW}🔄 3秒后继续...${RESET}"
+                sleep 3
                 break
             fi
             ;;
@@ -330,7 +334,8 @@ main_menu() {
                 delete_server
             else
                 echo -e "${YELLOW}⚠️ 未检测到服务器数据${RESET}"
-                read -r -p "按回车键继续..."
+                echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
             fi
             break  # 修复：添加break退出循环
             ;;
@@ -2122,7 +2127,8 @@ deploy_server() {
     echo -e "${GREEN}🥳🥳🥳 请尽情使用吧 🥳🥳🥳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     
-    read -r -p "按回车键返回主菜单..."
+    echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+    sleep 3
     return  # 修复：使用return而不是递归
 }
 
@@ -2137,7 +2143,8 @@ redeploy_server() {
     read -r -p "确认继续？(输入 'YES' 确认，其他任意键取消): " confirm
     if [ "$confirm" != "YES" ]; then
         echo -e "${CYAN}✅ 已取消重新部署${RESET}"
-        read -r -p "按回车键返回主菜单..."
+        echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
         return  # 修复：使用return而不是递归
     fi
     
@@ -2179,7 +2186,8 @@ update_server() {
     confirm=${confirm:-y}
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
         echo -e "${CYAN}✅ 已取消更新${RESET}"
-        read -r -p "按回车键返回主菜单..."
+        echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
         return  # 修复：使用return而不是递归
     fi
     
@@ -2293,7 +2301,8 @@ update_server() {
     echo -e "\n${GREEN}🎉 服务器更新完成！${RESET}"
     echo -e "${CYAN}💡 您的配置已保留，服务已更新到最新版本${RESET}"
     
-    read -r -p "按回车键返回主菜单..."
+    echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+    sleep 3
     return  # 修复：使用return而不是递归
 }
 
@@ -2309,7 +2318,8 @@ config_only() {
     confirm=${confirm:-y}
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
         echo -e "${CYAN}✅ 已取消配置修改${RESET}"
-        read -r -p "按回车键返回主菜单..."
+        echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
         return  # 修复：使用return而不是递归
     fi
     
@@ -2333,7 +2343,8 @@ config_only() {
     
     echo -e "${GREEN}✅ 配置修改完成，服务已重启${RESET}"
     
-    read -r -p "按回车键返回主菜单..."
+    echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+    sleep 3
     return  # 修复：使用return而不是递归
 }
 
@@ -2531,7 +2542,8 @@ test_server() {
     confirm=${confirm:-y}
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
         echo -e "${CYAN}✅ 已取消测试${RESET}"
-        read -r -p "按回车键返回主菜单..."
+        echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
         return  # 修复：使用return避免递归
     fi
     
@@ -2657,7 +2669,8 @@ test_server() {
     echo -e "重启容器: ${BOLD}docker restart $CONTAINER_NAME${RESET}"
     echo -e "进入容器: ${BOLD}docker exec -it $CONTAINER_NAME /bin/bash${RESET}"
     
-    read -r -p "按回车键返回主菜单..."
+    echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
     return  # 修复：使用return避免递归
 }
 
@@ -2674,7 +2687,8 @@ test_ports() {
     confirm=${confirm:-y}
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
         echo -e "${CYAN}✅ 已取消测试${RESET}"
-        read -r -p "按回车键返回主菜单..."
+        echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
         return
     fi
     
@@ -2685,14 +2699,16 @@ test_ports() {
     else
         echo -e "${RED}❌ 容器 $CONTAINER_NAME 未运行${RESET}"
         echo -e "${YELLOW}💡 请先启动服务器再进行端口测试${RESET}"
-        read -r -p "按回车键返回主菜单..."
+        echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
         return
     fi
     
     # 调用连接信息展示函数
     show_connection_info
     
-    read -r -p "按回车键返回主菜单..."
+    echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
     return
 }
 
@@ -2706,21 +2722,24 @@ docker_logs() {
         if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
             echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
         fi
-        read -r -p "按回车键继续..."
+        echo -e "${YELLOW}🔄 3秒后继续...${RESET}"
+                sleep 3
         return
     fi
     
     # 检查Docker是否安装
     if ! command -v docker &> /dev/null; then
         echo -e "${RED}❌ Docker未安装${RESET}"
-        read -r -p "按回车键返回主菜单..."
+        echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
         return
     fi
     
     # 检查容器是否存在
     if ! docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo -e "${YELLOW}⚠️ 未找到小智服务器容器${RESET}"
-        read -r -p "按回车键返回主菜单..."
+        echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
         return
     fi
     
@@ -2783,7 +2802,8 @@ docker_logs() {
             ;;
     esac
     
-    read -r -p "按回车键返回主菜单..."
+    echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
     return
 }
 
@@ -2799,7 +2819,8 @@ delete_server() {
     read -r -p "确认完全删除？(输入 'DELETE' 确认，其他任意键取消): " confirm
     if [ "$confirm" != "DELETE" ]; then
         echo -e "${CYAN}✅ 已取消删除操作${RESET}"
-        read -r -p "按回车键返回主菜单..."
+        echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+                sleep 3
         return  # 修复：使用return而不是递归
     fi
     
@@ -2830,7 +2851,8 @@ delete_server() {
     echo -e "\n${GREEN}🎉 小智服务器已完全删除！${RESET}"
     echo -e "${CYAN}💡 如需重新部署，请运行脚本选择全新部署${RESET}"
     
-    read -r -p "按回车键返回主菜单..."
+    echo -e "${YELLOW}🔄 3秒后返回主菜单...${RESET}"
+    sleep 3
     return  # 修复：使用return而不是递归
 }
 
