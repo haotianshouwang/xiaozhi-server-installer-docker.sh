@@ -41,6 +41,25 @@ SERVER_DIR_EXISTS=false
 CONFIG_EXISTS=false
 
 # ========================= 工具函数 =========================
+
+# 安全输入函数，确保工作目录稳定
+safe_read() {
+    local prompt="$1"
+    local var_name="$2"
+    
+    # 保存当前工作目录
+    local pwd_backup
+    pwd_backup="$(pwd)" 2>/dev/null || pwd_backup="/tmp"
+    
+    # 执行读取操作
+    read -r -p "$prompt" "$var_name"
+    
+    # 恢复工作目录
+    cd "$pwd_backup" 2>/dev/null || true
+    
+    return 0
+}
+
 check_root_permission() {
     echo -e "\n${CYAN}🔐 检查root权限...${RESET}"
     if [ "$EUID" -eq 0 ]; then
@@ -1246,7 +1265,7 @@ config_vllm() {
                 vllm_provider_key="ChatGLMVLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了智谱清言 ChatGLM VLLM。${RESET}"
                 echo -e "${CYAN}🔑 密钥获取地址：https://open.bigmodel.cn/usercenter/apikeys${RESET}"
-                read -r -p "请输入 API Key: " api_key
+                safe_read "请输入 API Key: " api_key
                 api_key="${api_key:-}"
                 
                 sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
@@ -1258,7 +1277,7 @@ config_vllm() {
                 vllm_provider_key="QwenVLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen VLLM。${RESET}"
                 echo -e "${CYAN}🔑 密钥获取地址：https://dashscope.console.aliyun.com/apiKey${RESET}"
-                read -r -p "请输入 API Key: " api_key
+                safe_read "请输入 API Key: " api_key
                 api_key="${api_key:-}"
                 
                 sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
@@ -1270,8 +1289,8 @@ config_vllm() {
                 vllm_provider_key="WenxinVLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了百度文心一言 Wenxin VLLM。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/#/ai/wenxinworkshop/app/index${RESET}"
-                read -r -p "请输入 Access Key: " access_key
-                read -r -p "请输入 Secret Key: " secret_key
+                safe_read "请输入 Access Key: " access_key
+                safe_read "请输入 Secret Key: " secret_key
                 
                 sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
                 if [ -n "$access_key" ] && [ -n "$secret_key" ]; then
@@ -1283,8 +1302,12 @@ config_vllm() {
                 vllm_provider_key="OpenaiVLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI VLLM。${RESET}"
                 echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/api-keys${RESET}"
+                # 修复：确保工作目录稳定
+                PWD_BACKUP="$(pwd)" 2>/dev/null || PWD_BACKUP="/tmp"
                 read -r -p "请输入 API Key: " api_key
                 api_key="${api_key:-}"
+                # 修复：恢复到原始工作目录
+                cd "$PWD_BACKUP" 2>/dev/null || true
                 
                 sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
                 if [ -n "$api_key" ]; then
@@ -1669,68 +1692,232 @@ config_keys() {
     if [[ "$key_choice" == "1" ]]; then
         echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
         
-        # 修复：使用循环配置，允许用户随时返回配置选择菜单
-        while true; do
-            echo -e "\n${YELLOW}🔧 配置进度：${RESET}"
-            echo "  [1/6] 配置 ASR (语音识别) 服务"
-            echo "  [2/6] 配置 LLM (大语言模型) 服务"
-            echo "  [3/6] 配置 VLLM (视觉大语言模型) 服务"
-            echo "  [4/6] 配置 TTS (语音合成) 服务"
-            echo "  [5/6] 配置 Memory (记忆) 服务"
-            echo "  [6/6] 配置服务器地址 (自动生成)"
-            echo "  [0] 完成配置并返回"
-            echo ""
+        # 恢复线性配置流程，一个接一个地配置
+        echo -e "\n${CYAN}=== 第1步：配置 ASR (语音识别) 服务 ===${RESET}"
+        config_asr
+        if [ $? -eq 1 ]; then
+            echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+            return 1
+        fi
+        
+        echo -e "\n${CYAN}=== 第2步：配置 LLM (大语言模型) 服务 ===${RESET}"
+        config_llm
+        if [ $? -eq 1 ]; then
+            echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+            echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
+            config_asr
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                return 1
+            fi
             
-            read -r -p "请选择要配置的服务 (1-6, 0完成): " service_choice
+            echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
+            config_llm
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                return 1
+            fi
+        fi
+        
+        echo -e "\n${CYAN}=== 第3步：配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+        config_vllm
+        if [ $? -eq 1 ]; then
+            echo -e "${CYAN}🔄 用户返回上一步，重新配置 LLM 服务${RESET}"
+            echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
+            config_llm
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+                echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
+                config_asr
+                if [ $? -eq 1 ]; then
+                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                    return 1
+                fi
+                
+                echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
+                config_llm
+                if [ $? -eq 1 ]; then
+                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                    return 1
+                fi
+            fi
             
-            case "$service_choice" in
-                1)
+            echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+            config_vllm
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                return 1
+            fi
+        fi
+        
+        echo -e "\n${CYAN}=== 第4步：配置 TTS (语音合成) 服务 ===${RESET}"
+        config_tts
+        if [ $? -eq 1 ]; then
+            echo -e "${CYAN}🔄 用户返回上一步，重新配置 VLLM 服务${RESET}"
+            echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+            config_vllm
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户返回上一步，重新配置 LLM 服务${RESET}"
+                echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
+                config_llm
+                if [ $? -eq 1 ]; then
+                    echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+                    echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
                     config_asr
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
+                        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                        return 1
                     fi
-                    ;;
-                2)
+                    
+                    echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
                     config_llm
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
+                        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                        return 1
                     fi
-                    ;;
-                3)
+                fi
+                
+                echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+                config_vllm
+                if [ $? -eq 1 ]; then
+                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                    return 1
+                fi
+            fi
+            
+            echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
+            config_tts
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                return 1
+            fi
+        fi
+        
+        echo -e "\n${CYAN}=== 第5步：配置 Memory (记忆) 服务 ===${RESET}"
+        config_memory
+        if [ $? -eq 1 ]; then
+            echo -e "${CYAN}🔄 用户返回上一步，重新配置 TTS 服务${RESET}"
+            echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
+            config_tts
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户返回上一步，重新配置 VLLM 服务${RESET}"
+                echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+                config_vllm
+                if [ $? -eq 1 ]; then
+                    echo -e "${CYAN}🔄 用户返回上一步，重新配置 LLM 服务${RESET}"
+                    echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
+                    config_llm
+                    if [ $? -eq 1 ]; then
+                        echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+                        echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
+                        config_asr
+                        if [ $? -eq 1 ]; then
+                            echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                            return 1
+                        fi
+                        
+                        echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
+                        config_llm
+                        if [ $? -eq 1 ]; then
+                            echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                            return 1
+                        fi
+                    fi
+                    
+                    echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
                     config_vllm
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
+                        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                        return 1
                     fi
-                    ;;
-                4)
+                fi
+                
+                echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
+                config_tts
+                if [ $? -eq 1 ]; then
+                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                    return 1
+                fi
+            fi
+            
+            echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
+            config_memory
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                return 1
+            fi
+        fi
+        
+        echo -e "\n${CYAN}=== 第6步：配置服务器地址 (自动生成) ===${RESET}"
+        config_server
+        if [ $? -eq 1 ]; then
+            echo -e "${CYAN}🔄 用户返回上一步，重新配置 Memory 服务${RESET}"
+            echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
+            config_memory
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户返回上一步，重新配置 TTS 服务${RESET}"
+                echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
+                config_tts
+                if [ $? -eq 1 ]; then
+                    echo -e "${CYAN}🔄 用户返回上一步，重新配置 VLLM 服务${RESET}"
+                    echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+                    config_vllm
+                    if [ $? -eq 1 ]; then
+                        echo -e "${CYAN}🔄 用户返回上一步，重新配置 LLM 服务${RESET}"
+                        echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
+                        config_llm
+                        if [ $? -eq 1 ]; then
+                            echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+                            echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
+                            config_asr
+                            if [ $? -eq 1 ]; then
+                                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                                return 1
+                            fi
+                            
+                            echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
+                            config_llm
+                            if [ $? -eq 1 ]; then
+                                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                                return 1
+                            fi
+                        fi
+                        
+                        echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+                        config_vllm
+                        if [ $? -eq 1 ]; then
+                            echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                            return 1
+                        fi
+                    fi
+                    
+                    echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
                     config_tts
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
+                        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                        return 1
                     fi
-                    ;;
-                5)
-                    config_memory
-                    if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
-                    fi
-                    ;;
-                6)
-                    config_server
-                    echo -e "${CYAN}🔄 继续配置其他服务或选择0完成配置${RESET}"
-                    ;;
-                0)
-                    echo -e "\n${GREEN}✅ 配置完成！${RESET}"
-                    echo -e "${CYAN}ℹ️ 详细配置文件已保存至: $CONFIG_FILE${RESET}"
-                    export KEY_CONFIG_MODE="auto"
-                    return
-                    ;;
-                *)
-                    echo -e "${RED}❌ 无效选择，请输入 1-6 或 0${RESET}"
-                    ;;
-            esac
+                fi
+                
+                echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
+                config_memory
+                if [ $? -eq 1 ]; then
+                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                    return 1
+                fi
+            fi
             
-            echo "" # 空行分隔
-        done
+            echo -e "\n${CYAN}=== 重新配置服务器地址 (自动生成) ===${RESET}"
+            config_server
+            if [ $? -eq 1 ]; then
+                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                return 1
+            fi
+        fi
+        
+        echo -e "\n${GREEN}✅ 配置完成！${RESET}"
+        echo -e "${CYAN}ℹ️ 详细配置文件已保存至: $CONFIG_FILE${RESET}"
+        export KEY_CONFIG_MODE="auto"
     fi
 }
 
