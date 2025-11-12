@@ -1526,8 +1526,8 @@ config_server() {
     echo -e "  - 公网IP：$EXTERNAL_IP"
 
     echo -e "\n${YELLOW}⚠️  请选择部署场景（影响地址生成）：${RESET}"
-    echo "1) Docker部署（仅内网访问，用内网IP）"
-    echo "2) 公网部署（外网访问，用公网IP，需提前配置端口映射）"
+    echo "1) 内网环境部署（仅内网访问，用内网IP）"
+    echo "2) 公网环境部署（外网访问，用公网IP，需提前配置端口映射）"
     read -r -p "请输入序号 (默认1): " deploy_choice
     deploy_choice=${deploy_choice:-1}
 
@@ -1544,20 +1544,20 @@ config_server() {
             vision_ip="$INTERNAL_IP"
             deploy_type_color="${GREEN}"
             deploy_type_icon="✅"
-            deploy_description="Docker内网部署"
+            deploy_description="内网环境部署"
             ota_url="http://$INTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="internal"
-            echo -e "${GREEN}✅ 已选择Docker内网部署，将使用内网IP生成地址${RESET}"
+            echo -e "${GREEN}✅ 已选择内网环境部署，将使用内网IP生成地址${RESET}"
             ;;
         2)
             ws_ip="$EXTERNAL_IP"
             vision_ip="$EXTERNAL_IP"
             deploy_type_color="${YELLOW}"
             deploy_type_icon="⚠️"
-            deploy_description="公网部署"
+            deploy_description="公网环境部署"
             ota_url="http://$EXTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="public"
-            echo -e "${GREEN}✅ 已选择公网部署，将使用公网IP生成地址${RESET}"
+            echo -e "${GREEN}✅ 已选择公网环境部署，将使用公网IP生成地址${RESET}"
             echo -e "${YELLOW}⚠️  注意：请确保路由器已配置端口映射（8000端口用于WebSocket，8003端口用于OTA/视觉接口）${RESET}"
             ;;
         *)
@@ -1565,10 +1565,10 @@ config_server() {
             vision_ip="$INTERNAL_IP"
             deploy_type_color="${RED}"
             deploy_type_icon="❌"
-            deploy_description="默认Docker内网部署"
+            deploy_description="默认内网环境部署"
             ota_url="http://$INTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="internal"
-            echo -e "${YELLOW}⚠️  输入无效，默认选择Docker内网部署${RESET}"
+            echo -e "${YELLOW}⚠️  输入无效，默认选择内网环境部署${RESET}"
             ;;
     esac
 
@@ -1598,16 +1598,10 @@ config_keys() {
 
         echo -e "\n${YELLOW}⚠️  注意：若您计划使用本地ASR模型（如FunASR），请确保服务器内存≥4G。${RESET}"
         
-        # 根据内存状态显示选项2的颜色
-        if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-            echo "1) 不执行docker安装 退出"
-            echo "2) 执行docker 退出"
-        else
-            echo "1) 不执行docker安装 退出"
-            echo -e "2) ${RED}执行docker 退出${RESET} ${RED}❌ 不推荐${RESET}"
-        fi
+        echo "1) 现在通过脚本配置密钥和服务商"
+        echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
         echo "0) 退出配置（将使用默认配置）"
-        read -r -p "请选择（默认1，输入0退出配置）：" key_choice
+        read -r -p "请选择（默认1）：" key_choice
         key_choice=${key_choice:-1}
         
         # 处理退出配置
@@ -1620,13 +1614,41 @@ config_keys() {
             echo -e "${CYAN}  - TTS: EdgeTTS (微软)${RESET}"
             echo -e "${CYAN}  - Memory: nomem (无记忆)${RESET}"
             echo -e "${CYAN}ℹ️  默认配置路径：$OVERRIDE_CONFIG_FILE${RESET}"
-            echo ""
-            read -r -p "确认退出详细配置流程？(y/n，默认y): " confirm_exit
-            confirm_exit=${confirm_exit:-y}
             
-            if [[ "$confirm_exit" == "y" || "$confirm_exit" == "Y" ]]; then
-                echo -e "${GREEN}✅ 已使用默认配置，脚本将继续执行...${RESET}"
+            # 进入第三级菜单
+            echo -e "\n${YELLOW}⚠️  确认退出并使用默认配置？${RESET}"
+            echo -e "${RED}⚠️  注意：如果服务器配置不足（内存<4GB），使用本地ASR模型可能会卡死。${RESET}"
+            
+            # 根据内存状况显示docker选项
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                echo "1) 不执行docker安装 退出"
+                echo "2) 执行docker 退出"
+            else
+                echo "1) 不执行docker安装 退出"
+                echo -e "2) ${RED}执行docker 退出${RESET} ${RED}❌ 不推荐${RESET}"
+            fi
+            echo "0) 返回上级菜单"
+            echo ""
+            
+            read -r -p "请选择：" final_choice
+            
+            # 处理最终选择
+            if [ "$final_choice" = "0" ]; then
+                continue  # 返回上级菜单
+            elif [ "$final_choice" = "1" ]; then
+                echo -e "\n${GREEN}✅ 已使用默认配置，不执行docker安装，脚本结束。${RESET}"
+                # 设置默认配置
+                sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$OVERRIDE_CONFIG_FILE"
                 
+                local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
+                local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
+                sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$OVERRIDE_CONFIG_FILE"
+                sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$OVERRIDE_CONFIG_FILE"
+                
+                # 脚本结束，不执行docker
+                exit 0
+            elif [ "$final_choice" = "2" ]; then
+                echo -e "\n${GREEN}✅ 已使用默认配置，执行docker安装，脚本将继续执行...${RESET}"
                 # 设置默认配置
                 sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$OVERRIDE_CONFIG_FILE"
                 
@@ -1639,73 +1661,59 @@ config_keys() {
                 export KEY_CONFIG_MODE="manual"
                 return_to_main=true
                 continue
-            else
-                echo -e "${GREEN}✅ 继续详细配置流程...${RESET}"
-                continue
             fi
+        elif [ "$key_choice" = "2" ]; then
+            echo -e "\n${YELLOW}⚠️  已选择稍后手动填写。${RESET}"
+            echo -e "${CYAN}ℹ️  为防止服务启动失败，脚本将自动将服务商预设为 \"AliyunStreamASR\" 和 \"ChatGLMLLM\"。${RESET}"
+            echo -e "${CYAN}ℹ️  您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$OVERRIDE_CONFIG_FILE${RESET}"
+            sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$OVERRIDE_CONFIG_FILE"
+            
+            local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
+            local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
+            sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$OVERRIDE_CONFIG_FILE"
+            sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$OVERRIDE_CONFIG_FILE"
+            
+            CURRENT_DEPLOY_TYPE="internal"
+            export KEY_CONFIG_MODE="manual"
+            return_to_main=true
+            continue
         fi
 
-        # 处理选项1：不执行docker安装 退出
         if [[ "$key_choice" == "1" ]]; then
-            echo -e "\n${YELLOW}⚠️  确认退出配置流程？${RESET}"
-            echo -e "${CYAN}ℹ️  将不执行docker安装，直接退出脚本。${RESET}"
-            echo ""
-            read -r -p "确认退出配置流程？(y/n，默认y): " confirm_exit
-            confirm_exit=${confirm_exit:-y}
+            echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
+            config_asr
+            config_llm
+            config_vllm
+            config_tts
+            config_memory
+            config_server
+
+            echo -e "\n${PURPLE}==================================================${RESET}"
+            echo -e "${GREEN}🎉 核心服务配置完成！${RESET}"
+            echo -e "${CYAN}ℹ️  详细配置文件已保存至: $OVERRIDE_CONFIG_FILE${RESET}"
+            echo -e "${PURPLE}==================================================${RESET}"
+            export KEY_CONFIG_MODE="auto"
             
-            if [[ "$confirm_exit" == "y" || "$confirm_exit" == "Y" ]]; then
-                echo -e "${GREEN}✅ 已退出配置流程，脚本将不执行docker安装。${RESET}"
-                exit 0
-            else
-                echo -e "${GREEN}✅ 继续配置流程...${RESET}"
-                continue
-            fi
+            return_to_main=true
+            continue
         fi
 
-        # 处理选项2：执行docker 退出
         if [[ "$key_choice" == "2" ]]; then
-            echo -e "\n${YELLOW}⚠️  确认执行docker安装并退出？${RESET}"
-            echo -e "${CYAN}ℹ️  将执行docker安装，但不会进行详细配置。${RESET}"
+            echo -e "\n${YELLOW}⚠️  已选择稍后手动填写。${RESET}"
+            echo -e "${CYAN}ℹ️  为防止服务启动失败，脚本将自动将服务商预设为 \"AliyunStreamASR\" 和 \"ChatGLMLLM\"。${RESET}"
+            echo -e "${CYAN}ℹ️  您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$OVERRIDE_CONFIG_FILE${RESET}"
+            sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$OVERRIDE_CONFIG_FILE"
             
-            # 如果内存不足，显示警告
-            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                echo -e "${RED}⚠️⚠️⚠️  警告：内存不足（${MEM_TOTAL}GB < 4GB），可能导致服务卡死或崩溃！${RESET}"
-                echo -e "${RED}⚠️  强烈建议选择其他选项或升级服务器内存后再部署。${RESET}"
-            fi
+            local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
+            local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
+            sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$OVERRIDE_CONFIG_FILE"
+            sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$OVERRIDE_CONFIG_FILE"
             
-            echo ""
-            read -r -p "确认执行docker安装并退出？(y/n，默认n): " confirm_docker
-            confirm_docker=${confirm_docker:-n}
-            
-            if [[ "$confirm_docker" == "y" || "$confirm_docker" == "Y" ]]; then
-                echo -e "${GREEN}✅ 开始执行docker安装...${RESET}"
-                
-                # 安装docker
-                install_docker
-                
-                echo -e "${GREEN}✅ Docker安装完成，脚本将退出。${RESET}"
-                exit 0
-            else
-                echo -e "${GREEN}✅ 继续配置流程...${RESET}"
-                continue
-            fi
+            CURRENT_DEPLOY_TYPE="internal"
+            export KEY_CONFIG_MODE="manual"
+            return_to_main=true
+            continue
         fi
-
-        config_asr
-        config_llm
-        config_vllm
-        config_tts
-        config_memory
-        config_server
-
-        echo -e "\n${PURPLE}==================================================${RESET}"
-        echo -e "${GREEN}🎉 核心服务配置完成！${RESET}"
-        echo -e "${CYAN}ℹ️  详细配置文件已保存至: $OVERRIDE_CONFIG_FILE${RESET}"
-        echo -e "${PURPLE}==================================================${RESET}"
-        export KEY_CONFIG_MODE="auto"
-        
-        # 完成配置后退出循环
-        return_to_main=true
     done
 }
 
@@ -1751,18 +1759,124 @@ show_connection_info() {
   
   # 显示当前部署类型和推荐地址
   if [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
-    echo -e "${GREEN}OTA接口（当前部署类型 - 内网访问）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-    echo -e "${YELLOW}💡 您的当前部署类型为内网访问，请使用上述OTA地址进行设备配置${RESET}"
+    echo -e "${GREEN}OTA接口（当前部署类型 - 内网环境）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+    echo -e "${YELLOW}💡 您的当前部署类型为内网环境，请使用上述OTA地址进行设备配置${RESET}"
     echo -e "${YELLOW}💡 如果需要从公网访问，请确保路由器已配置端口映射（8000, 8003）${RESET}"
   elif [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
-    echo -e "${YELLOW}OTA接口（当前部署类型 - 公网访问）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-    echo -e "${YELLOW}💡 您的当前部署类型为公网访问，请使用上述OTA地址进行设备配置${RESET}"
+    echo -e "${YELLOW}OTA接口（当前部署类型 - 公网环境）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+    echo -e "${YELLOW}💡 您的当前部署类型为公网环境，请使用上述OTA地址进行设备配置${RESET}"
     echo -e "${YELLOW}💡 确保路由器已配置端口映射（8000, 8003）${RESET}"
   else
     echo -e "${YELLOW}💡 请根据您的部署方式选择相应的OTA地址${RESET}"
   fi
   
   echo -e "${PURPLE}==================================================${RESET}"
+  
+  # 根据部署类型进行端口检查
+  if [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
+      echo -e "\n${YELLOW}📋 现在进行公网端口连通性检查...${RESET}"
+      check_network_ports "$EXTERNAL_IP" "公网"
+  elif [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
+      echo -e "\n${YELLOW}📋 现在进行内网端口连通性检查...${RESET}"
+      check_network_ports "$INTERNAL_IP" "内网"
+  else
+      echo -e "\n${YELLOW}📋 进行全面的端口连通性检查...${RESET}"
+      echo -e "${CYAN}🌐 检查内网连通性:${RESET}"
+      check_network_ports "$INTERNAL_IP" "内网"
+      echo -e "\n${CYAN}🌐 检查公网连通性:${RESET}"
+      check_network_ports "$EXTERNAL_IP" "公网"
+  fi
+}
+
+# ========================= 通用端口检查函数 =========================
+check_network_ports() {
+    local target_ip="$1"
+    local deploy_type="$2"
+    local ota_port=8003
+    local ws_port=8000
+    local ota_url="http://$target_ip:$ota_port/xiaozhi/ota/"
+    
+    echo -e "\n${CYAN}🔍 开始检查${deploy_type}端口连通性...${RESET}"
+    echo -e "${YELLOW}🌐 检查目标IP: $target_ip${RESET}"
+    echo -e "${CYAN}──────────────────────────────────────────────────${RESET}"
+    
+    # 检查OTA端口 (8003)
+    echo -e "${CYAN}📡 检查OTA端口 $ota_port...${RESET}"
+    if timeout 5 curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 "$ota_url" > /tmp/ota_status 2>/dev/null; then
+        local ota_status=$(cat /tmp/ota_status)
+        if [ "$ota_status" = "200" ] || [ "$ota_status" = "404" ]; then
+            echo -e "${GREEN}✅ OTA端口 $ota_port 连接正常${RESET}"
+            
+            # 获取OTA内容
+            echo -e "${CYAN}📋 获取OTA内容...${RESET}"
+            if timeout 10 curl -s "$ota_url" > /tmp/ota_content 2>/dev/null; then
+                local ota_content=$(cat /tmp/ota_content)
+                if [ -n "$ota_content" ] && [ "$ota_content" != "Connection refused" ]; then
+                    echo -e "${GREEN}📄 OTA内容：${RESET}"
+                    echo "$ota_content" | head -20 | sed 's/^/    /'  # 显示前20行，每行前面加缩进
+                    if [ $(echo "$ota_content" | wc -l) -gt 20 ]; then
+                        echo -e "${CYAN}    ... (内容过长，已截取前20行)${RESET}"
+                    fi
+                    
+                    echo -e "${GREEN}✅ OTA服务正常运行，配置正确${RESET}"
+                    echo -e "${CYAN}💡 请使用上述OTA地址进行设备配置${RESET}"
+                else
+                    echo -e "${YELLOW}⚠️  OTA服务已启动但返回空内容${RESET}"
+                fi
+            else
+                echo -e "${YELLOW}⚠️  无法获取OTA内容${RESET}"
+            fi
+        else
+            echo -e "${YELLOW}⚠️  OTA端口连接异常 (HTTP状态码: $ota_status)${RESET}"
+        fi
+    else
+        echo -e "${RED}❌ OTA端口 $ota_port 无法访问${RESET}"
+    fi
+    
+    echo
+    
+    # 检查WebSocket端口 (8000)
+    echo -e "${CYAN}🔌 检查WebSocket端口 $ws_port...${RESET}"
+    
+    # 使用nc检查端口是否开放
+    if timeout 5 nc -z "$target_ip" "$ws_port" 2>/dev/null; then
+        echo -e "${GREEN}✅ WebSocket端口 $ws_port 连接正常${RESET}"
+    else
+        echo -e "${RED}❌ WebSocket端口 $ws_port 无法访问${RESET}"
+    fi
+    
+    echo -e "${CYAN}──────────────────────────────────────────────────${RESET}"
+    
+    # 总结端口状态
+    local ports_ok=true
+    if ! timeout 5 curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 "$ota_url" > /tmp/ota_check 2>/dev/null; then
+        ports_ok=false
+    fi
+    if ! timeout 5 nc -z "$target_ip" "$ws_port" 2>/dev/null; then
+        ports_ok=false
+    fi
+    
+    if [ "$ports_ok" = true ]; then
+        echo -e "${GREEN}✅ ${deploy_type}端口检查完成 - 所有端口连接正常${RESET}"
+    else
+        echo -e "${RED}❌ ${deploy_type}端口检查发现问题${RESET}"
+        if [ "$deploy_type" = "公网" ]; then
+            echo -e "${YELLOW}🔧 请检查以下配置：${RESET}"
+            echo -e "  ${YELLOW}• 云服务器：${RESET}在云服务器控制台安全组中放行端口 $ws_port 和 $ota_port"
+            echo -e "  ${YELLOW}• 家庭网络：${RESET}在路由器中配置端口映射或DMZ设置"
+            echo -e "  ${YELLOW}• 防火墙：${RESET}确保云防火墙或硬件防火墙未阻止这些端口"
+            echo -e "  ${YELLOW}• 服务状态：${RESET}确认Docker容器和服务正在运行"
+        else
+            echo -e "${YELLOW}🔧 请检查以下配置：${RESET}"
+            echo -e "  ${YELLOW}• Docker服务：${RESET}确认Docker容器正在运行"
+            echo -e "  ${YELLOW}• 防火墙：${RESET}确认系统防火墙未阻止端口访问"
+            echo -e "  ${YELLOW}• 网络配置：${RESET}确认内网IP配置正确"
+        fi
+        echo -e "${CYAN}💡 配置完成后，可重新运行脚本来验证端口连通性${RESET}"
+    fi
+    
+    # 清理临时文件
+    rm -f /tmp/ota_status /tmp/ota_content /tmp/ota_check
 }
 
 # ========================= 主执行流程 =================
