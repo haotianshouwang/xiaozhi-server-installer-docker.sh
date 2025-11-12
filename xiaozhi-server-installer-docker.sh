@@ -1669,44 +1669,68 @@ config_keys() {
     if [[ "$key_choice" == "1" ]]; then
         echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
         
-        # 修复：按顺序配置所有服务，正确处理返回值
-        config_asr
-        if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return 1  # 修复：返回到上级菜单并传递正确的返回值
-        fi
-        
-        config_llm
-        if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return 1  # 修复：返回到上级菜单并传递正确的返回值
-        fi
-        
-        config_vllm
-        if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return 1  # 修复：返回到上级菜单并传递正确的返回值
-        fi
-        
-        config_tts
-        if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return 1  # 修复：返回到上级菜单并传递正确的返回值
-        fi
-        
-        config_memory
-        if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return 1  # 修复：返回到上级菜单并传递正确的返回值
-        fi
-        
-        config_server
-
-        echo -e "\n${PURPLE}==================================================${RESET}"
-        echo -e "${GREEN}🎉 核心服务配置完成！${RESET}"
-        echo -e "${CYAN}ℹ️ 详细配置文件已保存至: $CONFIG_FILE${RESET}"
-        echo -e "${PURPLE}==================================================${RESET}"
-        export KEY_CONFIG_MODE="auto"
+        # 修复：使用循环配置，允许用户随时返回配置选择菜单
+        while true; do
+            echo -e "\n${YELLOW}🔧 配置进度：${RESET}"
+            echo "  [1/6] 配置 ASR (语音识别) 服务"
+            echo "  [2/6] 配置 LLM (大语言模型) 服务"
+            echo "  [3/6] 配置 VLLM (视觉大语言模型) 服务"
+            echo "  [4/6] 配置 TTS (语音合成) 服务"
+            echo "  [5/6] 配置 Memory (记忆) 服务"
+            echo "  [6/6] 配置服务器地址 (自动生成)"
+            echo "  [0] 完成配置并返回"
+            echo ""
+            
+            read -r -p "请选择要配置的服务 (1-6, 0完成): " service_choice
+            
+            case "$service_choice" in
+                1)
+                    config_asr
+                    if [ $? -eq 1 ]; then
+                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
+                    fi
+                    ;;
+                2)
+                    config_llm
+                    if [ $? -eq 1 ]; then
+                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
+                    fi
+                    ;;
+                3)
+                    config_vllm
+                    if [ $? -eq 1 ]; then
+                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
+                    fi
+                    ;;
+                4)
+                    config_tts
+                    if [ $? -eq 1 ]; then
+                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
+                    fi
+                    ;;
+                5)
+                    config_memory
+                    if [ $? -eq 1 ]; then
+                        echo -e "${CYAN}🔄 用户返回配置菜单${RESET}"
+                    fi
+                    ;;
+                6)
+                    config_server
+                    echo -e "${CYAN}🔄 继续配置其他服务或选择0完成配置${RESET}"
+                    ;;
+                0)
+                    echo -e "\n${GREEN}✅ 配置完成！${RESET}"
+                    echo -e "${CYAN}ℹ️ 详细配置文件已保存至: $CONFIG_FILE${RESET}"
+                    export KEY_CONFIG_MODE="auto"
+                    return
+                    ;;
+                *)
+                    echo -e "${RED}❌ 无效选择，请输入 1-6 或 0${RESET}"
+                    ;;
+            esac
+            
+            echo "" # 空行分隔
+        done
     fi
 }
 
