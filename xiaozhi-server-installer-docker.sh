@@ -10,6 +10,7 @@ trap exit_confirm SIGINT
 
 AUTHOR="昊天兽王"
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
+Version="1.0.1"
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/config.yaml"
 DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/docker-compose.yml"
 MAIN_DIR="$HOME/xiaozhi-server"
@@ -109,7 +110,7 @@ show_start_ui() {
   echo -e "${PURPLE}==================================================${RESET}"
   echo -e "${BLUE}作者：$AUTHOR${RESET}"
   echo -e "${BLUE}功能：$SCRIPT_DESC${RESET}"
-  echo -e "${BLUE}版本：v3.0 终极增强版（支持多重备份、备用安装、14个镜像源和自定义选项）"
+  echo -e "${BLUE}版本：V$Version"
   echo -e "${PURPLE}==================================================${RESET}"
   HITOKOTO=$(curl -s https://v1.hitokoto.cn?c=a | jq -r '.hitokoto') || HITOKOTO="欢迎使用小智服务器部署脚本！"
   echo -e "${YELLOW}📜 一言：$HITOKOTO${RESET}"
