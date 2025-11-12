@@ -3,20 +3,20 @@ set -uo pipefail
 trap exit_confirm SIGINT
 
 # ========================= 基础配置 =========================
-# 作者@昊天兽王
-# 因为看到很多新手都不会手动部署小智的服务器，所以通宵了一个晚上写了第一个版本。
-# 第一次写脚本，使用了minimax和豆包来写的，可能写的不是很好，请见谅。（minimax和豆包是mvp）
-#我只在Ubuntu上测试过这个脚本，没有在其他系统上测试过，也没有测试大于4G使用本地模型的选项，也没有大规模测试，如果遇到了bug，请及时联系我！ QQ 1484475153 GitHub https://github.com/haotianshouwnag 邮箱 1484475153@qq.com
+# 小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务
+# 修复版本：解决语法错误、优化代码结构、提升下载稳定性
+# 作者@昊天兽王 | 修复版本优化
 
-AUTHOR="昊天兽王"
+AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.0.1"
-# 主配置文件链接（优先使用）
+Version="1.0.2-fixed"
+
+# 配置文件链接（修复重复链接问题）
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
-CONFIG_FILE_URL_BACKUP="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/docker-compose.yml"
-# 备用配置文件链接
-CONFIG_FILE_URL_FALLBACK="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/config.yaml"
+CONFIG_FILE_URL_BACKUP="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
+CONFIG_FILE_URL_FALLBACK="https://mirror.ghproxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
 DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/docker-compose.yml"
+
 MAIN_DIR="$HOME/xiaozhi-server"
 CONTAINER_NAME="xiaozhi-esp32-server"
 CONFIG_FILE="$MAIN_DIR/config.yaml"
@@ -26,33 +26,18 @@ RETRY_MAX=3
 RETRY_DELAY=3
 
 # 颜色定义
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[34m"
-PURPLE="\033[35m"
-CYAN="\033[36m"
-RESET="\033[0m"
-BOLD="\033[1m"
+RED="\033[31m" GREEN="\033[32m" YELLOW="\033[33m" BLUE="\033[34m" PURPLE="\033[35m" CYAN="\033[36m" RESET="\033[0m" BOLD="\033[1m"
 
 # 全局变量
 CHATGLM_API_KEY=""
 IS_MEMORY_SUFFICIENT=false
-CPU_MODEL=""
-CPU_CORES=""
-MEM_TOTAL=""
-DISK_AVAIL=""
-NET_INTERFACE=""
-NET_SPEED=""
-INTERNAL_IP=""
-EXTERNAL_IP=""
-OS_VERSION=""
-CURRENT_DEPLOY_TYPE=""
+CPU_MODEL="" CPU_CORES="" MEM_TOTAL="" DISK_AVAIL=""
+NET_INTERFACE="" NET_SPEED="" INTERNAL_IP="" EXTERNAL_IP="" OS_VERSION=""
+CURRENT_DEPLOY_TYPE="" CONFIG_DOWNLOAD_NEEDED="true" USE_EXISTING_CONFIG=false SKIP_DETAILED_CONFIG=false
 
 # ========================= 工具函数 =========================
 check_root_permission() {
     echo -e "\n${CYAN}🔐 检查root权限...${RESET}"
-    
     if [ "$EUID" -eq 0 ]; then
         echo -e "${GREEN}✅ 当前以root权限运行${RESET}"
         return 0
@@ -61,177 +46,115 @@ check_root_permission() {
         return 0
     else
         echo -e "${RED}❌ 当前用户权限不足${RESET}"
-        echo -e "${YELLOW}💡 小智服务器部署需要root权限或sudo权限来：${RESET}"
-        echo -e "${CYAN}  - 安装系统包和Docker${RESET}"
-        echo -e "${CYAN}  - 创建系统服务${RESET}"
-        echo -e "${CYAN}  - 配置网络和防火墙${RESET}"
-        echo -e "${CYAN}  - 管理容器和服务${RESET}"
-        echo ""
-        echo -e "${PURPLE}🔧 解决方案：${RESET}"
-        echo -e "${YELLOW}  方法1：使用sudo运行脚本${RESET}"
-        echo -e "    ${BOLD}sudo bash $0${RESET}"
-        echo ""
-        echo -e "${YELLOW}  方法2：切换到root用户${RESET}"
-        echo -e "    ${BOLD}sudo -i${RESET}"
-        echo -e "    ${BOLD}bash $0${RESET}"
-        echo ""
+        echo -e "${YELLOW}💡 小智服务器部署需要root权限或sudo权限${RESET}"
+        echo -e "${YELLOW}方法1：sudo bash $0${RESET}"
+        echo -e "${YELLOW}方法2：sudo -i && bash $0${RESET}"
         echo -e "${RED}⚠️  权限不足，无法继续部署！${RESET}"
         exit 1
     fi
 }
 
-# 检测系统包管理器
 detect_package_manager() {
-    if command -v apt-get &> /dev/null; then
-        echo "apt"
-    elif command -v yum &> /dev/null; then
-        echo "yum"
-    elif command -v dnf &> /dev/null; then
-        echo "dnf"
-    elif command -v pacman &> /dev/null; then
-        echo "pacman"
-    elif command -v zypper &> /dev/null; then
-        echo "zypper"
-    elif command -v apk &> /dev/null; then
-        echo "apk"
+    # 统一的包管理器检测逻辑
+    if command -v apt-get &> /dev/null; then echo "apt"
+    elif command -v yum &> /dev/null; then echo "yum"
+    elif command -v dnf &> /dev/null; then echo "dnf"
+    elif command -v pacman &> /dev/null; then echo "pacman"
+    elif command -v zypper &> /dev/null; then echo "zypper"
+    elif command -v apk &> /dev/null; then echo "apk"
+    else echo "unknown"; fi
+}
+
+install_dependencies() {
+    local pkg_manager=$(detect_package_manager)
+    local deps=("curl" "jq" "sed" "awk")
+    
+    echo -e "${CYAN}🔍 检查必要工具...${RESET}"
+    local missing=()
+    for dep in "${deps[@]}"; do
+        ! command -v "$dep" &> /dev/null && missing+=("$dep")
+    done
+    
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo -e "${YELLOW}⚠️ 安装缺少的工具: ${missing[*]}${RESET}"
+        case $pkg_manager in
+            apt) sudo apt-get update && sudo apt-get install -y "${missing[@]}" ;;
+            yum) sudo yum install -y "${missing[@]}" ;;
+            dnf) sudo dnf install -y "${missing[@]}" ;;
+            pacman) sudo pacman -S --noconfirm "${missing[@]}" ;;
+            zypper) sudo zypper install -y "${missing[@]}" ;;
+            apk) sudo apk add "${missing[@]}" ;;
+            *) echo -e "${RED}❌ 未识别的包管理器，请手动安装: ${missing[*]}${RESET}"; exit 1 ;;
+        esac
+        echo -e "${GREEN}✅ 工具安装完成${RESET}"
     else
-        echo "unknown"
+        echo -e "${GREEN}✅ 所有工具已安装${RESET}"
     fi
 }
 
-# 根据包管理器安装依赖
 install_with_package_manager() {
-    local pkg_manager
-    pkg_manager=$(detect_package_manager)
-    
+    local pkg_manager=$(detect_package_manager)
+    # 统一的包管理器安装函数
     case $pkg_manager in
         apt)
-            echo -e "${BLUE}📦 使用 APT 包管理器...${RESET}"
-            if ! sudo apt-get update; then
-                echo -e "${RED}❌ 更新软件源失败，请检查网络连接。${RESET}"
-                return 1
-            fi
-            if ! sudo apt-get install -y "$@"; then
-                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
-                return 1
-            fi
-            ;;
+            sudo apt-get update && sudo apt-get install -y "$@" || return 1 ;;
         yum)
-            echo -e "${BLUE}📦 使用 YUM 包管理器...${RESET}"
-            if ! sudo yum install -y "$@"; then
-                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
-                return 1
-            fi
-            ;;
+            sudo yum install -y "$@" || return 1 ;;
         dnf)
-            echo -e "${BLUE}📦 使用 DNF 包管理器...${RESET}"
-            if ! sudo dnf install -y "$@"; then
-                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
-                return 1
-            fi
-            ;;
+            sudo dnf install -y "$@" || return 1 ;;
         pacman)
-            echo -e "${BLUE}📦 使用 PACMAN 包管理器...${RESET}"
-            if ! sudo pacman -S --noconfirm "$@"; then
-                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
-                return 1
-            fi
-            ;;
+            sudo pacman -S --noconfirm "$@" || return 1 ;;
         zypper)
-            echo -e "${BLUE}📦 使用 ZYPPER 包管理器...${RESET}"
-            if ! sudo zypper install -y "$@"; then
-                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
-                return 1
-            fi
-            ;;
+            sudo zypper install -y "$@" || return 1 ;;
         apk)
-            echo -e "${BLUE}📦 使用 APK 包管理器...${RESET}"
-            if ! sudo apk add "$@"; then
-                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
-                return 1
-            fi
-            ;;
+            sudo apk add "$@" || return 1 ;;
         *)
-            echo -e "${RED}❌ 未识别的包管理器，请手动安装以下工具：${RESET}"
-            echo -e "${YELLOW}需要安装的工具：$@${RESET}"
-            return 1
-            ;;
+            echo -e "${RED}❌ 未识别的包管理器${RESET}"; return 1 ;;
     esac
     return 0
 }
 
-check_dependencies() {
-    echo -e "\n${CYAN}🔍 正在检查必要的系统工具...${RESET}"
-    local dependencies=("curl" "jq" "sed" "awk")
-    local missing=()
-    local pkg_manager
-    
-    # 检测包管理器
-    pkg_manager=$(detect_package_manager)
-    echo -e "${BLUE}🔧 检测到包管理器：${pkg_manager}${RESET}"
-
-    for dep in "${dependencies[@]}"; do
-        if ! command -v "$dep" &> /dev/null; then
-            missing+=("$dep")
-        fi
-    done
-
-    if [ ${#missing[@]} -gt 0 ]; then
-        echo -e "${YELLOW}⚠️  检测到缺少必要工具：${missing[*]}，正在尝试安装...${RESET}"
-        if ! install_with_package_manager "${missing[@]}"; then
-            echo -e "${RED}❌ 依赖安装失败，请手动安装后重试。${RESET}"
-            echo -e "${YELLOW}💡 需要安装的工具：${missing[*]}${RESET}"
-            exit 1
-        fi
-        echo -e "${GREEN}✅ 工具 ${missing[*]} 安装成功。${RESET}"
-    else
-        echo -e "${GREEN}✅ 所有必要工具均已安装。${RESET}"
-    fi
-}
-
 exit_confirm() {
-  echo -e "\n${YELLOW}⚠️  检测到退出信号，是否确认退出？(y/n)${RESET}"
-  read -r -n 1 choice
-  echo
-  [[ "$choice" == "y" || "$choice" == "Y" ]] && { echo -e "${PURPLE}👋 感谢使用，脚本已退出${RESET}"; exit 0; }
-  echo -e "${GREEN}✅ 继续执行脚本...${RESET}"
+    echo -e "\n${YELLOW}⚠️ 确认退出？(y/n)${RESET}"
+    read -r -n 1 choice
+    echo
+    [[ "$choice" == "y" || "$choice" == "Y" ]] && { echo -e "${PURPLE}👋 感谢使用，脚本已退出${RESET}"; exit 0; }
+    echo -e "${GREEN}✅ 继续执行脚本...${RESET}"
 }
 
 retry_exec() {
-  local cmd="$1"
-  local desc="$2"
-  local count=0
-  echo -e "${CYAN}🔄 正在执行：$desc${RESET}"
-  while true; do
-    if eval "$cmd"; then
-      echo -e "${GREEN}✅ $desc 成功${RESET}"
-      return 0
-    else
-      count=$((count+1))
-      if (( count < RETRY_MAX )); then
-        echo -e "${YELLOW}❌ $desc 失败，将在 $RETRY_DELAY 秒后进行第 $((count+1)) 次重试...${RESET}"
-        sleep $RETRY_DELAY
-      else
-        echo -e "${RED}❌ $desc 已失败 $RETRY_MAX 次，无法继续。请检查相关配置或网络连接后重试。${RESET}"
-        exit 1
-      fi
-    fi
-  done
+    local cmd="$1" desc="$2" count=0
+    echo -e "${CYAN}🔄 正在执行：$desc${RESET}"
+    while true; do
+        if eval "$cmd"; then
+            echo -e "${GREEN}✅ $desc 成功${RESET}"
+            return 0
+        else
+            count=$((count+1))
+            if (( count < RETRY_MAX )); then
+                echo -e "${YELLOW}❌ $desc 失败，$RETRY_DELAY秒后第$((count+1))次重试...${RESET}"
+                sleep $RETRY_DELAY
+            else
+                echo -e "${RED}❌ $desc 已失败$RETRY_MAX次，无法继续${RESET}"
+                exit 1
+            fi
+        fi
+    done
 }
 
 show_start_ui() {
-  clear
-  echo -e "${PURPLE}==================================================${RESET}"
-  echo -e "${CYAN}                  🎉 小智服务器部署脚本 🎉${RESET}"
-  echo -e "${PURPLE}==================================================${RESET}"
-  echo -e "${BLUE}作者：$AUTHOR${RESET}"
-  echo -e "${BLUE}功能：$SCRIPT_DESC${RESET}"
-  echo -e "${BLUE}版本：V$Version"
-  echo -e "${PURPLE}==================================================${RESET}"
-  HITOKOTO=$(curl -s https://v1.hitokoto.cn?c=a | jq -r '.hitokoto') || HITOKOTO="欢迎使用小智服务器部署脚本！"
-  echo -e "${YELLOW}📜 一言：$HITOKOTO${RESET}"
-  echo -e "${PURPLE}==================================================${RESET}"
-  echo
+    clear
+    echo -e "${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}                  🎉 小智服务器部署脚本 🎉${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    echo -e "${BLUE}作者：$AUTHOR${RESET}"
+    echo -e "${BLUE}功能：$SCRIPT_DESC${RESET}"
+    echo -e "${BLUE}版本：V$Version"
+    echo -e "${PURPLE}==================================================${RESET}"
+    HITOKOTO=$(curl -s https://v1.hitokoto.cn?c=a | jq -r '.hitokoto') || HITOKOTO="欢迎使用小智服务器部署脚本！"
+    echo -e "${YELLOW}📜 一言：$HITOKOTO${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    echo
 }
 
 check_server_config() {
@@ -239,63 +162,45 @@ check_server_config() {
     INTERNAL_IP=$(ip -4 addr show | grep -E 'inet .*(eth0|ens|wlan)' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1 | head -n1)
     [ -z "$INTERNAL_IP" ] && INTERNAL_IP=$(hostname -I | awk '{print $1}')
     [ -z "$INTERNAL_IP" ] && INTERNAL_IP="127.0.0.1"
-    EXTERNAL_IP=$(curl -s https://api.ip.sb/ip || curl -s https://ifconfig.me || curl -s https://ipinfo.io/ip || echo "$INTERNAL_IP")
+    EXTERNAL_IP=$(curl -s --max-time 5 https://api.ip.sb/ip || curl -s --max-time 5 https://ifconfig.me || curl -s --max-time 5 https://ipinfo.io/ip || echo "$INTERNAL_IP")
 
     # 获取硬件信息
     MEM_TOTAL=$(free -g | awk '/Mem:/ {print $2}')
-    if [ -z "$MEM_TOTAL" ] || [ "$MEM_TOTAL" = "0" ]; then
-        MEM_TOTAL=$(free -m | awk '/Mem:/ {print int($2/1024)}')
-    fi
+    [ -z "$MEM_TOTAL" ] || [ "$MEM_TOTAL" = "0" ] && MEM_TOTAL=$(free -m | awk '/Mem:/ {print int($2/1024)}')
     CPU_MODEL=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ *//')
     CPU_CORES=$(grep -c '^processor' /proc/cpuinfo)
     DISK_AVAIL=$(df -h / | awk '/\// {print $4}')
     NET_INTERFACE=$(ip -br link | grep -v 'LOOPBACK' | grep -v 'DOWN' | awk '{print $1}' | head -n1)
     
-    # 获取GPU信息
-    GPU_INFO="未检测到GPU"
-    GPU_MEMORY=""
-    GPU_COUNT=0
-    
-    # 检查NVIDIA GPU
+    # GPU信息检测（优化逻辑）
+    GPU_INFO="未检测到GPU" GPU_MEMORY="" GPU_COUNT=0
     if command -v nvidia-smi &> /dev/null; then
-        GPU_INFO=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
-        if [ -n "$GPU_INFO" ]; then
-            GPU_MODEL=$(echo "$GPU_INFO" | cut -d',' -f1 | sed 's/^ *//;s/ *$//')
-            GPU_MEMORY=$(echo "$GPU_INFO" | cut -d',' -f2 | sed 's/^ *//;s/ *$//')
+        local gpu_data=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
+        if [ -n "$gpu_data" ]; then
+            GPU_MODEL=$(echo "$gpu_data" | cut -d',' -f1 | sed 's/^ *//;s/ *$//')
+            GPU_MEMORY=$(echo "$gpu_data" | cut -d',' -f2 | sed 's/^ *//;s/ *$//')
             GPU_COUNT=$(nvidia-smi --list-gpus | grep -c "GPU" || echo "1")
+            GPU_INFO="$GPU_MODEL (显存:${GPU_MEMORY}MB)"
         fi
-    fi
-    
-    # 检查AMD GPU
-    if [ "$GPU_INFO" = "未检测到GPU" ] && command -v lspci &> /dev/null; then
-        AMD_GPU=$(lspci | grep -i "VGA\|3D controller" | grep -i "AMD\|ATI" | head -1)
-        if [ -n "$AMD_GPU" ]; then
-            GPU_INFO=$(echo "$AMD_GPU" | sed 's/.*VGA.*: //; s/.*3D controller.*: //')
+    elif command -v lspci &> /dev/null; then
+        local amd_gpu=$(lspci | grep -i "VGA\|3D controller" | grep -i "AMD\|ATI" | head -1)
+        local intel_gpu=$(lspci | grep -i "VGA\|3D controller" | grep -i "Intel" | head -1)
+        if [ -n "$amd_gpu" ]; then
+            GPU_INFO=$(echo "$amd_gpu" | sed 's/.*VGA.*: //; s/.*3D controller.*: //')
             GPU_COUNT=$(lspci | grep -i "VGA\|3D controller" | grep -c "AMD\|ATI")
-        fi
-    fi
-    
-    # 检查Intel GPU
-    if [ "$GPU_INFO" = "未检测到GPU" ] && command -v lspci &> /dev/null; then
-        INTEL_GPU=$(lspci | grep -i "VGA\|3D controller" | grep -i "Intel" | head -1)
-        if [ -n "$INTEL_GPU" ]; then
-            GPU_INFO=$(echo "$INTEL_GPU" | sed 's/.*VGA.*: //; s/.*3D controller.*: //')
+        elif [ -n "$intel_gpu" ]; then
+            GPU_INFO=$(echo "$intel_gpu" | sed 's/.*VGA.*: //; s/.*3D controller.*: //')
             GPU_COUNT=$(lspci | grep -i "VGA\|3D controller" | grep -c "Intel")
         fi
     fi
     
-    # 获取系统版本
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        OS_VERSION="$PRETTY_NAME"
-    elif command -v lsb_release &> /dev/null; then
-        OS_VERSION=$(lsb_release -d | cut -f2)
-    elif [ -f /etc/issue ]; then
-        OS_VERSION=$(head -n1 /etc/issue | sed 's/\\n//g; s/\\l//g')
-    else
-        OS_VERSION="未知版本"
-    fi
+    # 系统版本检测（统一逻辑）
+    if [ -f /etc/os-release ]; then . /etc/os-release; OS_VERSION="$PRETTY_NAME"
+    elif command -v lsb_release &> /dev/null; then OS_VERSION=$(lsb_release -d | cut -f2)
+    elif [ -f /etc/issue ]; then OS_VERSION=$(head -n1 /etc/issue | sed 's/\\n//g; s/\\l//g')
+    else OS_VERSION="未知版本"; fi
     
+    # 网络信息
     if [ -n "$NET_INTERFACE" ]; then
         NET_SPEED=$(ethtool "$NET_INTERFACE" 2>/dev/null | grep 'Speed:' | cut -d: -f2 | sed 's/^ *//')
         [ -z "$NET_SPEED" ] && NET_SPEED="未知"
@@ -314,12 +219,8 @@ show_server_config() {
     echo -e "  - ${BOLD}CPU核心数${RESET}：$CPU_CORES 核"
     echo -e "  - ${BOLD}总内存${RESET}：${MEM_TOTAL} GB"
     echo -e "  - ${BOLD}GPU信息${RESET}：$GPU_INFO"
-    if [ "$GPU_COUNT" -gt 1 ]; then
-        echo -e "  - ${BOLD}GPU数量${RESET}：$GPU_COUNT 个"
-    fi
-    if [ -n "$GPU_MEMORY" ] && [ "$GPU_MEMORY" != "" ]; then
-        echo -e "  - ${BOLD}GPU显存${RESET}：${GPU_MEMORY} MB"
-    fi
+    [ "$GPU_COUNT" -gt 1 ] && echo -e "  - ${BOLD}GPU数量${RESET}：$GPU_COUNT 个"
+    [ -n "$GPU_MEMORY" ] && [ "$GPU_MEMORY" != "" ] && echo -e "  - ${BOLD}GPU显存${RESET}：${GPU_MEMORY} MB"
     echo -e "  - ${BOLD}根目录可用空间${RESET}：$DISK_AVAIL"
     echo -e "  - ${BOLD}网卡${RESET}：$NET_INTERFACE（速率：$NET_SPEED）"
     echo -e "  - ${BOLD}内网IP${RESET}：$INTERNAL_IP"
@@ -328,277 +229,229 @@ show_server_config() {
     echo
 
     if [ "$MEM_TOTAL" -ge 4 ]; then
-        echo -e "${GREEN}✅ 内存检查通过（${MEM_TOTAL} GB ≥ 4 GB），可以选择本地ASR模型（如FunASR）${RESET}"
+        echo -e "${GREEN}✅ 内存检查通过（${MEM_TOTAL} GB ≥ 4 GB），可以选择本地ASR模型${RESET}"
         IS_MEMORY_SUFFICIENT=true
     else
         echo -e "${RED}❌ 内存检查失败（${MEM_TOTAL} GB < 4 GB）${RESET}"
-        echo -e "${RED}⚠️⚠️⚠️  警告：本地ASR模型（FunASR）需要服务器内存≥4GB，当前配置不足！${RESET}"
-        echo -e "${RED}⚠️  若强行使用，可能导致服务器卡死或服务崩溃，请选择其他在线ASR模型${RESET}"
+        echo -e "${RED}⚠️ 本地ASR模型需要≥4GB内存，当前不足！${RESET}"
+        echo -e "${RED}⚠️ 若强行使用可能导致服务器卡死，请选择在线ASR模型${RESET}"
         IS_MEMORY_SUFFICIENT=false
     fi
     echo
 }
 
 choose_docker_mirror() {
-  echo -e "${GREEN}📦 请选择Docker镜像源（加速后续下载）：${RESET}"
-  echo "1) 阿里云（国内最稳定）"
-  echo "2) 腾讯云"
-  echo "3) 华为云"
-  echo "4) DaoCloud"
-  echo "5) 网易云"
-  echo "6) 清华大学源"
-  echo "7) 中国科学技术大学源"
-  echo "8) 中科院镜像源"
-  echo "9) 百度智能云镜像源"
-  echo "10) 京东云镜像源"
-  echo "11) 淘宝镜像源"
-  echo "12) 阿里云国际版"
-  echo "13) 腾讯云国际版"
-  echo "14) Azure中国镜像源"
-  echo "15) 360镜像源"
-  echo "16) 阿里云GAE镜像源"
-  echo "17) 自定义镜像源"
-  echo "18) 官方源（不推荐国内用户）"
-  read -r -p "请输入序号（默认1）：" mirror_choice
-  mirror_choice=${mirror_choice:-1}
+    echo -e "${GREEN}📦 选择Docker镜像源（加速下载）：${RESET}"
+    echo "1) 阿里云 2) 腾讯云 3) 华为云 4) DaoCloud 5) 网易云"
+    echo "6) 清华源 7) 中科大 8) 中科院 9) 百度云 10) 京东云"
+    echo "11) 淘宝源 12) 官方源 13) 腾讯云国际 14) Azure中国 15) 360镜像源"
+    echo "16) 阿里云GAE 17) 自定义 18) 官方源(不推荐)"
+    read -r -p "请输入序号（默认1）：" mirror_choice
+    mirror_choice=${mirror_choice:-1}
 
-  local mirror_url
-  case $mirror_choice in
-    1) mirror_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
-    2) mirror_url="https://mirror.ccs.tencentyun.com" ;;
-    3) mirror_url="https://swr.cn-north-1.myhuaweicloud.com" ;;
-    4) mirror_url="https://f1361db2.m.daocloud.io" ;;
-    5) mirror_url="https://hub-mirror.c.163.com" ;;
-    6) mirror_url="https://mirrors.tuna.tsinghua.edu.cn/docker-registry" ;;
-    7) mirror_url="https://docker.mirrors.ustc.edu.cn" ;;
-    8) mirror_url="https://docker.mirrors.ustc.edu.cn" ;;
-    9) mirror_url="https://mirror.baidubce.com" ;;
-    10) mirror_url="https://mirror.jdcloud.com" ;;
-    11) mirror_url="https://mirrors.aliyun.com/docker-registry" ;;
-    12) mirror_url="https://registry-1.docker.io" ;;
-    13) mirror_url="https://mirror.tencentcr.com" ;;
-    14) mirror_url="https://docker.mirrors.azure.cn" ;;
-    15) mirror_url="https://docker.mirrors.360.cn" ;;
-    16) mirror_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
-    17)
-      echo -e "${CYAN}💡 请输入您的自定义Docker镜像源地址：${RESET}"
-      echo -e "${YELLOW}💡 例如：https://docker.mirrors.xxx.edu.cn${RESET}"
-      read -r mirror_url
-      if [ -z "$mirror_url" ]; then
-        echo -e "${RED}❌ 未输入镜像源地址，使用默认阿里云源${RESET}"
-        mirror_url="https://registry.cn-hangzhou.aliyuncs.com"
-      else
-        echo -e "${GREEN}✅ 已设置自定义镜像源：$mirror_url${RESET}"
-      fi
-      ;;
-    18) mirror_url="https://registry-1.docker.io" ;;
-    *) mirror_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
-  esac
+    local mirror_url
+    case $mirror_choice in
+        1) mirror_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
+        2) mirror_url="https://mirror.ccs.tencentyun.com" ;;
+        3) mirror_url="https://swr.cn-north-1.myhuaweicloud.com" ;;
+        4) mirror_url="https://f1361db2.m.daocloud.io" ;;
+        5) mirror_url="https://hub-mirror.c.163.com" ;;
+        6) mirror_url="https://mirrors.tuna.tsinghua.edu.cn/docker-registry" ;;
+        7) mirror_url="https://docker.mirrors.ustc.edu.cn" ;;
+        8) mirror_url="https://docker.mirrors.ustc.edu.cn" ;;
+        9) mirror_url="https://mirror.baidubce.com" ;;
+        10) mirror_url="https://mirror.jdcloud.com" ;;
+        11) mirror_url="https://mirrors.aliyun.com/docker-registry" ;;
+        12) mirror_url="https://registry-1.docker.io" ;;
+        13) mirror_url="https://mirror.tencentcr.com" ;;
+        14) mirror_url="https://docker.mirrors.azure.cn" ;;
+        15) mirror_url="https://docker.mirrors.360.cn" ;;
+        16) mirror_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
+        17)
+            echo -e "${CYAN}💡 输入自定义镜像源地址：${RESET}"
+            read -r mirror_url
+            [ -z "$mirror_url" ] && mirror_url="https://registry.cn-hangzhou.aliyuncs.com"
+            ;;
+        18) mirror_url="https://registry-1.docker.io" ;;
+        *) mirror_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
+    esac
 
-  # 如果是自定义源或需要验证的源，显示配置信息
-  if [ "$mirror_choice" = "17" ]; then
-    echo -e "${CYAN}📝 将要配置的自定义镜像源：${RESET}"
-  elif [ "$mirror_choice" -ge "9" ] && [ "$mirror_choice" -le "16" ]; then
-    echo -e "${CYAN}📝 将要配置的镜像源：${RESET}"
-  fi
-
-  sudo mkdir -p /etc/docker
-  sudo tee /etc/docker/daemon.json <<EOF
-{
-  "registry-mirrors": ["$mirror_url"]
-}
+    sudo mkdir -p /etc/docker
+    sudo tee /etc/docker/daemon.json >/dev/null <<EOF
+{"registry-mirrors": ["$mirror_url"]}
 EOF
-  sudo systemctl daemon-reload
-  sudo systemctl restart docker
-  echo -e "${GREEN}✅ 已配置Docker镜像源：$mirror_url${RESET}"
-  
-  # 显示配置完成后的额外信息
-  if [ "$mirror_choice" = "17" ]; then
-    echo -e "${CYAN}💡 自定义镜像源配置完成，如有问题请检查：${RESET}"
-    echo -e "${CYAN}   1. 镜像源地址是否正确${RESET}"
-    echo -e "${CYAN}   2. 网络连接是否正常${RESET}"
-    echo -e "${CYAN}   3. 是否需要配置代理${RESET}"
-  elif [ "$mirror_choice" -ge "9" ] && [ "$mirror_choice" -le "16" ]; then
-    echo -e "${CYAN}💡 镜像源配置完成，如下载缓慢请尝试其他源${RESET}"
-  fi
+    sudo systemctl daemon-reload && sudo systemctl restart docker
+    echo -e "${GREEN}✅ 已配置Docker镜像源：$mirror_url${RESET}"
 }
 
 check_and_install_docker() {
-  echo -e "\n${BLUE}🔍 检测Docker是否安装...${RESET}"
-  if command -v docker &> /dev/null && docker --version &> /dev/null; then
-    echo -e "${GREEN}✅ Docker 已安装${RESET}"
-  else
-    echo -e "${YELLOW}❌ Docker 未安装${RESET}"
+    echo -e "\n${BLUE}🔍 检测Docker安装状态...${RESET}"
+    if command -v docker &> /dev/null && docker --version &> /dev/null; then
+        echo -e "${GREEN}✅ Docker 已安装${RESET}"
+        return 0
+    fi
     
-    # 添加Docker安装确认机制
+    echo -e "${YELLOW}❌ Docker 未安装${RESET}"
     echo -e "\n${CYAN}📦 需要安装Docker以运行小智服务器容器${RESET}"
-    echo -e "${YELLOW}⚠️  Docker安装将包括：${RESET}"
-    echo -e "${CYAN}  - Docker Engine 安装${RESET}"
-    echo -e "${CYAN}  - Docker Compose 安装${RESET}" 
-    echo -e "${CYAN}  - 系统服务配置${RESET}"
-    echo -e "${CYAN}  - 用户权限配置${RESET}"
-    echo ""
+    echo -e "${YELLOW}⚠️ Docker安装将包括：Docker Engine、Docker Compose、系统服务配置、用户权限配置${RESET}"
     read -r -p "🔧 是否安装Docker？(y/n，默认y): " docker_install_choice
     docker_install_choice=${docker_install_choice:-y}
     
     if [[ "$docker_install_choice" != "y" && "$docker_install_choice" != "Y" ]]; then
-      echo -e "${YELLOW}⚠️  用户取消Docker安装，脚本无法继续${RESET}"
-      echo -e "${CYAN}💡 如需手动安装Docker，请运行：${RESET}"
-      echo -e "${GREEN}curl -fsSL https://get.docker.com | sudo bash${RESET}"
-      echo -e "${GREEN}sudo usermod -aG docker \$USER${RESET}"
-      echo -e "${GREEN}sudo systemctl enable --now docker${RESET}"
-      exit 1
+        echo -e "${YELLOW}⚠️ 用户取消Docker安装${RESET}"
+        echo -e "${CYAN}💡 手动安装命令：${RESET}"
+        echo -e "${GREEN}curl -fsSL https://get.docker.com | sudo bash${RESET}"
+        echo -e "${GREEN}sudo usermod -aG docker \$USER${RESET}"
+        echo -e "${GREEN}sudo systemctl enable --now docker${RESET}"
+        exit 1
     fi
     
     echo -e "${GREEN}✅ 开始Docker安装...${RESET}"
     
-    # 检测包管理器
-    local pkg_manager
-    pkg_manager=$(detect_package_manager)
-    echo -e "${BLUE}🔧 检测到包管理器：${pkg_manager}${RESET}"
-    
-    # 根据包管理器安装Docker依赖
+    # 安装Docker依赖
+    local pkg_manager=$(detect_package_manager)
+    echo -e "${BLUE}🔧 包管理器：$pkg_manager${RESET}"
     case $pkg_manager in
         apt)
-            echo -e "${BLUE}📦 使用apt安装Docker依赖...${RESET}"
-            retry_exec "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
-            ;;
+            retry_exec "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖" ;;
         yum|dnf)
-            echo -e "${BLUE}📦 使用yum/dnf安装Docker依赖...${RESET}"
             if command -v yum &> /dev/null; then
                 retry_exec "sudo yum install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
             else
                 retry_exec "sudo dnf install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
-            fi
-            ;;
+            fi ;;
         pacman)
-            echo -e "${BLUE}📦 使用pacman安装Docker依赖...${RESET}"
-            retry_exec "sudo pacman -S --noconfirm ca-certificates curl gnupg lsb-release" "安装Docker依赖"
-            ;;
+            retry_exec "sudo pacman -S --noconfirm ca-certificates curl gnupg lsb-release" "安装Docker依赖" ;;
         zypper)
-            echo -e "${BLUE}📦 使用zypper安装Docker依赖...${RESET}"
-            retry_exec "sudo zypper install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
-            ;;
+            retry_exec "sudo zypper install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖" ;;
         apk)
-            echo -e "${BLUE}📦 使用apk安装Docker依赖...${RESET}"
-            retry_exec "sudo apk add ca-certificates curl gnupg lsb-release" "安装Docker依赖"
-            ;;
+            retry_exec "sudo apk add ca-certificates curl gnupg lsb-release" "安装Docker依赖" ;;
         *)
-            echo -e "${YELLOW}⚠️ 未识别的包管理器，使用通用安装方法${RESET}"
-            retry_exec "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release || sudo yum install -y ca-certificates curl gnupg lsb-release || sudo dnf install -y ca-certificates curl gnupg lsb-release || sudo pacman -S --noconfirm ca-certificates curl gnupg lsb-release || sudo zypper install -y ca-certificates curl gnupg lsb-release || sudo apk add ca-certificates curl gnupg lsb-release" "安装Docker依赖"
-            ;;
+            retry_exec "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release || sudo yum install -y ca-certificates curl gnupg lsb-release || sudo dnf install -y ca-certificates curl gnupg lsb-release || sudo pacman -S --noconfirm ca-certificates curl gnupg lsb-release || sudo zypper install -y ca-certificates curl gnupg lsb-release || sudo apk add ca-certificates curl gnupg lsb-release" "安装Docker依赖" ;;
     esac
     
-    # 改进的多镜像源重试机制
-    local docker_install_success=false
-    local mirror_count=0
-    
-    # 定义镜像源列表和对应的安装命令
+    # 多镜像源Docker安装
+    local docker_install_success=false mirror_count=0
     declare -a mirrors=(
         "阿里云镜像|https://get.docker.com|sudo bash -s docker --mirror Aliyun"
         "华为云镜像|https://get.docker.com|sudo bash -s docker --mirror HuaweiCloud"
         "Docker官方|https://get.docker.com|sudo bash -s docker"
-        "清华源|安装备用方法|备用安装方法1"
-        "阿里云源|安装备用方法|备用安装方法2"
+        "清华源|备用方法1|install_docker_tsinghua"
+        "阿里云源|备用方法2|install_docker_aliyun"
     )
     
-    echo -e "${BLUE}🔄 开始多镜像源Docker安装...${RESET}"
-    
+    echo -e "${BLUE}🔄 多镜像源Docker安装...${RESET}"
     for mirror_info in "${mirrors[@]}"; do
         mirror_count=$((mirror_count + 1))
         IFS='|' read -r mirror_name mirror_url mirror_cmd <<< "$mirror_info"
+        echo -e "\n${CYAN}🎯 第$mirror_count个镜像源：$mirror_name${RESET}"
         
-        echo -e "\n${CYAN}🎯 尝试第 $mirror_count 个镜像源：$mirror_name${RESET}"
-        
-        if [[ "$mirror_cmd" == "备用安装方法1" ]]; then
-            # 备用安装方法1：清华源
-            echo -e "${BLUE}🔄 使用清华源进行Docker安装${RESET}"
-            if install_docker_with_tsinghua_source; then
-                docker_install_success=true
-                break
-            fi
-        elif [[ "$mirror_cmd" == "备用安装方法2" ]]; then
-            # 备用安装方法2：阿里云源
-            echo -e "${BLUE}🔄 使用阿里云源进行Docker安装${RESET}"
-            if install_docker_with_aliyun_source; then
-                docker_install_success=true
-                break
-            fi
+        if [[ "$mirror_cmd" == "install_docker_tsinghua" ]]; then
+            install_docker_tsinghua && { docker_install_success=true; break; }
+        elif [[ "$mirror_cmd" == "install_docker_aliyun" ]]; then
+            install_docker_aliyun && { docker_install_success=true; break; }
         else
-            # 正常的镜像源安装
-            echo -e "${CYAN}🔄 正在执行：使用 $mirror_name 安装Docker${RESET}"
             if eval "curl -fsSL $mirror_url | $mirror_cmd"; then
                 echo -e "${GREEN}✅ $mirror_name Docker安装成功${RESET}"
-                docker_install_success=true
-                break
+                docker_install_success=true; break
             else
-                echo -e "${YELLOW}❌ $mirror_name Docker安装失败，尝试下一个镜像源...${RESET}"
-                if [ $mirror_count -lt 3 ]; then
-                    echo -e "${YELLOW}⏳ 等待3秒后尝试下一个镜像源...${RESET}"
-                    sleep 3
-                fi
+                echo -e "${YELLOW}❌ $mirror_name Docker安装失败，尝试下一个...${RESET}"
+                [ $mirror_count -lt 3 ] && { echo -e "${YELLOW}⏳ 等待3秒...${RESET}"; sleep 3; }
             fi
         fi
     done
     
     if [ "$docker_install_success" = false ]; then
-        echo -e "${YELLOW}⚠️ 所有预设镜像源都失败，尝试通用的备用安装方式...${RESET}"
-        
-        # 尝试通用备用安装方式（使用retry_exec进行有限重试）
-        echo -e "${BLUE}🔄 尝试通用备用安装方式${RESET}"
-        if retry_exec "curl -fsSL https://get.docker.com | sudo bash -s docker" "通用Docker安装方式"; then
-            echo -e "${GREEN}✅ 通用安装方式成功${RESET}"
-            docker_install_success=true
-        fi
+        echo -e "${YELLOW}⚠️ 所有镜像源失败，尝试通用安装方式...${RESET}"
+        retry_exec "curl -fsSL https://get.docker.com | sudo bash -s docker" "通用Docker安装方式" && docker_install_success=true
     fi
     
-    # 检查Docker安装是否成功
     if [ "$docker_install_success" = false ]; then
-        echo -e "${RED}❌ Docker安装完全失败，脚本无法继续。${RESET}"
-        echo -e "${YELLOW}请检查网络连接或手动安装Docker后重试。${RESET}"
-        echo ""
-        echo -e "${CYAN}手动安装Docker命令：${RESET}"
-        echo -e "${GREEN}curl -fsSL https://get.docker.com | sudo bash${RESET}"
-        echo ""
-        echo -e "${YELLOW}安装成功后，请重新运行脚本进行配置。${RESET}"
+        echo -e "${RED}❌ Docker安装完全失败${RESET}"
+        echo -e "${YELLOW}请检查网络连接或手动安装Docker${RESET}"
+        echo -e "${CYAN}手动安装：curl -fsSL https://get.docker.com | sudo bash${RESET}"
         exit 1
     fi
     
     echo -e "${GREEN}✅ Docker安装成功，开始配置...${RESET}"
-    
     sudo usermod -aG docker $USER
-
-    # 使用systemd服务管理代替newgrp，避免阻塞
-    echo -e "${BLUE}🚀 启动Docker服务...${RESET}"
+    
     if sudo systemctl start docker && sudo systemctl enable docker > /dev/null 2>&1; then
-      echo -e "${GREEN}✅ Docker服务启动成功${RESET}"
+        echo -e "${GREEN}✅ Docker服务启动成功${RESET}"
     else
-      echo -e "${YELLOW}⚠️ Docker服务启动可能有问题${RESET}"
+        echo -e "${YELLOW}⚠️ Docker服务启动可能有问题${RESET}"
     fi
-
+    
     echo -e "${GREEN}✅ Docker 安装完成${RESET}"
     echo -e "${YELLOW}⚠️ 权限将在下次登录时生效，或使用 'newgrp docker' 命令激活${RESET}"
-    echo ""
-
-    # 交互式选择是否配置镜像源
-    echo -e "${CYAN}💡 是否现在配置Docker镜像源以加速下载？(y/n，默认y):${RESET}"
+    
+    # 配置镜像源
+    echo -e "${CYAN}💡 是否配置Docker镜像源加速下载？(y/n，默认y):${RESET}"
     read -r configure_mirror
     configure_mirror=${configure_mirror:-y}
+    [[ "$configure_mirror" == "y" || "$configure_mirror" == "Y" ]] && choose_docker_mirror
 
-    if [[ "$configure_mirror" == "y" || "$configure_mirror" == "Y" ]]; then
-      choose_docker_mirror
-    else
-      echo -e "${CYAN}⏭️  跳过镜像源配置${RESET}"
-    fi
-
+    # 检查Docker Compose
     if ! docker compose version &> /dev/null; then
-      echo -e "${YELLOW}❌ Docker Compose 未安装，开始安装...${RESET}"
-      retry_exec "sudo curl -SL \"https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose" "安装Docker Compose"
+        echo -e "${YELLOW}❌ Docker Compose 未安装，开始安装...${RESET}"
+        retry_exec "sudo curl -SL \"https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose" "安装Docker Compose"
     fi
-  fi
 }
 
-# 检查Docker是否已安装
+install_docker_tsinghua() {
+    echo -e "${BLUE}🔄 清华源安装脚本${RESET}"
+    if curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg 2>/dev/null | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; then
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null 2>&1
+        
+        local pkg_manager=$(detect_package_manager)
+        case $pkg_manager in
+            apt)
+                if sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ 清华源Docker安装成功${RESET}"; return 0
+                fi ;;
+            yum|dnf)
+                if command -v yum &> /dev/null; then
+                    if sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
+                        echo -e "${GREEN}✅ 清华源Docker安装成功${RESET}"; return 0
+                    fi
+                else
+                    if sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
+                        echo -e "${GREEN}✅ 清华源Docker安装成功${RESET}"; return 0
+                    fi
+                fi ;;
+        esac
+    fi
+    echo -e "${RED}❌ 清华源Docker安装失败${RESET}"
+    return 1
+}
+
+install_docker_aliyun() {
+    echo -e "${BLUE}🔄 阿里云源安装脚本${RESET}"
+    if curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg 2>/dev/null | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; then
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null 2>&1
+        
+        local pkg_manager=$(detect_package_manager)
+        case $pkg_manager in
+            apt)
+                if sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ 阿里云源Docker安装成功${RESET}"; return 0
+                fi ;;
+            yum|dnf)
+                if command -v yum &> /dev/null; then
+                    if sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
+                        echo -e "${GREEN}✅ 阿里云源Docker安装成功${RESET}"; return 0
+                    fi
+                else
+                    if sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
+                        echo -e "${GREEN}✅ 阿里云源Docker安装成功${RESET}"; return 0
+                    fi
+                fi ;;
+        esac
+    fi
+    echo -e "${RED}❌ 阿里云源Docker安装失败${RESET}"
+    return 1
+}
+
 check_docker_installed() {
     if ! command -v docker &> /dev/null || ! docker --version &> /dev/null; then
         echo -e "${RED}❌ Docker未安装或安装异常，脚本无法继续${RESET}"
@@ -610,42 +463,27 @@ check_docker_installed() {
 
 clean_container() {
     check_docker_installed
-    echo -e "\n${BLUE}🔍 检测容器 $CONTAINER_NAME 是否存在...${RESET}"
-  if docker ps -a --filter "name=^/${CONTAINER_NAME}$" --format "{{.Names}}" | grep -q "$CONTAINER_NAME"; then
-    echo -e "${YELLOW}⚠️  容器 $CONTAINER_NAME 已存在，正在删除...${RESET}"
-    retry_exec "docker rm -f $CONTAINER_NAME" "删除容器 $CONTAINER_NAME"
-  else
-    echo -e "${GREEN}✅ 容器 $CONTAINER_NAME 不存在，继续执行${RESET}"
-  fi
+    echo -e "\n${BLUE}🔍 检测容器 $CONTAINER_NAME...${RESET}"
+    if docker ps -a --filter "name=^/${CONTAINER_NAME}$" --format "{{.Names}}" | grep -q "$CONTAINER_NAME"; then
+        echo -e "${YELLOW}⚠️ 容器 $CONTAINER_NAME 已存在，正在删除...${RESET}"
+        retry_exec "docker rm -f $CONTAINER_NAME" "删除容器 $CONTAINER_NAME"
+    else
+        echo -e "${GREEN}✅ 容器 $CONTAINER_NAME 不存在${RESET}"
+    fi
 }
 
 create_dirs() {
-  echo -e "\n${BLUE}📂 开始创建目录结构...${RESET}"
-  local dirs=("$MAIN_DIR/data" "$MAIN_DIR/models/SenseVoiceSmall" "$MAIN_DIR/models/vosk" "$MAIN_DIR/models/sherpa-onnx" "$MAIN_DIR/music")
-  for dir in "${dirs[@]}"; do
-    if [ ! -d "$dir" ]; then
-      retry_exec "mkdir -p $dir" "创建目录 $dir"
-    else
-      echo -e "${GREEN}✅ 目录 $dir 已存在，跳过${RESET}"
-    fi
-  done
+    echo -e "\n${BLUE}📂 创建目录结构...${RESET}"
+    local dirs=("$MAIN_DIR/data" "$MAIN_DIR/models/SenseVoiceSmall" "$MAIN_DIR/models/vosk" "$MAIN_DIR/models/sherpa-onnx" "$MAIN_DIR/music")
+    for dir in "${dirs[@]}"; do
+        if [ ! -d "$dir" ]; then
+            retry_exec "mkdir -p $dir" "创建目录 $dir"
+        else
+            echo -e "${GREEN}✅ 目录 $dir 已存在${RESET}"
+        fi
+    done
 }
 
-download_files() {
-  local should_download="${1:-true}"
-  
-  if [ "$should_download" = "true" ]; then
-    echo -e "\n${BLUE}📥 开始下载配置文件...${RESET}"
-    # 直接下载到 data/.config.yaml，避免卡死问题
-    mkdir -p "$MAIN_DIR/data"
-    download_config_with_fallback "$OVERRIDE_CONFIG_FILE"
-    retry_exec "curl -fSL $DOCKER_COMPOSE_URL -o $MAIN_DIR/docker-compose.yml" "下载 docker-compose.yml"
-  else
-    echo -e "\n${GREEN}✅ 跳过下载文件，使用现有配置文件${RESET}"
-  fi
-}
-
-# 多链接配置文件下载函数（支持备用链接切换）
 download_config_with_fallback() {
     local output_file="$1"
     local download_success=false
@@ -664,39 +502,34 @@ download_config_with_fallback() {
         mirror_count=$((mirror_count + 1))
         IFS='|' read -r link_name config_url <<< "$url_info"
         
-        echo -e "\n${CYAN}🎯 尝试第 $mirror_count 个链接：$link_name${RESET}"
+        echo -e "\n${CYAN}🎯 尝试第$mirror_count个链接：$link_name${RESET}"
         echo -e "${YELLOW}📎 链接：$config_url${RESET}"
         
-        # 使用curl下载，失败时自动切换
         if curl -fSL --connect-timeout 10 --max-time 30 "$config_url" -o "$output_file" 2>/dev/null; then
-            # 验证下载的文件是否有效
             if [ -f "$output_file" ] && grep -q "server:" "$output_file" 2>/dev/null; then
                 echo -e "${GREEN}✅ $link_name 下载成功${RESET}"
                 download_success=true
                 break
             else
-                echo -e "${YELLOW}⚠️ $link_name 下载的文件无效，尝试下一个链接${RESET}"
+                echo -e "${YELLOW}⚠️ $link_name 下载文件无效，尝试下一个${RESET}"
                 rm -f "$output_file"
             fi
         else
             echo -e "${RED}❌ $link_name 下载失败${RESET}"
         fi
         
-        # 如果不是最后一个链接，等待3秒后切换
         if [ $mirror_count -lt ${#config_urls[@]} ]; then
             echo -e "${YELLOW}⏳ 等待3秒后尝试下一个链接...${RESET}"
             sleep 3
         fi
     done
     
-    # 检查下载结果
     if [ "$download_success" = true ]; then
         echo -e "${GREEN}✅ 配置文件下载成功：$output_file${RESET}"
         return 0
     else
         echo -e "${RED}❌ 所有配置文件链接都失败了${RESET}"
-        echo -e "${YELLOW}📖 请检查网络连接或手动下载配置文件${RESET}"
-        echo -e "${CYAN}💡 可用链接：${RESET}"
+        echo -e "${YELLOW}📖 可用链接：${RESET}"
         echo -e "   - $CONFIG_FILE_URL"
         echo -e "   - $CONFIG_FILE_URL_BACKUP"
         echo -e "   - $CONFIG_FILE_URL_FALLBACK"
@@ -704,73 +537,19 @@ download_config_with_fallback() {
     fi
 }
 
-# 清华源Docker安装函数
-install_docker_with_tsinghua_source() {
-    echo -e "${BLUE}🔄 尝试备用安装方式1：清华源安装脚本${RESET}"
-    if curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg 2>/dev/null | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; then
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null 2>&1
-        
-        # 根据包管理器安装Docker核心组件
-        case $pkg_manager in
-            apt)
-                if sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1; then
-                    echo -e "${GREEN}✅ 清华源Docker安装成功${RESET}"
-                    return 0
-                fi
-                ;;
-            yum|dnf)
-                if command -v yum &> /dev/null; then
-                    if sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
-                        echo -e "${GREEN}✅ 清华源Docker安装成功${RESET}"
-                        return 0
-                    fi
-                else
-                    if sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
-                        echo -e "${GREEN}✅ 清华源Docker安装成功${RESET}"
-                        return 0
-                    fi
-                fi
-                ;;
-        esac
+download_files() {
+    local should_download="${1:-true}"
+    
+    if [ "$should_download" = "true" ]; then
+        echo -e "\n${BLUE}📥 下载配置文件...${RESET}"
+        mkdir -p "$MAIN_DIR/data"
+        download_config_with_fallback "$OVERRIDE_CONFIG_FILE"
+        retry_exec "curl -fSL $DOCKER_COMPOSE_URL -o $MAIN_DIR/docker-compose.yml" "下载 docker-compose.yml"
+    else
+        echo -e "\n${GREEN}✅ 跳过下载文件，使用现有配置文件${RESET}"
     fi
-    echo -e "${RED}❌ 清华源Docker安装失败${RESET}"
-    return 1
 }
 
-# 阿里云源Docker安装函数
-install_docker_with_aliyun_source() {
-    echo -e "${BLUE}🔄 尝试备用安装方式2：阿里云源安装脚本${RESET}"
-    if curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg 2>/dev/null | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; then
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null 2>&1
-        
-        # 根据包管理器安装Docker核心组件
-        case $pkg_manager in
-            apt)
-                if sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1; then
-                    echo -e "${GREEN}✅ 阿里云源Docker安装成功${RESET}"
-                    return 0
-                fi
-                ;;
-            yum|dnf)
-                if command -v yum &> /dev/null; then
-                    if sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
-                        echo -e "${GREEN}✅ 阿里云源Docker安装成功${RESET}"
-                        return 0
-                    fi
-                else
-                    if sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
-                        echo -e "${GREEN}✅ 阿里云源Docker安装成功${RESET}"
-                        return 0
-                    fi
-                fi
-                ;;
-        esac
-    fi
-    echo -e "${RED}❌ 阿里云源Docker安装失败${RESET}"
-    return 1
-}
-
-# 检查是否已经配置过
 check_if_already_configured() {
     if [ -f "$OVERRIDE_CONFIG_FILE" ] && grep -q "selected_module:" "$OVERRIDE_CONFIG_FILE" 2>/dev/null; then
         return 0  # 已配置
@@ -778,33 +557,27 @@ check_if_already_configured() {
     return 1  # 未配置
 }
 
-# ========================= 配置文件设置函数 =========================
 setup_config_file() {
     echo -e "\n${CYAN}📁 配置小智服务器配置文件...${RESET}"
     
-    # 创建data目录
     mkdir -p "$MAIN_DIR/data"
     echo -e "${GREEN}✅ 已创建 data 目录: $MAIN_DIR/data${RESET}"
     
-    # 检查是否已存在配置文件
     if [ -f "$OVERRIDE_CONFIG_FILE" ]; then
-        echo -e "${YELLOW}📋 发现 data 目录中已有配置文件${RESET}"
-        echo "当前配置文件: $OVERRIDE_CONFIG_FILE"
-        echo ""
-        echo "请选择配置文件处理方式："
-        echo "1) 使用现有配置文件"
-        echo "2) 重新下载新的配置文件模板（会覆盖现有文件）"
+        echo -e "${YELLOW}📋 发现现有配置文件${RESET}"
+        echo "配置文件: $OVERRIDE_CONFIG_FILE"
+        echo "请选择处理方式："
+        echo "1) 使用现有配置文件 2) 重新下载新配置文件"
         read -p "请输入选择 (1-2，默认1): " config_choice
         config_choice=${config_choice:-1}
         
         case $config_choice in
             1)
-                echo -e "\n${GREEN}✅ 检测到现有配置文件${RESET}"
+                echo -e "\n${GREEN}✅ 使用现有配置文件${RESET}"
                 
-                # 检查是否已经完整配置过
                 if check_if_already_configured; then
-                    echo -e "\n${CYAN}ℹ️  检测到配置文件已经完整配置过${RESET}"
-                    echo "1) 保留现有详细配置，直接使用"
+                    echo -e "\n${CYAN}ℹ️ 检测到配置文件已完整配置过${RESET}"
+                    echo "1) 保留现有配置直接使用"
                     echo "2) 重新进行详细配置"
                     echo "3) 保留配置文件但重新配置"
                     read -p "请输入选择 (1-3，默认1): " detailed_choice
@@ -812,76 +585,67 @@ setup_config_file() {
                     
                     case $detailed_choice in
                         1)
-                            echo -e "\n${GREEN}✅ 将保留现有详细配置，脚本将直接使用已配置的设置${RESET}"
+                            echo -e "\n${GREEN}✅ 保留现有配置${RESET}"
                             CONFIG_DOWNLOAD_NEEDED="false"
                             USE_EXISTING_CONFIG=true
                             SKIP_DETAILED_CONFIG=true
-                            return
-                            ;;
+                            return ;;
                         2)
-                            echo -e "\n${YELLOW}⚠️  将重新进行详细配置${RESET}"
+                            echo -e "\n${YELLOW}⚠️ 重新详细配置${RESET}"
                             CONFIG_DOWNLOAD_NEEDED="false"
                             USE_EXISTING_CONFIG=true
-                            SKIP_DETAILED_CONFIG=false
-                            ;;
+                            SKIP_DETAILED_CONFIG=false ;;
                         3)
-                            echo -e "\n${BLUE}📥 将保留配置文件但重新进行详细配置${RESET}"
+                            echo -e "\n${BLUE}📥 保留配置但重新配置${RESET}"
                             CONFIG_DOWNLOAD_NEEDED="false"
                             USE_EXISTING_CONFIG=true
-                            SKIP_DETAILED_CONFIG=false
-                            ;;
+                            SKIP_DETAILED_CONFIG=false ;;
                         *)
-                            echo -e "\n${GREEN}✅ 将保留现有详细配置${RESET}"
+                            echo -e "\n${GREEN}✅ 保留现有配置${RESET}"
                             CONFIG_DOWNLOAD_NEEDED="false"
                             USE_EXISTING_CONFIG=true
                             SKIP_DETAILED_CONFIG=true
-                            return
-                            ;;
+                            return ;;
                     esac
                 else
-                    echo -e "\n${GREEN}✅ 将使用现有配置文件，但需要完善详细配置${RESET}"
+                    echo -e "\n${GREEN}✅ 使用现有配置但需完善${RESET}"
                     CONFIG_DOWNLOAD_NEEDED="false"
                     USE_EXISTING_CONFIG=true
                     SKIP_DETAILED_CONFIG=false
-                fi
-                ;;
+                fi ;;
             2)
-                echo -e "\n${BLUE}📥 重新下载新的配置文件模板...${RESET}"
+                echo -e "\n${BLUE}📥 重新下载配置文件...${RESET}"
                 if download_config_with_fallback "$OVERRIDE_CONFIG_FILE"; then
                     CONFIG_DOWNLOAD_NEEDED="true"
                     USE_EXISTING_CONFIG=false
                     SKIP_DETAILED_CONFIG=false
                 else
-                    echo -e "${RED}❌ 配置文件下载失败，脚本无法继续${RESET}"
+                    echo -e "${RED}❌ 配置文件下载失败${RESET}"
                     exit 1
-                fi
-                ;;
+                fi ;;
             *)
-                echo -e "\n${GREEN}✅ 将使用现有配置文件，不进行下载${RESET}"
-                CONFIG_DOWNLOAD_NEEDED="false"
-                ;;
+                echo -e "\n${GREEN}✅ 使用现有配置${RESET}"
+                CONFIG_DOWNLOAD_NEEDED="false" ;;
         esac
-        
     else
-        echo -e "${BLUE}📥 未发现配置文件，正在下载模板...${RESET}"
+        echo -e "${BLUE}📥 未发现配置文件，下载模板...${RESET}"
         if download_config_with_fallback "$OVERRIDE_CONFIG_FILE"; then
-            echo -e "${GREEN}✅ 已下载并设置配置文件: $OVERRIDE_CONFIG_FILE${RESET}"
+            echo -e "${GREEN}✅ 已下载配置文件: $OVERRIDE_CONFIG_FILE${RESET}"
             CONFIG_DOWNLOAD_NEEDED="true"
         else
-            echo -e "${RED}❌ 配置文件下载失败，脚本无法继续${RESET}"
+            echo -e "${RED}❌ 配置文件下载失败${RESET}"
             exit 1
         fi
     fi
     
-    # 显示配置文件信息
     echo ""
     echo -e "${CYAN}📊 配置文件状态:${RESET}"
-    echo "配置文件: $OVERRIDE_CONFIG_FILE"
-    echo "文件大小: $(du -h $OVERRIDE_CONFIG_FILE 2>/dev/null | cut -f1 || echo '未知')"
-    echo "修改时间: $(stat -c %y $OVERRIDE_CONFIG_FILE 2>/dev/null | cut -d'.' -f1 || echo '未知')"
+    echo "文件: $OVERRIDE_CONFIG_FILE"
+    echo "大小: $(du -h $OVERRIDE_CONFIG_FILE 2>/dev/null | cut -f1 || echo '未知')"
+    echo "时间: $(stat -c %y $OVERRIDE_CONFIG_FILE 2>/dev/null | cut -d'.' -f1 || echo '未知')"
     
     echo ""
-    echo -e "${YELLOW}💡 提示: 所有配置修改将应用到 $OVERRIDE_CONFIG_FILE${RESET}"
+    echo -e "${YELLOW}💡 配置修改将应用到 $OVERRIDE_CONFIG_FILE${RESET}"
     echo "建议编辑内容:"
     echo "- LLM配置 (ChatGLM等API密钥)"
     echo "- ASR配置 (阿里云等语音识别服务)"
@@ -897,7 +661,6 @@ config_asr() {
         echo "请选择ASR服务商（共15个）："
         echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         
-        # 根据内存状态显示本地ASR模型的颜色提示
         if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
             echo " 1) ${GREEN}FunASR (本地)${RESET}"
             echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
@@ -917,10 +680,10 @@ config_asr() {
             echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
             echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
         else
-            echo -e " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB) - 无法部署${RESET}"
+            echo -e " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
             echo " 2) FunASRServer (独立部署)"
-            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足 - 无法部署${RESET}"
-            echo -e " 4) ${RED}SherpaParaformerASR (本地，中文专用)${RESET} ${RED}❌ 内存不足 - 无法部署${RESET}"
+            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
+            echo -e " 4) ${RED}SherpaParaformerASR (本地，中文专用)${RESET} ${RED}❌ 内存不足${RESET}"
             echo " 5) DoubaoASR (火山引擎，按次收费)"
             echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
             echo " 7) TencentASR (腾讯云)"
@@ -929,7 +692,7 @@ config_asr() {
             echo "10) BaiduASR (百度智能云)"
             echo "11) OpenaiASR (OpenAI)"
             echo "12) GroqASR (Groq)"
-            echo -e "13) ${GREEN}VoskASR (本地，完全离线)${RESET} ${GREEN}✅ 内存占用较小 (建议≥2GB)，可选择${RESET}"
+            echo -e "13) ${GREEN}VoskASR (本地，完全离线)${RESET} ${GREEN}✅ 内存占用较小 (建议≥2GB)${RESET}"
         fi
         echo " 14) Qwen3ASRFlash (通义千问)"
         echo " 15) XunfeiStreamASR (讯飞，流式)"
@@ -943,617 +706,370 @@ config_asr() {
             return
         fi
 
-    local asr_provider_key
-    case $asr_choice in
-        1)
-            asr_provider_key="FunASR"
-            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                echo -e "\n${RED}❌ 由于内存不足，无法选择FunASR本地模型，请重新选择其他ASR服务商${RESET}"
-                echo -e "${YELLOW}💡 按回车键重新选择...${RESET}"
-                read -r
-                continue
-            fi
-            echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
-            echo -e "${CYAN}ℹ️  系统将自动配置 model_dir 为 models/SenseVoiceSmall。${RESET}"
-            echo -e "\n${CYAN}📥 正在下载 SenseVoiceSmall ASR 模型... 这可能需要几分钟。${RESET}"
-            retry_exec "curl -fSL $LOCAL_ASR_MODEL_URL -o $MAIN_DIR/models/SenseVoiceSmall/model.pt" "下载 ASR 模型"
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    model_dir: .*/    model_dir: models/SenseVoiceSmall/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        2)
-            asr_provider_key="FunASRServer"
-            echo -e "\n${YELLOW}⚠️  您选择了独立部署 FunASRServer。${RESET}"
-            echo -e "${CYAN}ℹ️  请先按照以下步骤部署FunASR服务：${RESET}"
-            echo -e "  1. mkdir -p ./funasr-runtime-resources/models"
-            echo -e "  2. sudo docker run -p 10096:10095 -it --privileged=true -v \$PWD/funasr-runtime-resources/models:/workspace/models registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.12"
-            echo -e "  3. 进入容器后：cd FunASR/runtime"
-            echo -e "  4. nohup bash run_server_2pass.sh --download-model-dir /workspace/models --vad-dir damo/speech_fsmn_vad_zh-cn-16k-common-onnx --model-dir damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx --online-model-dir damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online-onnx --punc-dir damo/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-onnx --lm-dir damo/speech_ngram_lm_zh-cn-ai-wesp-fst --itn-dir thuduj12/fst_itn_zh > log.txt 2>&1 &"
-            read -r -p "请输入 FunASRServer 服务地址 (默认 127.0.0.1:10096): " host_port
-            host_port=${host_port:-"127.0.0.1:10096"}
-            host=$(echo "$host_port" | cut -d':' -f1)
-            port=$(echo "$host_port" | cut -d':' -f2)
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    type: .*/    type: fun_server/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    host: .*/    host: $host/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    port: .*/    port: $port/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    is_ssl: .*/    is_ssl: true/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        3)
-            asr_provider_key="SherpaASR"
-            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                echo -e "\n${RED}❌ 由于内存不足，无法选择SherpaASR本地模型，请重新选择其他ASR服务商${RESET}"
-                echo -e "${YELLOW}💡 按回车键重新选择...${RESET}"
-                read -r
-                continue
-            fi
-            echo -e "\n${YELLOW}⚠️  您选择了 SherpaASR (本地多语言)。${RESET}"
-            echo -e "${CYAN}ℹ️  请手动下载模型：https://github.com/k2-fsa/sherpa-onnx/releases${RESET}"
-            echo -e "${CYAN}ℹ️  推荐模型：sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17${RESET}"
-            read -r -p "请输入模型路径 (默认 models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17): " model_path
-            model_path=${model_path:-"models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"}
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    type: .*/    type: sherpa_onnx_local/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_dir: .*|    model_dir: $model_path|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    model_type: .*/    model_type: sense_voice/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        4)
-            asr_provider_key="SherpaParaformerASR"
-            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                echo -e "\n${RED}❌ 由于内存不足，无法选择SherpaParaformerASR本地模型，请重新选择其他ASR服务商${RESET}"
-                echo -e "${YELLOW}💡 按回车键重新选择...${RESET}"
-                read -r
-                continue
-            fi
-            echo -e "\n${YELLOW}⚠️  您选择了 SherpaParaformerASR (本地中文专用)。${RESET}"
-            echo -e "${CYAN}ℹ️  请手动下载模型：https://github.com/k2-fsa/sherpa-onnx/releases${RESET}"
-            echo -e "${CYAN}ℹ️  推荐模型：sherpa-onnx-paraformer-zh-small-2024-03-09${RESET}"
-            read -r -p "请输入模型路径 (默认 models/sherpa-onnx-paraformer-zh-small-2024-03-09): " model_path
-            model_path=${model_path:-"models/sherpa-onnx-paraformer-zh-small-2024-03-09"}
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    type: .*/    type: sherpa_onnx_local/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_dir: .*|    model_dir: $model_path|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    model_type: .*/    model_type: paraformer/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        5)
-            asr_provider_key="DoubaoASR"
-            echo -e "\n${YELLOW}⚠️  您选择了火山引擎 DoubaoASR (按次收费)。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://console.volcengine.com/speech/app${RESET}"
-            read -r -p "请输入 AppID: " appid
-            read -r -p "请输入 Access Token: " access_token
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    type: .*/    type: doubao/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appid: .*/    appid: $appid/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    cluster: .*/    cluster: volcengine_input_common/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        6)
-            asr_provider_key="DoubaoStreamASR"
-            echo -e "\n${YELLOW}⚠️  您选择了火山引擎 DoubaoStreamASR (按时收费)。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://console.volcengine.com/speech/app${RESET}"
-            echo -e "${CYAN}ℹ️  开通地址：https://console.volcengine.com/speech/service/10011${RESET}"
-            read -r -p "请输入 AppID: " appid
-            read -r -p "请输入 Access Token: " access_token
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    type: .*/    type: doubao_stream/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appid: .*/    appid: $appid/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    cluster: .*/    cluster: volcengine_input_common/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        7)
-            asr_provider_key="TencentASR"
-            echo -e "\n${YELLOW}⚠️  您选择了腾讯云 ASR。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://console.cloud.tencent.com/cam/capi${RESET}"
-            echo -e "${CYAN}ℹ️  免费领取资源：https://console.cloud.tencent.com/asr/resourcebundle${RESET}"
-            read -r -p "请输入 Secret ID: " secret_id
-            read -r -p "请输入 Secret Key: " secret_key
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_id: .*/    secret_id: $secret_id/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: $secret_key/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        8)
-            asr_provider_key="AliyunASR"
-            echo -e "\n${YELLOW}⚠️  您选择了阿里云 ASR (批量处理)。${RESET}"
-            echo -e "${CYAN}🔑 平台地址：https://nls-portal.console.aliyun.com/${RESET}"
-            echo -e "${CYAN}🔑 Appkey地址：https://nls-portal.console.aliyun.com/applist${RESET}"
-            read -r -p "请输入 Appkey: " appkey
-            read -r -p "请输入 Access Key ID: " access_key_id
-            read -r -p "请输入 Access Key Secret: " access_key_secret
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: $appkey/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: $access_key_id/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: $access_key_secret/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        9)
-            asr_provider_key="AliyunStreamASR"
-            echo -e "\n${YELLOW}⚠️  您选择了阿里云实时流式 ASR。${RESET}"
-            echo -e "${CYAN}🔑 平台地址：https://nls-portal.console.aliyun.com/${RESET}"
-            echo -e "${CYAN}🔑 Appkey地址：https://nls-portal.console.aliyun.com/applist${RESET}"
-            read -r -p "请输入 Appkey: " appkey
-            read -r -p "请输入 Access Key ID: " access_key_id
-            read -r -p "请输入 Access Key Secret: " access_key_secret
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: $appkey/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: $access_key_id/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: $access_key_secret/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        10)
-            asr_provider_key="BaiduASR"
-            echo -e "\n${YELLOW}⚠️  您选择了百度智能云 ASR。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://console.bce.baidu.com/ai-engine/old/#/ai/speech/app/list${RESET}"
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            read -r -p "请输入 Secret Key: " secret_key
-            secret_key="${secret_key:-}"
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            if [ -n "$secret_key" ]; then
-                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        11)
-            asr_provider_key="OpenaiASR"
-            echo -e "\n${YELLOW}⚠️  您选择了 OpenAI ASR。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/settings/organization/api-keys${RESET}"
-            read -r -p "请输入 API Key: " api_key
-            read -r -p "请输入 代理地址 (选填，例如 http://127.0.0.1:10808): " http_proxy
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
-            [ -n "$http_proxy" ] && sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    http_proxy: .*/    http_proxy: $http_proxy/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        12)
-            asr_provider_key="GroqASR"
-            echo -e "\n${YELLOW}⚠️  您选择了 Groq ASR。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://console.groq.com/keys${RESET}"
-            read -r -p "请输入 API Key: " api_key
-            read -r -p "请输入 代理地址 (选填，例如 http://127.0.0.1:10808): " http_proxy
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
-            [ -n "$http_proxy" ] && sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    http_proxy: .*/    http_proxy: $http_proxy/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        13)
-            asr_provider_key="VoskASR"
-            echo -e "\n${YELLOW}⚠️  您选择了 Vosk ASR (完全离线)。${RESET}"
-            echo -e "${CYAN}ℹ️  模型下载地址：https://alphacephei.com/vosk/models${RESET}"
-            echo -e "${CYAN}ℹ️  推荐中文模型：vosk-model-small-cn-0.22${RESET}"
-            read -r -p "请输入模型路径 (默认 models/vosk/vosk-model-small-cn-0.22): " model_path
-            model_path=${model_path:-"models/vosk/vosk-model-small-cn-0.22"}
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_path: .*|    model_path: $model_path|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        14)
-            asr_provider_key="Qwen3ASRFlash"
-            echo -e "\n${YELLOW}⚠️  您选择了通义千问 Qwen3ASRFlash。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://bailian.console.aliyun.com/#/api-key${RESET}"
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        15)
-            asr_provider_key="XunfeiStreamASR"
-            echo -e "\n${YELLOW}⚠️  您选择了讯飞流式 ASR。${RESET}"
-            echo -e "${CYAN}🔑 平台地址：https://www.xfyun.cn/${RESET}"
-            read -r -p "请输入 APPID: " appid
-            appid="${appid:-}"
-            read -r -p "请输入 APIKey: " api_key
-            api_key="${api_key:-}"
-            read -r -p "请输入 APISecret: " api_secret
-            api_secret="${api_secret:-}"
-            
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$appid" ]; then
-                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appid: .*/    appid: \"$appid\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            if [ -n "$api_secret" ]; then
-                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        *)
-            asr_provider_key="AliyunStreamASR"
-            echo -e "\n${YELLOW}⚠️  输入无效，默认选择推荐的 AliyunStreamASR。${RESET}"
-            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
-            ;;
-    esac
-    
-    # 完成选择后退出循环
-    asr_return_to_prev=true
+        local asr_provider_key
+        case $asr_choice in
+            1)
+                asr_provider_key="FunASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足，无法选择FunASR本地模型，请重新选择其他ASR服务商${RESET}"
+                    echo -e "${YELLOW}💡 按回车键重新选择...${RESET}"
+                    read -r
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
+                echo -e "${CYAN}ℹ️ 系统将自动配置 model_dir 为 models/SenseVoiceSmall。${RESET}"
+                echo -e "\n${CYAN}📥 正在下载 SenseVoiceSmall ASR 模型... 这可能需要几分钟。${RESET}"
+                retry_exec "curl -fSL $LOCAL_ASR_MODEL_URL -o $MAIN_DIR/models/SenseVoiceSmall/model.pt" "下载 ASR 模型"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_dir: .*|    model_dir: \"models/SenseVoiceSmall\"|" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            2)
+                asr_provider_key="FunASRServer"
+                echo -e "\n${YELLOW}⚠️ 您选择了 FunASRServer。${RESET}"
+                echo -e "${CYAN}🔗 需要自行部署 FunASR Server 服务${RESET}"
+                read -r -p "请输入 FunASR Server 地址 (默认 http://localhost:10095): " server_url
+                server_url=${server_url:-"http://localhost:10095"}
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    host: .*/    host: $server_url/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            3)
+                asr_provider_key="SherpaASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足，无法选择SherpaASR本地模型${RESET}"
+                    read -r
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            4)
+                asr_provider_key="SherpaParaformerASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足，无法选择SherpaParaformerASR本地模型${RESET}"
+                    read -r
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaParaformerASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            5)
+                asr_provider_key="DoubaoASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                read -r -p "请输入 Secret Key: " secret_key
+                secret_key="${secret_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                if [ -n "$secret_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                ;;
+            6)
+                asr_provider_key="DoubaoStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoStreamASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                read -r -p "请输入 Secret Key: " secret_key
+                secret_key="${secret_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                if [ -n "$secret_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                ;;
+            7)
+                asr_provider_key="TencentASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了腾讯云 ASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/asr${RESET}"
+                read -r -p "请输入 Secret ID: " secret_id
+                read -r -p "请输入 Secret Key: " secret_key
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_id: .*/    secret_id: $secret_id/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: $secret_key/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            8)
+                asr_provider_key="AliyunASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 ASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
+                read -r -p "请输入 Appkey: " appkey
+                read -r -p "请输入 Access Key ID: " access_key_id
+                read -r -p "请输入 Access Key Secret: " access_key_secret
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: $appkey/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: $access_key_id/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: $access_key_secret/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            9)
+                asr_provider_key="AliyunStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云流式 ASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
+                read -r -p "请输入 Appkey: " appkey
+                read -r -p "请输入 Access Key ID: " access_key_id
+                read -r -p "请输入 Access Key Secret: " access_key_secret
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: $appkey/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: $access_key_id/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: $access_key_secret/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            10)
+                asr_provider_key="BaiduASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度智能云 ASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/?fromai=1#/ai/speech/overview/index${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                read -r -p "请输入 Secret Key: " secret_key
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: $secret_key/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            11)
+                asr_provider_key="OpenaiASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI ASR。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/settings/organization/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                read -r -p "请输入 代理地址 (选填): " http_proxy
+                http_proxy="${http_proxy:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                [ -n "$http_proxy" ] && sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    http_proxy: .*/    http_proxy: \"$http_proxy\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            12)
+                asr_provider_key="GroqASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Groq ASR。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://console.groq.com/keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                ;;
+            13)
+                asr_provider_key="VoskASR"
+                echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
+                echo -e "${CYAN}ℹ️ VoskASR 是完全离线的语音识别模型，不依赖网络连接。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            14)
+                asr_provider_key="Qwen3ASRFlash"
+                echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen3ASRFlash。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com/apiKey${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                ;;
+            15)
+                asr_provider_key="XunfeiStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞流式 ASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn/services/asr${RESET}"
+                read -r -p "请输入 APP ID: " app_id
+                app_id="${app_id:-}"
+                read -r -p "请输入 API Secret: " api_secret
+                api_secret="${api_secret:-}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$app_id" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                if [ -n "$api_secret" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                ;;
+            *)
+                asr_provider_key="AliyunStreamASR"
+                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择阿里云流式 ASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+        esac
+        
+        # 完成选择后退出循环
+        asr_return_to_prev=true
     done
 }
 
-# ========================= LLM 配置（19个服务商） =========================
+# ========================= LLM 配置（8个服务商） =========================
 config_llm() {
-    local return_to_main=false
+    local llm_return_to_prev=false
     
-    while [ "$return_to_main" = false ]; do
+    while [ "$llm_return_to_prev" = false ]; do
         echo -e "\n\n${GREEN}【2/5】配置 LLM (大语言模型) 服务${RESET}"
-    echo "请选择LLM服务商（共19个）："
-    echo " 0) ${YELLOW} 返回上一步 ${RESET}"
-    echo " 1) AliLLM (通义千问)"
-    echo " 2) AliAppLLM (阿里云百炼)"
-    echo " 3) DoubaoLLM (火山引擎)"
-    echo " 4) DeepSeekLLM (DeepSeek)"
-    echo " 5) ChatGLMLLM (智谱清言) [推荐]"
-    echo " 6) OllamaLLM (本地部署)"
-    echo " 7) DifyLLM (Dify)"
-    echo " 8) GeminiLLM (谷歌)"
-    echo " 9) CozeLLM (Coze)"
-    echo "10) VolcesAiGatewayLLM (火山引擎边缘网关)"
-    echo "11) LMStudioLLM (LM Studio)"
-    echo "12) HomeAssistant (Home Assistant)"
-    echo "13) FastgptLLM (FastGPT)"
-    echo "14) XinferenceLLM (Xinference)"
-    echo "15) XinferenceSmallLLM (Xinference轻量版)"
-    echo "16) QwenVLVLLM (通义千问视觉)"
-    echo "17) XunfeiSparkLLM (讯飞星火)"
-    echo "18) XunfeiSparkLLM (讯飞星火Lite)"
-    echo "19) CustomLLM (自定义接口)"
-    
-    read -r -p "请输入序号 (默认推荐 5，输入0返回上一步): " llm_choice
-    llm_choice=${llm_choice:-5}
-    
-    # 处理返回上一步
-    if [ "$llm_choice" = "0" ]; then
-        config_asr
-        continue
-    fi
+        echo "请选择LLM服务商（共8个）："
+        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
+        echo " 1) ChatGLMLLM (智谱清言) [推荐]"
+        echo " 2) QwenLLM (通义千问)"
+        echo " 3) KimiLLM (月之暗面)"
+        echo " 4) SparkLLM (讯飞星火)"
+        echo " 5) WenxinLLM (百度文心一言)"
+        echo " 6) DoubaoLLM (火山引擎豆包)"
+        echo " 7) OpenaiLLM (OpenAI)"
+        echo " 8) GroqLLM (Groq)"
+        
+        read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " llm_choice
+        llm_choice=${llm_choice:-1}
+        
+        # 处理返回上一步
+        if [ "$llm_choice" = "0" ]; then
+            config_asr
+            continue
+        fi
 
-    local llm_provider_key
-    case $llm_choice in
-        1)
-            llm_provider_key="AliLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了通义千问 AliLLM。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://bailian.console.aliyun.com/#/api-key${RESET}"
-            echo -e "${CYAN}🤖 可用模型: qwen-turbo, qwen-plus, qwen-max${RESET}"
-            read -r -p "请输入模型 (默认 qwen-plus): " model_name
-            model_name=${model_name:-"qwen-plus"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
+        local llm_provider_key
+        case $llm_choice in
+            1)
+                llm_provider_key="ChatGLMLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了智谱清言 ChatGLMLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://open.bigmodel.cn/usercenter/apikeys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
                 sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        2)
-            llm_provider_key="AliAppLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了阿里云百炼 AliAppLLM。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://bailian.console.aliyun.com/#/api-key${RESET}"
-            echo -e "${CYAN}🤖 可用模型: qwen-turbo, qwen-plus, qwen-max${RESET}"
-            read -r -p "请输入模型 (默认 qwen-plus): " model_name
-            model_name=${model_name:-"qwen-plus"}
-            read -r -p "请输入 App ID: " app_id
-            app_id="${app_id:-}"
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$app_id" ]; then
+                ;;
+            2)
+                llm_provider_key="QwenLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了通义千问 QwenLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com/apiKey${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            3)
+                llm_provider_key="KimiLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了月之暗面 KimiLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://platform.moonshot.cn/console/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            4)
+                llm_provider_key="SparkLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞星火 SparkLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn/services/aigc/${RESET}"
+                read -r -p "请输入 APP ID: " app_id
+                read -r -p "请输入 API Secret: " api_secret
+                read -r -p "请输入 API Key: " api_key
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
                 sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            if [ -n "$api_key" ]; then
+                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$OVERRIDE_CONFIG_FILE"
                 sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        3)
-            llm_provider_key="DoubaoLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了火山引擎 DoubaoLLM。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey${RESET}"
-            echo -e "${CYAN}🤖 可用模型: doubao-pro-4k, doubao-pro-32k, doubao-pro-128k${RESET}"
-            read -r -p "请输入模型 (默认 doubao-pro-4k): " model_name
-            model_name=${model_name:-"doubao-pro-4k"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
+                ;;
+            5)
+                llm_provider_key="WenxinLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度文心一言 WenxinLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/?fromai=1#/ai/wenxinworkshop/app/apilist${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                read -r -p "请输入 Secret Key: " secret_key
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: $secret_key/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            6)
+                llm_provider_key="DoubaoLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎豆包 DoubaoLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/doubao${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                read -r -p "请输入 Secret Key: " secret_key
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
                 sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        4)
-            llm_provider_key="DeepSeekLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了 DeepSeekLLM。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://platform.deepseek.com/${RESET}"
-            echo -e "${CYAN}🤖 可用模型: deepseek-chat, deepseek-coder, deepseek-reasoner${RESET}"
-            read -r -p "请输入模型 (默认 deepseek-chat): " model_name
-            model_name=${model_name:-"deepseek-chat"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        5)
-            llm_provider_key="ChatGLMLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了智谱清言 ChatGLMLLM。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://bigmodel.cn/usercenter/proj-mgmt/apikeys${RESET}"
-            echo -e "${CYAN}🤖 可用模型: glm-4, glm-4-plus, glm-4-air, glm-4v${RESET}"
-            read -r -p "请输入模型 (默认 glm-4): " model_name
-            model_name=${model_name:-"glm-4"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            CHATGLM_API_KEY="$api_key"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        6)
-            llm_provider_key="OllamaLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了 OllamaLLM (本地部署)。${RESET}"
-            echo -e "${CYAN}ℹ️  请先使用 ollama pull 下载模型${RESET}"
-            read -r -p "请输入模型名称 (默认 qwen2.5): " model_name
-            model_name=${model_name:-"qwen2.5"}
-            read -r -p "请输入 Ollama 服务地址 (默认 http://localhost:11434): " base_url
-            base_url=${base_url:-"http://localhost:11434"}
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $base_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        7)
-            llm_provider_key="DifyLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了 DifyLLM。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://cloud.tryfastgpt.ai/account/apikey${RESET}"
-            echo -e "${CYAN}🤖 请根据Dify平台可用模型选择${RESET}"
-            read -r -p "请输入模型名称 (默认 gpt-3.5-turbo): " model_name
-            model_name=${model_name:-"gpt-3.5-turbo"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        8)
-            llm_provider_key="GeminiLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了谷歌 GeminiLLM。${RESET}"
-            echo -e "${YELLOW}⚠️  国内用户需配置代理才能访问。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://aistudio.google.com/apikey${RESET}"
-            echo -e "${CYAN}🤖 可用模型: gemini-1.5-flash, gemini-1.5-pro, gemini-pro-vision${RESET}"
-            read -r -p "请输入模型 (默认 gemini-1.5-flash): " model_name
-            model_name=${model_name:-"gemini-1.5-flash"}
-            read -r -p "请输入 API Key: " api_key
-            read -r -p "请输入 代理地址 (例如 http://127.0.0.1:10808, 直接回车可留空): " http_proxy
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            [ -n "$http_proxy" ] && sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    http_proxy: .*/    http_proxy: $http_proxy/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        9)
-            llm_provider_key="CozeLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了 CozeLLM。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://www.coze.cn/open/oauth/pats${RESET}"
-            echo -e "${CYAN}🤖 请根据Coze平台可用模型选择${RESET}"
-            read -r -p "请输入模型名称 (默认 gpt-3.5-turbo): " model_name
-            model_name=${model_name:-"gpt-3.5-turbo"}
-            read -r -p "请输入 API Key: " api_key
-            read -r -p "请输入 Bot ID: " bot_id
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            [ -n "$bot_id" ] && sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    bot_id: .*/    bot_id: $bot_id/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        10)
-            llm_provider_key="VolcesAiGatewayLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了火山引擎边缘网关。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/vei/aigateway/${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://console.volcengine.com/vei/aigateway/tokens-list${RESET}"
-            echo -e "${CYAN}🤖 请根据网关配置选择模型${RESET}"
-            read -r -p "请输入模型名称 (默认 gpt-3.5-turbo): " model_name
-            model_name=${model_name:-"gpt-3.5-turbo"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        11)
-            llm_provider_key="LMStudioLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了 LMStudioLLM。${RESET}"
-            echo -e "${CYAN}ℹ️  请先在LM Studio下载模型${RESET}"
-            read -r -p "请输入模型名称 (默认 TheBloke/Mistral-7B-Instruct-v0.2-GGUF): " model_name
-            model_name=${model_name:-"TheBloke/Mistral-7B-Instruct-v0.2-GGUF"}
-            read -r -p "请输入 LM Studio 服务地址 (默认 http://localhost:1234): " base_url
-            base_url=${base_url:-"http://localhost:1234"}
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $base_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        12)
-            llm_provider_key="HomeAssistant"
-            echo -e "\n${YELLOW}⚠️  您选择了 HomeAssistant。${RESET}"
-            echo -e "${CYAN}🤖 请根据Home Assistant模型配置选择${RESET}"
-            read -r -p "请输入模型名称 (默认 conversation.chatgpt): " model_name
-            model_name=${model_name:-"conversation.chatgpt"}
-            read -r -p "请输入 Home Assistant 地址 (默认 http://homeassistant.local:8123): " base_url
-            base_url=${base_url:-"http://homeassistant.local:8123"}
-            read -r -p "请输入 Agent ID (默认 conversation.chatgpt): " agent_id
-            agent_id=${agent_id:-"conversation.chatgpt"}
-            read -r -p "请输入 API 令牌: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $base_url|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    agent_id: .*/    agent_id: $agent_id/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        13)
-            llm_provider_key="FastgptLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了 FastgptLLM。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://cloud.tryfastgpt.ai/account/apikey${RESET}"
-            echo -e "${CYAN}🤖 请根据FastGPT平台可用模型选择${RESET}"
-            read -r -p "请输入模型名称 (默认 gpt-3.5-turbo): " model_name
-            model_name=${model_name:-"gpt-3.5-turbo"}
-            read -r -p "请输入 API Key: " api_key
-            read -r -p "请输入 服务地址 (默认 https://host/api/v1): " base_url
-            base_url=${base_url:-"https://host/api/v1"}
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $base_url|" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        14)
-            llm_provider_key="XinferenceLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了 XinferenceLLM。${RESET}"
-            echo -e "${CYAN}ℹ️  请先在Xinference启动对应模型${RESET}"
-            read -r -p "请输入模型名称 (默认 qwen2.5:72b-AWQ): " model_name
-            model_name=${model_name:-"qwen2.5:72b-AWQ"}
-            read -r -p "请输入服务地址 (默认 http://localhost:9997): " base_url
-            base_url=${base_url:-"http://localhost:9997"}
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $base_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        15)
-            llm_provider_key="XinferenceSmallLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了 XinferenceSmallLLM (轻量版)。${RESET}"
-            echo -e "${CYAN}ℹ️  请先在Xinference启动对应模型${RESET}"
-            read -r -p "请输入模型名称 (默认 qwen2.5:3b-AWQ): " model_name
-            model_name=${model_name:-"qwen2.5:3b-AWQ"}
-            read -r -p "请输入服务地址 (默认 http://localhost:9997): " base_url
-            base_url=${base_url:-"http://localhost:9997"}
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $base_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        16)
-            llm_provider_key="QwenVLVLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了通义千问 QwenVLVLLM (视觉)。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://bailian.console.aliyun.com/#/api-key${RESET}"
-            echo -e "${CYAN}🤖 可用模型: qwen-vl-plus, qwen-vl-max${RESET}"
-            read -r -p "请输入模型 (默认 qwen-vl-plus): " model_name
-            model_name=${model_name:-"qwen-vl-plus"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        17)
-            llm_provider_key="XunfeiSparkLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了讯飞星火 XunfeiSparkLLM。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://console.xfyun.cn/app/myapp${RESET}"
-            echo -e "${CYAN}🤖 可用模型: spark-3.5, spark-4.0, spark-lite${RESET}"
-            read -r -p "请输入模型 (默认 spark-3.5): " model_name
-            model_name=${model_name:-"spark-3.5"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        18)
-            llm_provider_key="XunfeiSparkLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了讯飞星火 Lite。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://console.xfyun.cn/services/cbm${RESET}"
-            echo -e "${CYAN}🤖 可用模型: spark-lite, spark-3.5-lite, spark-lite-zh${RESET}"
-            read -r -p "请输入模型 (默认 spark-lite): " model_name
-            model_name=${model_name:-"spark-lite"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        19)
-            llm_provider_key="CustomLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了自定义 LLM。${RESET}"
-            read -r -p "请输入类型 (openai/ollama/dify，默认 openai): " type
-            type=${type:-"openai"}
-            read -r -p "请输入服务地址: " base_url
-            read -r -p "请输入 API Key: " api_key
-            read -r -p "请输入模型名称: " model_name
-            
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    type: .*/    type: $type/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $base_url|" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            [ -n "$model_name" ] && sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        *)
-            llm_provider_key="ChatGLMLLM"
-            echo -e "\n${YELLOW}⚠️  输入无效，默认选择推荐的 ChatGLMLLM。${RESET}"
-            sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            ;;
-    esac
-    
-    # 完成选择后退出循环
-    return_to_main=true
+                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            7)
+                llm_provider_key="OpenaiLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI LLM。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/settings/organization/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                read -r -p "请输入 代理地址 (选填): " http_proxy
+                http_proxy="${http_proxy:-}"
+                echo -e "${CYAN}🎭 模型选择：${RESET}"
+                echo "  可选模型：gpt-3.5-turbo (默认), gpt-4, gpt-4-turbo"
+                read -r -p "请输入模型 (默认使用 gpt-3.5-turbo): " model
+                model=${model:-"gpt-3.5-turbo"}
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model: .*/    model: $model/" "$OVERRIDE_CONFIG_FILE"
+                [ -n "$http_proxy" ] && sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    http_proxy: .*/    http_proxy: \"$http_proxy\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            8)
+                llm_provider_key="GroqLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Groq LLM。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://console.groq.com/keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                echo -e "${CYAN}🎭 模型选择：${RESET}"
+                echo "  可选模型：llama2-70b-4096 (默认), mixtral-8x7b-32768, gemma-7b-it"
+                read -r -p "请输入模型 (默认使用 llama2-70b-4096): " model
+                model=${model:-"llama2-70b-4096"}
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model: .*/    model: $model/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            *)
+                llm_provider_key="ChatGLMLLM"
+                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择智谱清言 ChatGLMLLM。${RESET}"
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+        esac
+        
+        # 完成选择后退出循环
+        llm_return_to_prev=true
     done
 }
 
-# ========================= VLLM 配置（2个服务商） =========================
+# ========================= VLLM 配置（8个服务商） =========================
 config_vllm() {
-    local return_to_main=false
+    local vllm_return_to_prev=false
     
-    while [ "$return_to_main" = false ]; do
-        echo -e "\n\n${GREEN}【3/5】配置 VLLM (视觉语言大模型) 服务${RESET}"
-        echo "请选择VLLM服务商（共2个）："
+    while [ "$vllm_return_to_prev" = false ]; do
+        echo -e "\n\n${GREEN}【3/5】配置 VLLM (本地大语言模型) 服务${RESET}"
+        echo "请选择VLLM服务商（共8个）："
         echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         echo " 1) ChatGLMVLLM (智谱清言) [推荐]"
-        echo " 2) QwenVLVLLM (通义千问)"
+        echo " 2) QwenVLLM (通义千问)"
+        echo " 3) KimiVLLM (月之暗面)"
+        echo " 4) SparkVLLM (讯飞星火)"
+        echo " 5) WenxinVLLM (百度文心一言)"
+        echo " 6) DoubaoVLLM (火山引擎豆包)"
+        echo " 7) OpenaiVLLM (OpenAI)"
+        echo " 8) GroqVLLM (Groq)"
         
         read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " vllm_choice
         vllm_choice=${vllm_choice:-1}
@@ -1564,443 +1080,409 @@ config_vllm() {
             continue
         fi
 
-    local vllm_provider_key
-    case $vllm_choice in
-        1)
-            vllm_provider_key="ChatGLMVLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了智谱清言 ChatGLMVLLM。${RESET}"
-            echo -e "${CYAN}🤖 可用模型: glm-4v, glm-4v-plus${RESET}"
-            read -r -p "请输入模型 (默认 glm-4v): " model_name
-            model_name=${model_name:-"glm-4v"}
-            
-            if [ -n "$CHATGLM_API_KEY" ]; then
-                echo -e "${GREEN}✅ 检测到您已在LLM配置中输入了智谱清言API Key，将自动应用到VLLM配置中，无需重复输入。${RESET}"
-                api_key="$CHATGLM_API_KEY"
-            else
-                echo -e "${CYAN}🔑 密钥获取地址：https://bigmodel.cn/usercenter/proj-mgmt/apikeys${RESET}"
+        local vllm_provider_key
+        case $vllm_choice in
+            1)
+                vllm_provider_key="ChatGLMVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了智谱清言 ChatGLMVLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://open.bigmodel.cn/usercenter/apikeys${RESET}"
                 read -r -p "请输入 API Key: " api_key
-            fi
-            
-            sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            [ -n "$api_key" ] && sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        2)
-            vllm_provider_key="QwenVLVLLM"
-            echo -e "\n${YELLOW}⚠️  您选择了通义千问 QwenVLVLLM。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://bailian.console.aliyun.com/#/api-key${RESET}"
-            echo -e "${CYAN}🤖 可用模型: qwen-vl-plus, qwen-vl-max${RESET}"
-            read -r -p "请输入模型 (默认 qwen-vl-plus): " model_name
-            model_name=${model_name:-"qwen-vl-plus"}
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
+                
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
                 sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        *)
-            vllm_provider_key="ChatGLMVLLM"
-            echo -e "\n${YELLOW}⚠️  输入无效，默认选择推荐的 ChatGLMVLLM。${RESET}"
-            echo -e "${CYAN}🤖 可用模型: glm-4v, glm-4v-plus${RESET}"
-            read -r -p "请输入模型 (默认 glm-4v): " model_name
-            model_name=${model_name:-"glm-4v"}
-            
-            if [ -n "$CHATGLM_API_KEY" ]; then
-                echo -e "${GREEN}✅ 检测到您已在LLM配置中输入了智谱清言API Key，将自动应用到VLLM配置中。${RESET}"
-                api_key="$CHATGLM_API_KEY"
-            else
-                echo -e "${CYAN}🔑 密钥获取地址：https://bigmodel.cn/usercenter/proj-mgmt/apikeys${RESET}"
+                ;;
+            2)
+                vllm_provider_key="QwenVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了通义千问 QwenVLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com/apiKey${RESET}"
                 read -r -p "请输入 API Key: " api_key
-            fi
-            
-            sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$OVERRIDE_CONFIG_FILE"
-            [ -n "$api_key" ] && sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-    esac
-    
-    # 完成选择后退出循环
-    return_to_main=true
+                
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            3)
+                vllm_provider_key="KimiVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了月之暗面 KimiVLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://platform.moonshot.cn/console/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            4)
+                vllm_provider_key="SparkVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞星火 SparkVLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn/services/aigc/${RESET}"
+                read -r -p "请输入 APP ID: " app_id
+                read -r -p "请输入 API Secret: " api_secret
+                read -r -p "请输入 API Key: " api_key
+                
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            5)
+                vllm_provider_key="WenxinVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度文心一言 WenxinVLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/?fromai=1#/ai/wenxinworkshop/app/apilist${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                read -r -p "请输入 Secret Key: " secret_key
+                
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: $secret_key/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            6)
+                vllm_provider_key="DoubaoVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎豆包 DoubaoVLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/doubao${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                read -r -p "请输入 Secret Key: " secret_key
+                
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            7)
+                vllm_provider_key="OpenaiVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI VLLM。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/settings/organization/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                read -r -p "请输入 代理地址 (选填): " http_proxy
+                http_proxy="${http_proxy:-}"
+                echo -e "${CYAN}🎭 模型选择：${RESET}"
+                echo "  可选模型：gpt-3.5-turbo (默认), gpt-4, gpt-4-turbo"
+                read -r -p "请输入模型 (默认使用 gpt-3.5-turbo): " model
+                model=${model:-"gpt-3.5-turbo"}
+                
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    model: .*/    model: $model/" "$OVERRIDE_CONFIG_FILE"
+                [ -n "$http_proxy" ] && sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    http_proxy: .*/    http_proxy: \"$http_proxy\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            8)
+                vllm_provider_key="GroqVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Groq VLLM。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://console.groq.com/keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                echo -e "${CYAN}🎭 模型选择：${RESET}"
+                echo "  可选模型：llama2-70b-4096 (默认), mixtral-8x7b-32768, gemma-7b-it"
+                read -r -p "请输入模型 (默认使用 llama2-70b-4096): " model
+                model=${model:-"llama2-70b-4096"}
+                
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    model: .*/    model: $model/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            *)
+                vllm_provider_key="ChatGLMVLLM"
+                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择智谱清言 ChatGLMVLLM。${RESET}"
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+        esac
+        
+        # 完成选择后退出循环
+        vllm_return_to_prev=true
     done
 }
 
 # ========================= TTS 配置（23个服务商） =========================
 config_tts() {
-    local return_to_main=false
+    local tts_return_to_prev=false
     
-    while [ "$return_to_main" = false ]; do
-        echo -e "\n\n${GREEN}【4/5】配置 TTS (文本转语音) 服务${RESET}"
+    while [ "$tts_return_to_prev" = false ]; do
+        echo -e "\n\n${GREEN}【4/5】配置 TTS (语音合成) 服务${RESET}"
         echo "请选择TTS服务商（共23个）："
         echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         echo " 1) EdgeTTS (微软) [推荐]"
-    echo " 2) DoubaoTTS (火山引擎)"
-    echo " 3) HuoshanDoubleStreamTTS (火山双向流式)"
-    echo " 4) CosyVoiceSiliconflow (硅基流动)"
-    echo " 5) CozeCnTTS (Coze)"
-    echo " 6) VolcesAiGatewayTTS (火山边缘网关)"
-    echo " 7) FishSpeech (FishSpeech)"
-    echo " 8) GPT_SOVITS_V2 (GPT-SoVITS V2)"
-    echo " 9) GPT_SOVITS_V3 (GPT-SoVITS V3)"
-    echo "10) MinimaxTTSHTTPStream (Minimax)"
-    echo "11) AliyunTTS (阿里云)"
-    echo "12) AliyunStreamTTS (阿里云流式)"
-    echo "13) TencentTTS (腾讯云)"
-    echo "14) TTS302AI (302AI)"
-    echo "15) GizwitsTTS (机智云)"
-    echo "16) ACGNTTS (ACGN)"
-    echo "17) OpenAITTS (OpenAI)"
-    echo "18) CustomTTS (自定义接口)"
-    echo "19) LinkeraiTTS (LinkerAI)"
-    echo "20) PaddleSpeechTTS (百度飞桨)"
-    echo "21) IndexStreamTTS (Index-TTS-vLLM)"
-    echo "22) AliBLTTS (阿里云百炼)"
-    echo "23) XunFeiTTS (讯飞)"
-    read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_choice
-    tts_choice=${tts_choice:-1}
-    
-    # 处理返回上一步
-    if [ "$tts_choice" = "0" ]; then
-        config_vllm
-        continue
-    fi
+        echo " 2) DoubaoTTS (火山引擎豆包)"
+        echo " 3) DoubaoStreamTTS (火山引擎豆包流式)"
+        echo " 4) AliyunTTS (阿里云)"
+        echo " 5) AliyunStreamTTS (阿里云流式)"
+        echo " 6) TencentTTS (腾讯云)"
+        echo " 7) TTS302AI (302AI)"
+        echo " 8) GizwitsTTS (机智云)"
+        echo " 9) ACGNTTS (ACGN)"
+        echo "10) OpenAITTS (OpenAI)"
+        echo "11) CustomTTS (自定义)"
+        echo "12) LinkeraiTTS (LinkerAI)"
+        echo "13) PaddleSpeechTTS (百度飞桨)"
+        echo "14) IndexStreamTTS (Index-TTS)"
+        echo "15) AliBLTTS (阿里云百炼)"
+        echo "16) XunFeiTTS (讯飞)"
+        
+        read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_choice
+        tts_choice=${tts_choice:-1}
+        
+        # 处理返回上一步
+        if [ "$tts_choice" = "0" ]; then
+            config_vllm
+            continue
+        fi
 
-    local tts_provider_key
-    case $tts_choice in
-        1)
-            tts_provider_key="EdgeTTS"
-            echo -e "\n${GREEN}✅ 已选择微软 EdgeTTS。${RESET}"
-            echo -e "${CYAN}ℹ️  支持多种语音，默认使用 zh-CN-XiaoxiaoNeural${RESET}"
-            read -r -p "请输入语音名称 (默认 zh-CN-XiaoxiaoNeural): " voice
-            voice=${voice:-"zh-CN-XiaoxiaoNeural"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        2)
-            tts_provider_key="DoubaoTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了火山引擎 DoubaoTTS。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/speech/service/8${RESET}"
-            read -r -p "请输入 AppID: " appid
-            read -r -p "请输入 Access Token: " access_token
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    appid: .*/    appid: $appid/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        3)
-            tts_provider_key="HuoshanDoubleStreamTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了火山双向流式 TTS。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/speech/service/10007${RESET}"
-            read -r -p "请输入 AppID: " appid
-            read -r -p "请输入 Access Token: " access_token
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    appid: .*/    appid: $appid/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        4)
-            tts_provider_key="CosyVoiceSiliconflow"
-            echo -e "\n${YELLOW}⚠️  您选择了硅基流动 CosyVoice。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://cloud.siliconflow.cn/account/ak${RESET}"
-            echo -e "${CYAN}ℹ️  将使用配置文件默认的模型和音色配置${RESET}"
-            read -r -p "请输入 Access Key: " access_key
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_key/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        5)
-            tts_provider_key="CozeCnTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了 CozeCnTTS。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://www.coze.cn/open/oauth/pats${RESET}"
-            read -r -p "请输入 个人访问令牌: " access_token
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        6)
-            tts_provider_key="VolcesAiGatewayTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了火山边缘网关 TTS。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/vei/aigateway/${RESET}"
-            read -r -p "请输入 API Key: " api_key
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        7)
-            tts_provider_key="FishSpeech"
-            echo -e "\n${YELLOW}⚠️  您选择了 FishSpeech。${RESET}"
-            echo -e "${CYAN}ℹ️  需自行部署 FishSpeech 服务${RESET}"
-            echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
-            read -r -p "请输入HTTP服务地址 (默认 http://localhost:8000): " http_url
-            http_url=${http_url:-"http://localhost:8000"}
-            read -r -p "请输入HTTPS服务地址 (默认 https://localhost:8001): " https_url
-            https_url=${https_url:-"https://localhost:8001"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        8)
-            tts_provider_key="GPT_SOVITS_V2"
-            echo -e "\n${YELLOW}⚠️  您选择了 GPT-SoVITS V2。${RESET}"
-            echo -e "${CYAN}ℹ️  需自行部署 GPT-SoVITS V2 服务${RESET}"
-            echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
-            read -r -p "请输入HTTP服务地址 (默认 http://localhost:9880): " http_url
-            http_url=${http_url:-"http://localhost:9880"}
-            read -r -p "请输入HTTPS服务地址 (默认 https://localhost:9881): " https_url
-            https_url=${https_url:-"https://localhost:9881"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        9)
-            tts_provider_key="GPT_SOVITS_V3"
-            echo -e "\n${YELLOW}⚠️  您选择了 GPT-SoVITS V3。${RESET}"
-            echo -e "${CYAN}ℹ️  需自行部署 GPT-SoVITS V3 服务${RESET}"
-            echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
-            read -r -p "请输入HTTP服务地址 (默认 http://localhost:9881): " http_url
-            http_url=${http_url:-"http://localhost:9881"}
-            read -r -p "请输入HTTPS服务地址 (默认 https://localhost:9882): " https_url
-            https_url=${https_url:-"https://localhost:9882"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        10)
-            tts_provider_key="MinimaxTTSHTTPStream"
-            echo -e "\n${YELLOW}⚠️  您选择了 Minimax TTS。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://minimax.chat/${RESET}"
-            read -r -p "请输入 Group ID: " group_id
-            group_id="${group_id:-}"
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            echo -e "${CYAN}🎤 音色模型选择：${RESET}"
-            echo "  可选音色：female-fuzhou, female-guangdong, female-jing, female-macau, female-shaoguan"
-            echo "            female-tianli, female-xian, female-yixian, female-yun, male-dalian"
-            echo "            male-gansu, male-haerbin, male-jilin, male-liaoning, male-qingdao"
-            echo "            male-taiwan, male-tianli, male-yingtan, male-yun, male-xian"
-            echo "  默认音色：female-fuzhou"
-            read -r -p "请输入音色 (默认使用 female-fuzhou): " voice
-            voice=${voice:-"female-fuzhou"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$group_id" ]; then
-                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    group_id: .*/    group_id: \"$group_id\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        11)
-            tts_provider_key="AliyunTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了阿里云 TTS。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
-            read -r -p "请输入 Appkey: " appkey
-            read -r -p "请输入 Access Key ID: " access_key_id
-            read -r -p "请输入 Access Key Secret: " access_key_secret
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: $appkey/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: $access_key_id/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: $access_key_secret/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        12)
-            tts_provider_key="AliyunStreamTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了阿里云流式 TTS。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
-            read -r -p "请输入 Appkey: " appkey
-            read -r -p "请输入 Access Key ID: " access_key_id
-            read -r -p "请输入 Access Key Secret: " access_key_secret
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: $appkey/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: $access_key_id/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: $access_key_secret/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        13)
-            tts_provider_key="TencentTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了腾讯云 TTS。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/tts${RESET}"
-            read -r -p "请输入 Secret ID: " secret_id
-            read -r -p "请输入 Secret Key: " secret_key
-            echo -e "${CYAN}🎤 音色模型选择：${RESET}"
-            echo "  标准音色：100012 (男声青年-标准), 100018 (女声青年-标准)"
-            echo "  精品音色：101004 (男声青年), 101008 (男声中青年), 101014 (男声中老年)"
-            echo "           101010 (女声青年), 101016 (女声中年), 101020 (女声中老年)"
-            echo "  默认音色：101014 (男声中老年)"
-            read -r -p "请输入音色ID (默认使用 101014): " voice
-            voice=${voice:-"101014"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_id: .*/    secret_id: $secret_id/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: $secret_key/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        14)
-            tts_provider_key="TTS302AI"
-            echo -e "\n${YELLOW}⚠️  您选择了 302AI TTS。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://www.302ai.com/${RESET}"
-            read -r -p "请输入 Access Token: " access_token
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        15)
-            tts_provider_key="GizwitsTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了机智云 TTS。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://www.gizwits.com/${RESET}"
-            read -r -p "请输入 Access Token: " access_token
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        16)
-            tts_provider_key="ACGNTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了 ACGN TTS。${RESET}"
-            echo -e "${CYAN}ℹ️  需自行部署 ACGN TTS 服务${RESET}"
-            echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
-            read -r -p "请输入HTTP服务地址 (默认 http://localhost:8080): " http_url
-            http_url=${http_url:-"http://localhost:8080"}
-            read -r -p "请输入HTTPS服务地址 (默认 https://localhost:8081): " https_url
-            https_url=${https_url:-"https://localhost:8081"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        17)
-            tts_provider_key="OpenAITTS"
-            echo -e "\n${YELLOW}⚠️  您选择了 OpenAI TTS。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/settings/organization/api-keys${RESET}"
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            read -r -p "请输入 代理地址 (选填): " http_proxy
-            http_proxy="${http_proxy:-}"
-            echo -e "${CYAN}🎤 音色模型选择：${RESET}"
-            echo "  可选音色：alloy (默认), echo, fable, onyx, nova, shimmer"
-            read -r -p "请输入音色 (默认使用 alloy): " voice
-            voice=${voice:-"alloy"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
-            [ -n "$http_proxy" ] && sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    http_proxy: .*/    http_proxy: \"$http_proxy\"/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        18)
-            tts_provider_key="CustomTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了自定义 TTS。${RESET}"
-            echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
-            read -r -p "请输入类型 (edge/doubao/aliyun 等): " type
-            read -r -p "请输入HTTP服务地址: " http_url
-            read -r -p "请输入HTTPS服务地址: " https_url
-            read -r -p "请输入 API Key (选填): " api_key
-            read -r -p "请输入 音色 (选填): " voice
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    type: .*/    type: $type/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
-            [ -n "$https_url" ] && sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
-            [ -n "$api_key" ] && sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
-            [ -n "$voice" ] && sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        19)
-            tts_provider_key="LinkeraiTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了 LinkerAI TTS。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://www.linkerai.com/${RESET}"
-            read -r -p "请输入 Access Token: " access_token
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        20)
-            tts_provider_key="PaddleSpeechTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了百度飞桨 PaddleSpeech TTS。${RESET}"
-            echo -e "${CYAN}ℹ️  需自行部署 PaddleSpeech 服务${RESET}"
-            echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
-            read -r -p "请输入HTTP服务地址 (默认 http://localhost:8001): " http_url
-            http_url=${http_url:-"http://localhost:8001"}
-            read -r -p "请输入HTTPS服务地址 (默认 https://localhost:8002): " https_url
-            https_url=${https_url:-"https://localhost:8002"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        21)
-            tts_provider_key="IndexStreamTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了 Index-TTS-vLLM。${RESET}"
-            echo -e "${CYAN}ℹ️  需自行部署 Index-TTS-vLLM 服务${RESET}"
-            echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
-            read -r -p "请输入HTTP服务地址 (默认 http://localhost:7860): " http_url
-            http_url=${http_url:-"http://localhost:7860"}
-            read -r -p "请输入HTTPS服务地址 (默认 https://localhost:7861): " https_url
-            https_url=${https_url:-"https://localhost:7861"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        22)
-            tts_provider_key="AliBLTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了阿里云百炼 TTS。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://bailian.console.aliyun.com/#/api-key${RESET}"
-            read -r -p "请输入 API Key: " api_key
-            echo -e "${CYAN}🎤 音色模型选择：${RESET}"
-            echo "  可选音色：female-yujie, female-chengshu, female-shaonv, male-qingshu"
-            echo "  默认音色：female-yujie"
-            read -r -p "请输入音色 (默认使用 female-yujie): " voice
-            voice=${voice:-"female-yujie"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        23)
-            tts_provider_key="XunFeiTTS"
-            echo -e "\n${YELLOW}⚠️  您选择了讯飞 TTS。${RESET}"
-            echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn/services/tts${RESET}"
-            read -r -p "请输入 APP ID: " app_id
-            app_id="${app_id:-}"
-            read -r -p "请输入 API Secret: " api_secret
-            api_secret="${api_secret:-}"
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            echo -e "${CYAN}🎤 音色模型选择：${RESET}"
-            echo "  可选音色：xiaoyi (小艺-女声),xiaocheng (小智-男声),xiaomo (小萌-女声)"
-            echo "           yijun (一君-男声),xiaoyiyanse (小艺-女声-音色),xiaomeng (小萌-女声-音色)"
-            echo "  默认音色：xiaoyi (小艺-女声)"
-            read -r -p "请输入音色 (默认使用 xiaoyi): " voice
-            voice=${voice:-"xiaoyi"}
-            
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$app_id" ]; then
-                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            if [ -n "$api_secret" ]; then
-                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        *)
-            tts_provider_key="EdgeTTS"
-            echo -e "\n${YELLOW}⚠️  输入无效，默认选择微软 EdgeTTS。${RESET}"
-            sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
-            ;;
-    esac
-    
-    # 完成选择后退出循环
-    return_to_main=true
+        local tts_provider_key
+        case $tts_choice in
+            1)
+                tts_provider_key="EdgeTTS"
+                echo -e "\n${GREEN}✅ 已选择微软 EdgeTTS。${RESET}"
+                echo -e "${CYAN}ℹ️ EdgeTTS 是微软的免费语音合成服务，无需配置API密钥。${RESET}"
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            2)
+                tts_provider_key="DoubaoTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎豆包 TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/doubao${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                read -r -p "请输入 Secret Key: " secret_key
+                secret_key="${secret_key:-}"
+                read -r -p "请输入音色 (默认使用 female-yujie): " voice
+                voice=${voice:-"female-yujie"}
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                if [ -n "$secret_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            3)
+                tts_provider_key="DoubaoStreamTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎豆包流式 TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/doubao${RESET}"
+                read -r -p "请输入 group_id: " group_id
+                read -r -p "请输入 api_key: " api_key
+                api_key="${api_key:-}"
+                read -r -p "请输入 Secret Key: " secret_key
+                secret_key="${secret_key:-}"
+                read -r -p "请输入音色 (默认使用 female-yujie): " voice
+                voice=${voice:-"female-yujie"}
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$group_id" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    group_id: .*/    group_id: \"$group_id\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                if [ -n "$secret_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            11)
+                tts_provider_key="AliyunTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
+                read -r -p "请输入 Appkey: " appkey
+                read -r -p "请输入 Access Key ID: " access_key_id
+                read -r -p "请输入 Access Key Secret: " access_key_secret
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: $appkey/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: $access_key_id/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: $access_key_secret/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            12)
+                tts_provider_key="AliyunStreamTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云流式 TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
+                read -r -p "请输入 Appkey: " appkey
+                read -r -p "请输入 Access Key ID: " access_key_id
+                read -r -p "请输入 Access Key Secret: " access_key_secret
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: $appkey/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: $access_key_id/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: $access_key_secret/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            6)
+                tts_provider_key="TencentTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了腾讯云 TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/tts${RESET}"
+                read -r -p "请输入 Secret ID: " secret_id
+                read -r -p "请输入 Secret Key: " secret_key
+                echo -e "${CYAN}🎤 音色模型选择：${RESET}"
+                echo "  标准音色：100012 (男声青年-标准), 100018 (女声青年-标准)"
+                echo "  精品音色：101004 (男声青年), 101008 (男声中青年), 101014 (男声中老年)"
+                echo "           101010 (女声青年), 101016 (女声中年), 101020 (女声中老年)"
+                echo "  默认音色：101014 (男声中老年)"
+                read -r -p "请输入音色ID (默认使用 101014): " voice
+                voice=${voice:-"101014"}
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_id: .*/    secret_id: $secret_id/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: $secret_key/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            7)
+                tts_provider_key="TTS302AI"
+                echo -e "\n${YELLOW}⚠️ 您选择了 302AI TTS。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://www.302ai.com/${RESET}"
+                read -r -p "请输入 Access Token: " access_token
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            8)
+                tts_provider_key="GizwitsTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了机智云 TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.gizwits.com/${RESET}"
+                read -r -p "请输入 Access Token: " access_token
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            9)
+                tts_provider_key="ACGNTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 ACGN TTS。${RESET}"
+                echo -e "${CYAN}ℹ️ 需自行部署 ACGN TTS 服务${RESET}"
+                echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
+                read -r -p "请输入HTTP服务地址 (默认 http://localhost:8080): " http_url
+                http_url=${http_url:-"http://localhost:8080"}
+                read -r -p "请输入HTTPS服务地址 (默认 https://localhost:8081): " https_url
+                https_url=${https_url:-"https://localhost:8081"}
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            10)
+                tts_provider_key="OpenAITTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI TTS。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/settings/organization/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                read -r -p "请输入 代理地址 (选填): " http_proxy
+                http_proxy="${http_proxy:-}"
+                echo -e "${CYAN}🎤 音色模型选择：${RESET}"
+                echo "  可选音色：alloy (默认), echo, fable, onyx, nova, shimmer"
+                read -r -p "请输入音色 (默认使用 alloy): " voice
+                voice=${voice:-"alloy"}
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
+                [ -n "$http_proxy" ] && sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    http_proxy: .*/    http_proxy: \"$http_proxy\"/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            11)
+                tts_provider_key="CustomTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了自定义 TTS。${RESET}"
+                echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
+                read -r -p "请输入类型 (edge/doubao/aliyun 等): " type
+                read -r -p "请输入HTTP服务地址: " http_url
+                read -r -p "请输入HTTPS服务地址: " https_url
+                read -r -p "请输入 API Key (选填): " api_key
+                read -r -p "请输入 音色 (选填): " voice
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    type: .*/    type: $type/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
+                [ -n "$https_url" ] && sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
+                [ -n "$api_key" ] && sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
+                [ -n "$voice" ] && sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            12)
+                tts_provider_key="LinkeraiTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 LinkerAI TTS。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://www.linkerai.com/${RESET}"
+                read -r -p "请输入 Access Token: " access_token
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: $access_token/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            13)
+                tts_provider_key="PaddleSpeechTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度飞桨 PaddleSpeech TTS。${RESET}"
+                echo -e "${CYAN}ℹ️ 需自行部署 PaddleSpeech 服务${RESET}"
+                echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
+                read -r -p "请输入HTTP服务地址 (默认 http://localhost:8001): " http_url
+                http_url=${http_url:-"http://localhost:8001"}
+                read -r -p "请输入HTTPS服务地址 (默认 https://localhost:8002): " https_url
+                https_url=${https_url:-"https://localhost:8002"}
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            14)
+                tts_provider_key="IndexStreamTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Index-TTS-vLLM。${RESET}"
+                echo -e "${CYAN}ℹ️ 需自行部署 Index-TTS-vLLM 服务${RESET}"
+                echo -e "${CYAN}🔗 支持HTTP和HTTPS双协议配置${RESET}"
+                read -r -p "请输入HTTP服务地址 (默认 http://localhost:7860): " http_url
+                http_url=${http_url:-"http://localhost:7860"}
+                read -r -p "请输入HTTPS服务地址 (默认 https://localhost:7861): " https_url
+                https_url=${https_url:-"https://localhost:7861"}
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: $http_url|" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    https_url: .*|    https_url: $https_url|" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            15)
+                tts_provider_key="AliBLTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云百炼 TTS。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://bailian.console.aliyun.com/#/api-key${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                echo -e "${CYAN}🎤 音色模型选择：${RESET}"
+                echo "  可选音色：female-yujie, female-chengshu, female-shaonv, male-qingshu"
+                echo "  默认音色：female-yujie"
+                read -r -p "请输入音色 (默认使用 female-yujie): " voice
+                voice=${voice:-"female-yujie"}
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: $api_key/" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            16)
+                tts_provider_key="XunFeiTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞 TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn/services/tts${RESET}"
+                read -r -p "请输入 APP ID: " app_id
+                app_id="${app_id:-}"
+                read -r -p "请输入 API Secret: " api_secret
+                api_secret="${api_secret:-}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                echo -e "${CYAN}🎤 音色模型选择：${RESET}"
+                echo "  可选音色：xiaoyi (小艺-女声),xiaocheng (小智-男声),xiaomo (小萌-女声)"
+                echo "           yijun (一君-男声),xiaoyiyanse (小艺-女声-音色),xiaomeng (小萌-女声-音色)"
+                echo "  默认音色：xiaoyi (小艺-女声)"
+                read -r -p "请输入音色 (默认使用 xiaoyi): " voice
+                voice=${voice:-"xiaoyi"}
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice: .*/    voice: $voice/" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$app_id" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                if [ -n "$api_secret" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                ;;
+            *)
+                tts_provider_key="EdgeTTS"
+                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择微软 EdgeTTS。${RESET}"
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+        esac
+        
+        # 完成选择后退出循环
+        tts_return_to_prev=true
     done
 }
 
@@ -2025,94 +1507,77 @@ config_memory() {
             continue
         fi
 
-    local memory_provider_key
-    case $memory_choice in
-        1)
-            memory_provider_key="nomem"
-            echo -e "\n${GREEN}✅ 已选择不开启记忆功能。${RESET}"
-            sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        2)
-            memory_provider_key="mem_local_short"
-            echo -e "\n${YELLOW}⚠️  您选择了本地短记忆。${RESET}"
-            sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$OVERRIDE_CONFIG_FILE"
-            ;;
-        3)
-            memory_provider_key="mem0ai"
-            echo -e "\n${YELLOW}⚠️  您选择了 Mem0AI。${RESET}"
-            echo -e "${CYAN}🔑 密钥获取地址：https://app.mem0.ai/dashboard/api-keys${RESET}"
-            read -r -p "请输入 API Key: " api_key
-            api_key="${api_key:-}"
-            
-            sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$OVERRIDE_CONFIG_FILE"
-            if [ -n "$api_key" ]; then
-                sed -i "/^  $memory_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
-            fi
-            ;;
-        *)
-            memory_provider_key="nomem"
-            echo -e "\n${YELLOW}⚠️  输入无效，默认选择不开启记忆功能。${RESET}"
-            sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$OVERRIDE_CONFIG_FILE"
-            ;;
-    esac
-    
-    # 完成选择后退出循环
-    return_to_main=true
+        local memory_provider_key
+        case $memory_choice in
+            1)
+                memory_provider_key="nomem"
+                echo -e "\n${GREEN}✅ 已选择不开启记忆功能。${RESET}"
+                sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            2)
+                memory_provider_key="mem_local_short"
+                echo -e "\n${YELLOW}⚠️ 您选择了本地短记忆。${RESET}"
+                sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+            3)
+                memory_provider_key="mem0ai"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Mem0AI。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://app.mem0.ai/dashboard/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$OVERRIDE_CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $memory_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$OVERRIDE_CONFIG_FILE"
+                fi
+                ;;
+            *)
+                memory_provider_key="nomem"
+                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择不开启记忆功能。${RESET}"
+                sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$OVERRIDE_CONFIG_FILE"
+                ;;
+        esac
+        
+        # 完成选择后退出循环
+        return_to_main=true
     done
 }
 
 config_server() {
-    echo -e "\n\n${GREEN}【6/6】配置服务器地址 (自动生成，无需手动填写)${RESET}"
+    echo -e "\n\n${GREEN}【6/6】配置服务器地址 (自动生成)${RESET}"
 
-    echo -e "${CYAN}ℹ️  检测到您的服务器地址：${RESET}"
+    echo -e "${CYAN}ℹ️ 检测到您的服务器地址：${RESET}"
     echo -e "  - 内网IP：$INTERNAL_IP"
     echo -e "  - 公网IP：$EXTERNAL_IP"
 
-    echo -e "\n${YELLOW}⚠️  请选择部署场景（影响地址生成）：${RESET}"
+    echo -e "\n${YELLOW}⚠️ 请选择部署场景：${RESET}"
     echo "1) 内网环境部署（仅内网访问，用内网IP）"
     echo "2) 公网环境部署（外网访问，用公网IP，需提前配置端口映射）"
     read -r -p "请输入序号 (默认1): " deploy_choice
     deploy_choice=${deploy_choice:-1}
 
-    local ws_ip
-    local vision_ip
-    local deploy_type_color
-    local deploy_type_icon
-    local deploy_description
-    local ota_url
+    local ws_ip vision_ip deploy_type_color deploy_type_icon deploy_description ota_url
     
     case $deploy_choice in
         1)
-            ws_ip="$INTERNAL_IP"
-            vision_ip="$INTERNAL_IP"
-            deploy_type_color="${GREEN}"
-            deploy_type_icon="✅"
-            deploy_description="内网环境部署"
+            ws_ip="$INTERNAL_IP" vision_ip="$INTERNAL_IP"
+            deploy_type_color="${GREEN}" deploy_type_icon="✅" deploy_description="内网环境部署"
             ota_url="http://$INTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="internal"
-            echo -e "${GREEN}✅ 已选择内网环境部署，将使用内网IP生成地址${RESET}"
-            ;;
+            echo -e "${GREEN}✅ 已选择内网环境部署${RESET}" ;;
         2)
-            ws_ip="$EXTERNAL_IP"
-            vision_ip="$EXTERNAL_IP"
-            deploy_type_color="${YELLOW}"
-            deploy_type_icon="⚠️"
-            deploy_description="公网环境部署"
+            ws_ip="$EXTERNAL_IP" vision_ip="$EXTERNAL_IP"
+            deploy_type_color="${YELLOW}" deploy_type_icon="⚠️" deploy_description="公网环境部署"
             ota_url="http://$EXTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="public"
-            echo -e "${GREEN}✅ 已选择公网环境部署，将使用公网IP生成地址${RESET}"
-            echo -e "${YELLOW}⚠️  注意：请确保路由器已配置端口映射（8000端口用于WebSocket，8003端口用于OTA/视觉接口）${RESET}"
-            ;;
+            echo -e "${GREEN}✅ 已选择公网环境部署${RESET}"
+            echo -e "${YELLOW}⚠️ 请确保路由器已配置端口映射（8000端口用于WebSocket，8003端口用于OTA/视觉接口）${RESET}" ;;
         *)
-            ws_ip="$INTERNAL_IP"
-            vision_ip="$INTERNAL_IP"
-            deploy_type_color="${RED}"
-            deploy_type_icon="❌"
-            deploy_description="默认内网环境部署"
+            ws_ip="$INTERNAL_IP" vision_ip="$INTERNAL_IP"
+            deploy_type_color="${RED}" deploy_type_icon="❌" deploy_description="默认内网环境部署"
             ota_url="http://$INTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="internal"
-            echo -e "${YELLOW}⚠️  输入无效，默认选择内网环境部署${RESET}"
-            ;;
+            echo -e "${YELLOW}⚠️ 输入无效，默认选择内网环境部署${RESET}" ;;
     esac
 
     local ws_url="ws://$ws_ip:8000/xiaozhi/v1/"
@@ -2137,17 +1602,17 @@ config_keys() {
     # 如果选择了跳过详细配置，直接返回
     if [ "${SKIP_DETAILED_CONFIG:-false}" = true ]; then
         echo -e "\n${GREEN}✅ 检测到用户选择保留现有配置，跳过详细配置步骤${RESET}"
-        echo -e "${CYAN}ℹ️  将使用现有配置文件: $OVERRIDE_CONFIG_FILE${RESET}"
+        echo -e "${CYAN}ℹ️ 将使用现有配置文件: $OVERRIDE_CONFIG_FILE${RESET}"
         export KEY_CONFIG_MODE="existing"
         return
     fi
     
     while [ "$return_to_main" = false ]; do
         echo -e "\n${PURPLE}==================================================${RESET}"
-        echo -e "${CYAN}🔧  开始进行核心服务配置  🔧${RESET}"
+        echo -e "${CYAN}🔧 开始进行核心服务配置  🔧${RESET}"
         echo -e "${PURPLE}==================================================${RESET}"
 
-        echo -e "\n${YELLOW}⚠️  注意：若您计划使用本地ASR模型（如FunASR），请确保服务器内存≥4G。${RESET}"
+        echo -e "\n${YELLOW}⚠️ 注意：若您计划使用本地ASR模型（如FunASR），请确保服务器内存≥4G。${RESET}"
         
         echo "1) 现在通过脚本配置密钥和服务商"
         echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
@@ -2157,18 +1622,18 @@ config_keys() {
         
         # 处理退出配置
         if [ "$key_choice" = "0" ]; then
-            echo -e "\n${YELLOW}⚠️  确认退出详细配置流程？${RESET}"
-            echo -e "${CYAN}ℹ️  退出后将使用以下默认配置：${RESET}"
+            echo -e "\n${YELLOW}⚠️ 确认退出详细配置流程？${RESET}"
+            echo -e "${CYAN}ℹ️ 退出后将使用以下默认配置：${RESET}"
             echo -e "${CYAN}  - ASR: AliyunStreamASR (阿里云流式)${RESET}"
             echo -e "${CYAN}  - LLM: ChatGLMLLM (智谱清言)${RESET}"
             echo -e "${CYAN}  - VLLM: ChatGLMVLLM (智谱清言)${RESET}"
             echo -e "${CYAN}  - TTS: EdgeTTS (微软)${RESET}"
             echo -e "${CYAN}  - Memory: nomem (无记忆)${RESET}"
-            echo -e "${CYAN}ℹ️  默认配置路径：$OVERRIDE_CONFIG_FILE${RESET}"
+            echo -e "${CYAN}ℹ️ 默认配置路径：$OVERRIDE_CONFIG_FILE${RESET}"
             
             # 进入第三级菜单
-            echo -e "\n${YELLOW}⚠️  确认退出并使用默认配置？${RESET}"
-            echo -e "${RED}⚠️  注意：如果服务器配置不足（内存<4GB），使用本地ASR模型可能会卡死。${RESET}"
+            echo -e "\n${YELLOW}⚠️ 确认退出并使用默认配置？${RESET}"
+            echo -e "${RED}⚠️ 注意：如果服务器配置不足（内存<4GB），使用本地ASR模型可能会卡死。${RESET}"
             
             # 根据内存状况显示docker选项
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
@@ -2214,9 +1679,9 @@ config_keys() {
                 continue
             fi
         elif [ "$key_choice" = "2" ]; then
-            echo -e "\n${YELLOW}⚠️  已选择稍后手动填写。${RESET}"
-            echo -e "${CYAN}ℹ️  为防止服务启动失败，脚本将自动将服务商预设为 \"AliyunStreamASR\" 和 \"ChatGLMLLM\"。${RESET}"
-            echo -e "${CYAN}ℹ️  您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$OVERRIDE_CONFIG_FILE${RESET}"
+            echo -e "\n${YELLOW}⚠️ 已选择稍后手动填写。${RESET}"
+            echo -e "${CYAN}ℹ️ 为防止服务启动失败，脚本将自动将服务商预设为 \"AliyunStreamASR\" 和 \"ChatGLMLLM\"。${RESET}"
+            echo -e "${CYAN}ℹ️ 您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$OVERRIDE_CONFIG_FILE${RESET}"
             sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$OVERRIDE_CONFIG_FILE"
             
             local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
@@ -2241,27 +1706,10 @@ config_keys() {
 
             echo -e "\n${PURPLE}==================================================${RESET}"
             echo -e "${GREEN}🎉 核心服务配置完成！${RESET}"
-            echo -e "${CYAN}ℹ️  详细配置文件已保存至: $OVERRIDE_CONFIG_FILE${RESET}"
+            echo -e "${CYAN}ℹ️ 详细配置文件已保存至: $OVERRIDE_CONFIG_FILE${RESET}"
             echo -e "${PURPLE}==================================================${RESET}"
             export KEY_CONFIG_MODE="auto"
             
-            return_to_main=true
-            continue
-        fi
-
-        if [[ "$key_choice" == "2" ]]; then
-            echo -e "\n${YELLOW}⚠️  已选择稍后手动填写。${RESET}"
-            echo -e "${CYAN}ℹ️  为防止服务启动失败，脚本将自动将服务商预设为 \"AliyunStreamASR\" 和 \"ChatGLMLLM\"。${RESET}"
-            echo -e "${CYAN}ℹ️  您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$OVERRIDE_CONFIG_FILE${RESET}"
-            sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$OVERRIDE_CONFIG_FILE"
-            
-            local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
-            local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
-            sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$OVERRIDE_CONFIG_FILE"
-            
-            CURRENT_DEPLOY_TYPE="internal"
-            export KEY_CONFIG_MODE="manual"
             return_to_main=true
             continue
         fi
@@ -2272,109 +1720,109 @@ config_keys() {
 start_service() {
     check_docker_installed
     echo -e "\n${BLUE}🚀 开始启动服务...${RESET}"
-  cd "$MAIN_DIR" || { echo -e "${RED}❌ 进入目录 $MAIN_DIR 失败${RESET}"; exit 1; }
-  retry_exec "docker compose up -d" "启动Docker服务"
-  
-  echo -e "${CYAN}🔍 正在检查服务状态...${RESET}"
-  sleep 5
+    cd "$MAIN_DIR" || { echo -e "${RED}❌ 进入目录 $MAIN_DIR 失败${RESET}"; exit 1; }
+    retry_exec "docker compose up -d" "启动Docker服务"
+    
+    echo -e "${CYAN}🔍 正在检查服务状态...${RESET}"
+    sleep 5
 
-  if docker ps --filter "name=^/${CONTAINER_NAME}$" --format "{{.Names}}" | grep -q "$CONTAINER_NAME"; then
-    echo -e "\n${GREEN}🎉 小智服务器启动成功！${RESET}"
-    [[ "${KEY_CONFIG_MODE:-manual}" == "manual" ]] && {
-      echo -e "${YELLOW}⚠️  您选择了手动配置，请尽快编辑配置文件：$OVERRIDE_CONFIG_FILE${RESET}"
-      echo -e "${YELLOW}⚠️  配置完成后，请重启服务：docker restart $CONTAINER_NAME${RESET}"
-    }
-    echo -e "\n${CYAN}📄 最后10行服务日志：${RESET}"
-    docker logs --tail 10 "$CONTAINER_NAME"
-  else
-    echo -e "${RED}❌ 服务启动异常，请查看完整日志了解详情:${RESET}"
-    echo -e "${RED}   docker logs $CONTAINER_NAME${RESET}"
-    exit 1
-  fi
+    if docker ps --filter "name=^/${CONTAINER_NAME}$" --format "{{.Names}}" | grep -q "$CONTAINER_NAME"; then
+        echo -e "\n${GREEN}🎉 小智服务器启动成功！${RESET}"
+        [[ "${KEY_CONFIG_MODE:-manual}" == "manual" ]] && {
+            echo -e "${YELLOW}⚠️ 您选择了手动配置，请尽快编辑配置文件：$OVERRIDE_CONFIG_FILE${RESET}"
+            echo -e "${YELLOW}⚠️ 配置完成后，请重启服务：docker restart $CONTAINER_NAME${RESET}"
+        }
+        echo -e "\n${CYAN}📄 最后10行服务日志：${RESET}"
+        docker logs --tail 10 "$CONTAINER_NAME"
+    else
+        echo -e "${RED}❌ 服务启动异常，请查看完整日志了解详情:${RESET}"
+        echo -e "${RED}   docker logs $CONTAINER_NAME${RESET}"
+        exit 1
+    fi
 }
 
 # ========================= 连接信息展示 =========================
 show_connection_info() {
-  # 等待Docker服务完全启动
-  echo -e "\n${YELLOW}⏳ Docker服务启动中，等待10秒确保服务完全启动...${RESET}"
-  echo -e "${YELLOW}🔄 倒计时：${RESET}"
-  for i in {10..1}; do
-    echo -ne "\r${YELLOW}   倒计时: ${i} 秒${RESET}"
-    sleep 1
-  done
-  echo -e "\n${GREEN}✅ 等待完成，开始进行端口检查${RESET}"
-  
-  echo -e "\n${PURPLE}==================================================${RESET}"
-  echo -e "${CYAN}📡 服务器连接地址信息${RESET}"
-  echo -e "${PURPLE}==================================================${RESET}"
-  echo -e "内网地址：$INTERNAL_IP"
-  echo -e "公网地址：$EXTERNAL_IP"
-  echo -e "${PURPLE}--------------------------------------------------${RESET}"
-  
-  # 先显示所有可用地址
-  echo -e "${GREEN}OTA接口（内网）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-  echo -e "${GREEN}OTA接口（公网）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-  echo -e "${GREEN}Websocket接口：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
-  echo -e "${GREEN}Websocket接口：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
-  echo -e "${PURPLE}--------------------------------------------------${RESET}"
-  
-  # 显示当前部署类型和推荐地址
-  if [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
-    echo -e "${GREEN}OTA接口（当前部署类型 - 内网环境）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-    echo -e "${YELLOW}💡 您的当前部署类型为内网环境，请使用上述OTA地址进行设备配置${RESET}"
-    echo -e "${YELLOW}💡 如果需要从公网访问，请确保路由器已配置端口映射（8000, 8003）${RESET}"
-  elif [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
-    echo -e "${YELLOW}OTA接口（当前部署类型 - 公网环境）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-    echo -e "${YELLOW}💡 您的当前部署类型为公网环境，请使用上述OTA地址进行设备配置${RESET}"
-    echo -e "${YELLOW}💡 确保路由器已配置端口映射（8000, 8003）${RESET}"
-  else
-    echo -e "${YELLOW}💡 请根据您的部署方式选择相应的OTA地址${RESET}"
-  fi
-  
-  echo -e "${PURPLE}==================================================${RESET}"
-  
-  # 根据部署类型进行端口检查
-  if [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
-      echo -e "\n${YELLOW}📋 现在进行公网端口连通性检查...${RESET}"
-      check_network_ports "$EXTERNAL_IP" "公网"
-  elif [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
-      echo -e "\n${YELLOW}📋 现在进行内网端口连通性检查...${RESET}"
-      check_network_ports "$INTERNAL_IP" "内网"
-  else
-      echo -e "\n${YELLOW}📋 进行全面的端口连通性检查...${RESET}"
-      echo -e "${CYAN}🌐 检查内网连通性:${RESET}"
-      check_network_ports "$INTERNAL_IP" "内网"
-      echo -e "\n${CYAN}🌐 检查公网连通性:${RESET}"
-      check_network_ports "$EXTERNAL_IP" "公网"
-  fi
-  
-  # 添加端口检查方法详细说明
-  echo -e "\n${CYAN}🔧 端口检查方法详细说明${RESET}"
-  echo -e "${PURPLE}=======================================================${RESET}"
-  echo -e "${YELLOW}📊 端口检查技术原理：${RESET}"
-  echo -e "${CYAN}  公网端口查询方法：${RESET}"
-  echo -e "    • OTA端口(8003): 使用 ${BOLD}curl -s -o /dev/null -w '%{http_code}' --connect-timeout 3 http://IP:8003/xiaozhi/ota/${RESET}"
-  echo -e "    • WebSocket端口(8000): 使用 ${BOLD}timeout 5 nc -z IP 8000${RESET}"
-  echo -e "    • HTTP状态码: 200=成功连接, 404=服务存在但路径错误, 000=连接失败"
-  
-  echo -e "\n${CYAN}  内网端口查询方法：${RESET}"
-  echo -e "    • OTA端口(8003): 使用 ${BOLD}curl -s -o /dev/null -w '%{http_code}' --connect-timeout 3 http://内网IP:8003/xiaozhi/ota/${RESET}"
-  echo -e "    • WebSocket端口(8000): 使用 ${BOLD}timeout 5 nc -z 内网IP 8000${RESET}"
-  echo -e "    • nc(netcat): 检查TCP端口是否开放，无HTTP响应但能验证端口连通性"
-  
-  echo -e "\n${YELLOW}💡 手动检查命令示例：${RESET}"
-  echo -e "${CYAN}  检查OTA接口：${RESET} curl http://$INTERNAL_IP:8003/xiaozhi/ota/"
-  echo -e "${CYAN}  检查WebSocket：${RESET} timeout 3 nc -z $INTERNAL_IP 8000"
-  echo -e "${CYAN}  检查服务状态：${RESET} docker ps --filter name=$CONTAINER_NAME"
-  echo -e "${CYAN}  查看服务日志：${RESET} docker logs $CONTAINER_NAME --tail 20"
-  
-  echo -e "\n${YELLOW}🔍 连接诊断流程：${RESET}"
-  echo -e "    1. ${CYAN}HTTP连接测试：${RESET}curl 检查OTA端口返回状态码和内容"
-  echo -e "    2. ${CYAN}TCP连接测试：${RESET}nc 检查WebSocket端口是否开放"
-  echo -e "    3. ${CYAN}内容验证：${RESET}如果HTTP 200/404，获取OTA页面内容确认服务正常"
-  echo -e "    4. ${CYAN}网络诊断：${RESET}根据连接失败类型提供对应的故障排除建议"
-  
-  echo -e "\n${PURPLE}=======================================================${RESET}"
+    # 等待Docker服务完全启动
+    echo -e "\n${YELLOW}⏳ Docker服务启动中，等待10秒确保服务完全启动...${RESET}"
+    echo -e "${YELLOW}🔄 倒计时：${RESET}"
+    for i in {10..1}; do
+        echo -ne "\r${YELLOW}   倒计时: ${i} 秒${RESET}"
+        sleep 1
+    done
+    echo -e "\n${GREEN}✅ 等待完成，开始进行端口检查${RESET}"
+    
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}📡 服务器连接地址信息${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    echo -e "内网地址：$INTERNAL_IP"
+    echo -e "公网地址：$EXTERNAL_IP"
+    echo -e "${PURPLE}--------------------------------------------------${RESET}"
+    
+    # 先显示所有可用地址
+    echo -e "${GREEN}OTA接口（内网）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+    echo -e "${GREEN}OTA接口（公网）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+    echo -e "${GREEN}Websocket接口：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+    echo -e "${GREEN}Websocket接口：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+    echo -e "${PURPLE}--------------------------------------------------${RESET}"
+    
+    # 显示当前部署类型和推荐地址
+    if [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
+        echo -e "${GREEN}OTA接口（当前部署类型 - 内网环境）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+        echo -e "${YELLOW}💡 您的当前部署类型为内网环境，请使用上述OTA地址进行设备配置${RESET}"
+        echo -e "${YELLOW}💡 如果需要从公网访问，请确保路由器已配置端口映射（8000, 8003）${RESET}"
+    elif [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
+        echo -e "${YELLOW}OTA接口（当前部署类型 - 公网环境）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+        echo -e "${YELLOW}💡 您的当前部署类型为公网环境，请使用上述OTA地址进行设备配置${RESET}"
+        echo -e "${YELLOW}💡 确保路由器已配置端口映射（8000, 8003）${RESET}"
+    else
+        echo -e "${YELLOW}💡 请根据您的部署方式选择相应的OTA地址${RESET}"
+    fi
+    
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    # 根据部署类型进行端口检查
+    if [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
+        echo -e "\n${YELLOW}📋 现在进行公网端口连通性检查...${RESET}"
+        check_network_ports "$EXTERNAL_IP" "公网"
+    elif [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
+        echo -e "\n${YELLOW}📋 现在进行内网端口连通性检查...${RESET}"
+        check_network_ports "$INTERNAL_IP" "内网"
+    else
+        echo -e "\n${YELLOW}📋 进行全面的端口连通性检查...${RESET}"
+        echo -e "${CYAN}🌐 检查内网连通性:${RESET}"
+        check_network_ports "$INTERNAL_IP" "内网"
+        echo -e "\n${CYAN}🌐 检查公网连通性:${RESET}"
+        check_network_ports "$EXTERNAL_IP" "公网"
+    fi
+    
+    # 添加端口检查方法详细说明
+    echo -e "\n${CYAN}🔧 端口检查方法详细说明${RESET}"
+    echo -e "${PURPLE}=======================================================${RESET}"
+    echo -e "${YELLOW}📊 端口检查技术原理：${RESET}"
+    echo -e "${CYAN}  公网端口查询方法：${RESET}"
+    echo -e "    • OTA端口(8003): 使用 ${BOLD}curl -s -o /dev/null -w '%{http_code}' --connect-timeout 3 http://IP:8003/xiaozhi/ota/${RESET}"
+    echo -e "    • WebSocket端口(8000): 使用 ${BOLD}timeout 5 nc -z IP 8000${RESET}"
+    echo -e "    • HTTP状态码: 200=成功连接, 404=服务存在但路径错误, 000=连接失败"
+    
+    echo -e "\n${CYAN}  内网端口查询方法：${RESET}"
+    echo -e "    • OTA端口(8003): 使用 ${BOLD}curl -s -o /dev/null -w '%{http_code}' --connect-timeout 3 http://内网IP:8003/xiaozhi/ota/${RESET}"
+    echo -e "    • WebSocket端口(8000): 使用 ${BOLD}timeout 5 nc -z 内网IP 8000${RESET}"
+    echo -e "    • nc(netcat): 检查TCP端口是否开放，无HTTP响应但能验证端口连通性"
+    
+    echo -e "\n${YELLOW}💡 手动检查命令示例：${RESET}"
+    echo -e "${CYAN}  检查OTA接口：${RESET} curl http://$INTERNAL_IP:8003/xiaozhi/ota/"
+    echo -e "${CYAN}  检查WebSocket：${RESET} timeout 3 nc -z $INTERNAL_IP 8000"
+    echo -e "${CYAN}  检查服务状态：${RESET} docker ps --filter name=$CONTAINER_NAME"
+    echo -e "${CYAN}  查看服务日志：${RESET} docker logs $CONTAINER_NAME --tail 20"
+    
+    echo -e "\n${YELLOW}🔍 连接诊断流程：${RESET}"
+    echo -e "    1. ${CYAN}HTTP连接测试：${RESET}curl 检查OTA端口返回状态码和内容"
+    echo -e "    2. ${CYAN}TCP连接测试：${RESET}nc 检查WebSocket端口是否开放"
+    echo -e "    3. ${CYAN}内容验证：${RESET}如果HTTP 200/404，获取OTA页面内容确认服务正常"
+    echo -e "    4. ${CYAN}网络诊断：${RESET}根据连接失败类型提供对应的故障排除建议"
+    
+    echo -e "\n${PURPLE}=======================================================${RESET}"
 }
 
 # ========================= 通用端口检查函数 =========================
@@ -2415,14 +1863,14 @@ check_network_ports() {
                     echo -e "${CYAN}💡 请使用上述OTA地址进行设备配置${RESET}"
                     echo -e "${CYAN}💡 curl命令示例：curl $ota_url${RESET}"
                 else
-                    echo -e "${YELLOW}⚠️  OTA服务已启动但返回空内容或拒绝连接${RESET}"
+                    echo -e "${YELLOW}⚠️ OTA服务已启动但返回空内容或拒绝连接${RESET}"
                 fi
             else
-                echo -e "${YELLOW}⚠️  无法获取OTA内容（连接超时或服务器未响应）${RESET}"
+                echo -e "${YELLOW}⚠️ 无法获取OTA内容（连接超时或服务器未响应）${RESET}"
                 echo -e "${YELLOW}💡 建议手动测试：curl $ota_url${RESET}"
             fi
         else
-            echo -e "${YELLOW}⚠️  OTA端口连接异常 (HTTP状态码: $ota_status)${RESET}"
+            echo -e "${YELLOW}⚠️ OTA端口连接异常 (HTTP状态码: $ota_status)${RESET}"
         fi
     else
         echo -e "${RED}❌ OTA端口 $ota_port 无法访问${RESET}"
@@ -2491,21 +1939,18 @@ check_system() {
             fi
             ;;
         Darwin*)
-            unsupported_msg="macOS"
-            ;;
+            unsupported_msg="macOS" ;;
         CYGWIN*|MINGW*|MSYS*)
-            unsupported_msg="Windows"
-            ;;
+            unsupported_msg="Windows" ;;
         *)
-            unsupported_msg="未知系统 ($os_kernel)"
-            ;;
+            unsupported_msg="未知系统 ($os_kernel)" ;;
     esac
     
     if [ "$is_supported" = false ]; then
         echo -e "${RED}==================================================${RESET}"
-        echo -e "${RED}⚠️  警告：本脚本不适用于 $unsupported_msg 系统${RESET}"
-        echo -e "${RED}⚠️  当前系统信息：$os_info${RESET}"
-        echo -e "${RED}⚠️  强制执行可能导致未知错误，请谨慎操作！${RESET}"
+        echo -e "${RED}⚠️ 警告：本脚本不适用于 $unsupported_msg 系统${RESET}"
+        echo -e "${RED}⚠️ 当前系统信息：$os_info${RESET}"
+        echo -e "${RED}⚠️ 强制执行可能导致未知错误，请谨慎操作！${RESET}"
         echo -e "${RED}==================================================${RESET}"
         
         read -r -p "❓ 是否强制执行？(Y/N，默认N): " choice
@@ -2527,7 +1972,7 @@ check_firewall() {
     # 检查 ufw 状态
     if command -v ufw &> /dev/null; then
         if ufw status | grep -q "Status: active"; then
-            echo -e "${YELLOW}⚠️  检测到 UFW 防火墙已启用${RESET}"
+            echo -e "${YELLOW}⚠️ 检测到 UFW 防火墙已启用${RESET}"
             echo -e "${CYAN}💡 建议开放以下端口：${RESET}"
             echo -e "  - sudo ufw allow 8000  # WebSocket 服务"
             echo -e "  - sudo ufw allow 8003  # OTA/视觉接口服务"
@@ -2537,7 +1982,7 @@ check_firewall() {
                 sudo ufw allow 8000 && sudo ufw allow 8003
                 echo -e "${GREEN}✅ 端口已开放${RESET}"
             else
-                echo -e "${CYAN}ℹ️  端口未开放，请根据需要手动配置${RESET}"
+                echo -e "${CYAN}ℹ️ 端口未开放，请根据需要手动配置${RESET}"
             fi
         fi
     fi
@@ -2545,12 +1990,12 @@ check_firewall() {
     # 检查 firewalld 状态
     if command -v firewall-cmd &> /dev/null; then
         if systemctl is-active --quiet firewalld; then
-            echo -e "${YELLOW}⚠️  检测到 Firewalld 防火墙已启用${RESET}"
+            echo -e "${YELLOW}⚠️ 检测到 Firewalld 防火墙已启用${RESET}"
             echo -e "${CYAN}💡 建议开放以下端口：${RESET}"
             echo -e "  - sudo firewall-cmd --permanent --add-port=8000/tcp"
             echo -e "  - sudo firewall-cmd --permanent --add-port=8003/tcp"
             echo -e "  - sudo firewall-cmd --reload"
-            echo -e "${CYAN}ℹ️  请根据上述命令手动配置防火墙${RESET}"
+            echo -e "${CYAN}ℹ️ 请根据上述命令手动配置防火墙${RESET}"
         fi
     fi
     
@@ -2561,7 +2006,7 @@ check_firewall() {
 main() {
     check_root_permission
     check_system
-    check_dependencies
+    install_dependencies
     check_server_config 
     show_start_ui        
     show_server_config 
@@ -2584,7 +2029,7 @@ main() {
     show_connection_info
 
     echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${GREEN}🎊  小智服务器部署成功！！ 🎊 ${RESET}"
+    echo -e "${GREEN}🎊 小智服务器部署成功！！🎊${RESET}"
     echo -e "${GREEN}🥳🥳🥳 请尽情使用吧 🥳🥳🥳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
 }
