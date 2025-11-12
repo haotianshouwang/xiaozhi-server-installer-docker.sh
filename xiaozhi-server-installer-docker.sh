@@ -250,6 +250,13 @@ main_menu() {
     echo -e "${PURPLE}==================================================${RESET}"
     read -r -p "请输入选项: " menu_choice
     
+    # 修复：处理空输入情况
+    if [ -z "$menu_choice" ]; then
+        echo -e "${YELLOW}⚠️ 请输入有效的选项编号${RESET}"
+        sleep 1
+        continue
+    fi
+    
     case $menu_choice in
         1)
             # 根据部署状态决定行为
@@ -333,7 +340,12 @@ main_menu() {
             ;;
         *)
             echo -e "${RED}❌ 无效选项，请重新选择${RESET}"
-            read -r -p "按回车键继续..."
+            if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
+                echo -e "${CYAN}💡 请输入1-7或0退出${RESET}"
+            else
+                echo -e "${CYAN}💡 请输入1或0退出${RESET}"
+            fi
+            sleep 2
             # 不使用return，而是继续循环让用户重新输入
             continue
             ;;
