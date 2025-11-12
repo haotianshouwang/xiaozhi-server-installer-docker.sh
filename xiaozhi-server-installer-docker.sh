@@ -225,14 +225,24 @@ show_server_config() {
 
 choose_docker_mirror() {
   echo -e "${GREEN}📦 请选择Docker镜像源（加速后续下载）：${RESET}"
-  echo "1) 阿里云"
+  echo "1) 阿里云（国内最稳定）"
   echo "2) 腾讯云"
   echo "3) 华为云"
   echo "4) DaoCloud"
   echo "5) 网易云"
   echo "6) 清华大学源"
   echo "7) 中国科学技术大学源"
-  echo "8) 官方源（不推荐国内用户）"
+  echo "8) 中科院镜像源"
+  echo "9) 百度智能云镜像源"
+  echo "10) 京东云镜像源"
+  echo "11) 淘宝镜像源"
+  echo "12) 阿里云国际版"
+  echo "13) 腾讯云国际版"
+  echo "14) Azure中国镜像源"
+  echo "15) 360镜像源"
+  echo "16) 阿里云GAE镜像源"
+  echo "17) 自定义镜像源"
+  echo "18) 官方源（不推荐国内用户）"
   read -r -p "请输入序号（默认1）：" mirror_choice
   mirror_choice=${mirror_choice:-1}
 
@@ -240,14 +250,41 @@ choose_docker_mirror() {
   case $mirror_choice in
     1) mirror_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
     2) mirror_url="https://mirror.ccs.tencentyun.com" ;;
-    3) mirror_url="https://repo.huaweicloud.com" ;;
+    3) mirror_url="https://swr.cn-north-1.myhuaweicloud.com" ;;
     4) mirror_url="https://f1361db2.m.daocloud.io" ;;
     5) mirror_url="https://hub-mirror.c.163.com" ;;
     6) mirror_url="https://mirrors.tuna.tsinghua.edu.cn/docker-registry" ;;
     7) mirror_url="https://docker.mirrors.ustc.edu.cn" ;;
-    8) mirror_url="https://registry-1.docker.io" ;;
+    8) mirror_url="https://docker.mirrors.ustc.edu.cn" ;;
+    9) mirror_url="https://mirror.baidubce.com" ;;
+    10) mirror_url="https://mirror.jdcloud.com" ;;
+    11) mirror_url="https://mirrors.aliyun.com/docker-registry" ;;
+    12) mirror_url="https://registry-1.docker.io" ;;
+    13) mirror_url="https://mirror.tencentcr.com" ;;
+    14) mirror_url="https://docker.mirrors.azure.cn" ;;
+    15) mirror_url="https://docker.mirrors.360.cn" ;;
+    16) mirror_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
+    17)
+      echo -e "${CYAN}💡 请输入您的自定义Docker镜像源地址：${RESET}"
+      echo -e "${YELLOW}💡 例如：https://docker.mirrors.xxx.edu.cn${RESET}"
+      read -r mirror_url
+      if [ -z "$mirror_url" ]; then
+        echo -e "${RED}❌ 未输入镜像源地址，使用默认阿里云源${RESET}"
+        mirror_url="https://registry.cn-hangzhou.aliyuncs.com"
+      else
+        echo -e "${GREEN}✅ 已设置自定义镜像源：$mirror_url${RESET}"
+      fi
+      ;;
+    18) mirror_url="https://registry-1.docker.io" ;;
     *) mirror_url="https://registry.cn-hangzhou.aliyuncs.com" ;;
   esac
+
+  # 如果是自定义源或需要验证的源，显示配置信息
+  if [ "$mirror_choice" = "17" ]; then
+    echo -e "${CYAN}📝 将要配置的自定义镜像源：${RESET}"
+  elif [ "$mirror_choice" -ge "9" ] && [ "$mirror_choice" -le "16" ]; then
+    echo -e "${CYAN}📝 将要配置的镜像源：${RESET}"
+  fi
 
   sudo mkdir -p /etc/docker
   sudo tee /etc/docker/daemon.json <<EOF
@@ -258,6 +295,16 @@ EOF
   sudo systemctl daemon-reload
   sudo systemctl restart docker
   echo -e "${GREEN}✅ 已配置Docker镜像源：$mirror_url${RESET}"
+  
+  # 显示配置完成后的额外信息
+  if [ "$mirror_choice" = "17" ]; then
+    echo -e "${CYAN}💡 自定义镜像源配置完成，如有问题请检查：${RESET}"
+    echo -e "${CYAN}   1. 镜像源地址是否正确${RESET}"
+    echo -e "${CYAN}   2. 网络连接是否正常${RESET}"
+    echo -e "${CYAN}   3. 是否需要配置代理${RESET}"
+  elif [ "$mirror_choice" -ge "9" ] && [ "$mirror_choice" -le "16" ]; then
+    echo -e "${CYAN}💡 镜像源配置完成，如下载缓慢请尝试其他源${RESET}"
+  fi
 }
 
 check_and_install_docker() {
@@ -1449,8 +1496,9 @@ config_server() {
     echo -e "  - 公网IP：$EXTERNAL_IP"
 
     echo -e "\n${YELLOW}⚠️  请选择部署场景（影响地址生成）：${RESET}"
-    echo "1) Docker部署（仅内网访问，用内网IP）"
-    echo "2) 公网部署（外网访问，用公网IP，需提前配置端口映射）"
+    echo -e "如果你的服务器在局域网需要在外面访问，请选择2，并自行配置IP，内网穿透。"
+    echo "1) 内网服务器部署（仅内网访问，用内网IP）"
+    echo "2) （云服务器）公网服务器部署（外网访问，用公网IP，需提前配置端口映射）"
     read -r -p "请输入序号 (默认1): " deploy_choice
     deploy_choice=${deploy_choice:-1}
 
@@ -1467,10 +1515,10 @@ config_server() {
             vision_ip="$INTERNAL_IP"
             deploy_type_color="${GREEN}"
             deploy_type_icon="✅"
-            deploy_description="Docker内网部署"
+            deploy_description="内网服务器部署"
             ota_url="http://$INTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="internal"
-            echo -e "${GREEN}✅ 已选择Docker内网部署，将使用内网IP生成地址${RESET}"
+            echo -e "${GREEN}✅ 已选择内网服务器部署，将使用内网IP生成地址${RESET}"
             ;;
         2)
             ws_ip="$EXTERNAL_IP"
@@ -1480,18 +1528,18 @@ config_server() {
             deploy_description="公网部署"
             ota_url="http://$EXTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="public"
-            echo -e "${GREEN}✅ 已选择公网部署，将使用公网IP生成地址${RESET}"
-            echo -e "${YELLOW}⚠️  注意：请确保路由器已配置端口映射（8000端口用于WebSocket，8003端口用于OTA/视觉接口）${RESET}"
+            echo -e "${GREEN}✅ 已选择（云服务器）公网服务器部署，将使用公网IP生成地址${RESET}"
+            echo -e "${YELLOW}⚠️  注意：确保路由器/防火墙已配置/放行端口（映射）（8000端口用于WebSocket，8003端口用于OTA/视觉接口）${RESET}"
             ;;
         *)
             ws_ip="$INTERNAL_IP"
             vision_ip="$INTERNAL_IP"
             deploy_type_color="${RED}"
             deploy_type_icon="❌"
-            deploy_description="默认Docker内网部署"
+            deploy_description="内网服务器部署"
             ota_url="http://$INTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="internal"
-            echo -e "${YELLOW}⚠️  输入无效，默认选择Docker内网部署${RESET}"
+            echo -e "${YELLOW}⚠️  输入无效，默认选择内网服务器部署${RESET}"
             ;;
     esac
 
@@ -1640,11 +1688,11 @@ show_connection_info() {
   if [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
     echo -e "${GREEN}OTA接口（当前部署类型 - 内网访问）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
     echo -e "${YELLOW}💡 您的当前部署类型为内网访问，请使用上述OTA地址进行设备配置${RESET}"
-    echo -e "${YELLOW}💡 如果需要从公网访问，请确保路由器已配置端口映射（8000, 8003）${RESET}"
+    echo -e "${YELLOW}💡 如果需要从公网访问，确保路由器/防火墙已配置/放行端口（映射）（8000, 8003）${RESET}"
   elif [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
     echo -e "${YELLOW}OTA接口（当前部署类型 - 公网访问）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
     echo -e "${YELLOW}💡 您的当前部署类型为公网访问，请使用上述OTA地址进行设备配置${RESET}"
-    echo -e "${YELLOW}💡 确保路由器已配置端口映射（8000, 8003）${RESET}"
+    echo -e "${YELLOW}💡 确保路由器/防火墙已配置/放行端口（映射）（8000, 8003）${RESET}"
   else
     echo -e "${YELLOW}💡 请根据您的部署方式选择相应的OTA地址${RESET}"
   fi
@@ -1765,5 +1813,3 @@ main() {
     echo -e "${GREEN}🥳🥳🥳 请尽情使用吧 🥳🥳🥳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
 }
-
-main "$@"
