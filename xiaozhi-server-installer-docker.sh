@@ -46,6 +46,36 @@ OS_VERSION=""
 CURRENT_DEPLOY_TYPE=""
 
 # ========================= 工具函数 =========================
+check_root_permission() {
+    echo -e "\n${CYAN}🔐 检查root权限...${RESET}"
+    
+    if [ "$EUID" -eq 0 ]; then
+        echo -e "${GREEN}✅ 当前以root权限运行${RESET}"
+        return 0
+    elif sudo -n true 2>/dev/null; then
+        echo -e "${GREEN}✅ 检测到sudo权限，可执行必要的管理操作${RESET}"
+        return 0
+    else
+        echo -e "${RED}❌ 当前用户权限不足${RESET}"
+        echo -e "${YELLOW}💡 小智服务器部署需要root权限或sudo权限来：${RESET}"
+        echo -e "${CYAN}  - 安装系统包和Docker${RESET}"
+        echo -e "${CYAN}  - 创建系统服务${RESET}"
+        echo -e "${CYAN}  - 配置网络和防火墙${RESET}"
+        echo -e "${CYAN}  - 管理容器和服务${RESET}"
+        echo ""
+        echo -e "${PURPLE}🔧 解决方案：${RESET}"
+        echo -e "${YELLOW}  方法1：使用sudo运行脚本${RESET}"
+        echo -e "    ${BOLD}sudo bash $0${RESET}"
+        echo ""
+        echo -e "${YELLOW}  方法2：切换到root用户${RESET}"
+        echo -e "    ${BOLD}sudo -i${RESET}"
+        echo -e "    ${BOLD}bash $0${RESET}"
+        echo ""
+        echo -e "${RED}⚠️  权限不足，无法继续部署！${RESET}"
+        exit 1
+    fi
+}
+
 check_dependencies() {
     echo -e "\n${CYAN}🔍 正在检查必要的系统工具...${RESET}"
     local dependencies=("curl" "jq" "sed" "awk")
@@ -1496,9 +1526,8 @@ config_server() {
     echo -e "  - 公网IP：$EXTERNAL_IP"
 
     echo -e "\n${YELLOW}⚠️  请选择部署场景（影响地址生成）：${RESET}"
-    echo -e "如果你的服务器在局域网需要在外面访问，请选择2，并自行配置IP，内网穿透。"
-    echo "1) 内网服务器部署（仅内网访问，用内网IP）"
-    echo "2) （云服务器）公网服务器部署（外网访问，用公网IP，需提前配置端口映射）"
+    echo "1) Docker部署（仅内网访问，用内网IP）"
+    echo "2) 公网部署（外网访问，用公网IP，需提前配置端口映射）"
     read -r -p "请输入序号 (默认1): " deploy_choice
     deploy_choice=${deploy_choice:-1}
 
@@ -1515,10 +1544,10 @@ config_server() {
             vision_ip="$INTERNAL_IP"
             deploy_type_color="${GREEN}"
             deploy_type_icon="✅"
-            deploy_description="内网服务器部署"
+            deploy_description="Docker内网部署"
             ota_url="http://$INTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="internal"
-            echo -e "${GREEN}✅ 已选择内网服务器部署，将使用内网IP生成地址${RESET}"
+            echo -e "${GREEN}✅ 已选择Docker内网部署，将使用内网IP生成地址${RESET}"
             ;;
         2)
             ws_ip="$EXTERNAL_IP"
@@ -1528,18 +1557,18 @@ config_server() {
             deploy_description="公网部署"
             ota_url="http://$EXTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="public"
-            echo -e "${GREEN}✅ 已选择（云服务器）公网服务器部署，将使用公网IP生成地址${RESET}"
-            echo -e "${YELLOW}⚠️  注意：确保路由器/防火墙已配置/放行端口（映射）（8000端口用于WebSocket，8003端口用于OTA/视觉接口）${RESET}"
+            echo -e "${GREEN}✅ 已选择公网部署，将使用公网IP生成地址${RESET}"
+            echo -e "${YELLOW}⚠️  注意：请确保路由器已配置端口映射（8000端口用于WebSocket，8003端口用于OTA/视觉接口）${RESET}"
             ;;
         *)
             ws_ip="$INTERNAL_IP"
             vision_ip="$INTERNAL_IP"
             deploy_type_color="${RED}"
             deploy_type_icon="❌"
-            deploy_description="内网服务器部署"
+            deploy_description="默认Docker内网部署"
             ota_url="http://$INTERNAL_IP:8003/xiaozhi/ota/"
             CURRENT_DEPLOY_TYPE="internal"
-            echo -e "${YELLOW}⚠️  输入无效，默认选择内网服务器部署${RESET}"
+            echo -e "${YELLOW}⚠️  输入无效，默认选择Docker内网部署${RESET}"
             ;;
     esac
 
@@ -1688,11 +1717,11 @@ show_connection_info() {
   if [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
     echo -e "${GREEN}OTA接口（当前部署类型 - 内网访问）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
     echo -e "${YELLOW}💡 您的当前部署类型为内网访问，请使用上述OTA地址进行设备配置${RESET}"
-    echo -e "${YELLOW}💡 如果需要从公网访问，确保路由器/防火墙已配置/放行端口（映射）（8000, 8003）${RESET}"
+    echo -e "${YELLOW}💡 如果需要从公网访问，请确保路由器已配置端口映射（8000, 8003）${RESET}"
   elif [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
     echo -e "${YELLOW}OTA接口（当前部署类型 - 公网访问）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
     echo -e "${YELLOW}💡 您的当前部署类型为公网访问，请使用上述OTA地址进行设备配置${RESET}"
-    echo -e "${YELLOW}💡 确保路由器/防火墙已配置/放行端口（映射）（8000, 8003）${RESET}"
+    echo -e "${YELLOW}💡 确保路由器已配置端口映射（8000, 8003）${RESET}"
   else
     echo -e "${YELLOW}💡 请根据您的部署方式选择相应的OTA地址${RESET}"
   fi
@@ -1785,6 +1814,7 @@ check_firewall() {
 
 # ========================= 主执行函数 =========================
 main() {
+    check_root_permission
     check_system
     check_dependencies
     check_server_config 
