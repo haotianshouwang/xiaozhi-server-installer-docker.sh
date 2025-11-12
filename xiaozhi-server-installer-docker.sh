@@ -463,51 +463,82 @@ check_and_install_docker() {
             ;;
     esac
     
-    # 主要安装方法：使用阿里云的Docker安装脚本
-    if retry_exec "curl -fsSL https://get.docker.com | sudo bash -s docker --mirror Aliyun" "使用阿里云镜像安装Docker"; then
-      echo -e "${GREEN}✅ Docker 主安装方式成功${RESET}"
-    else
-      echo -e "${YELLOW}⚠️ 主安装方式失败，尝试备用安装方式...${RESET}"
-      
-      # 备用安装方法1：使用国内镜像源的安装脚本
-      echo -e "${BLUE}🔄 尝试备用安装方式1：清华源安装脚本${RESET}"
-      if retry_exec "curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg" "添加清华源Docker密钥"; then
-        retry_exec "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null" "添加清华源Docker源"
+    # 改进的多镜像源重试机制
+    local docker_install_success=false
+    local mirror_count=0
+    
+    # 定义镜像源列表和对应的安装命令
+    declare -a mirrors=(
+        "阿里云镜像|https://get.docker.com|sudo bash -s docker --mirror Aliyun"
+        "华为云镜像|https://get.docker.com|sudo bash -s docker --mirror HuaweiCloud"
+        "Docker官方|https://get.docker.com|sudo bash -s docker"
+        "清华源|安装备用方法|备用安装方法1"
+        "阿里云源|安装备用方法|备用安装方法2"
+    )
+    
+    echo -e "${BLUE}🔄 开始多镜像源Docker安装...${RESET}"
+    
+    for mirror_info in "${mirrors[@]}"; do
+        mirror_count=$((mirror_count + 1))
+        IFS='|' read -r mirror_name mirror_url mirror_cmd <<< "$mirror_info"
         
-        # 根据包管理器安装Docker核心组件
-        case $pkg_manager in
-            apt)
-                retry_exec "sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" "安装Docker核心组件"
-                ;;
-            yum|dnf)
-                if command -v yum &> /dev/null; then
-                    retry_exec "sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin" "安装Docker核心组件"
-                else
-                    retry_exec "sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin" "安装Docker核心组件"
+        echo -e "\n${CYAN}🎯 尝试第 $mirror_count 个镜像源：$mirror_name${RESET}"
+        
+        if [[ "$mirror_cmd" == "备用安装方法1" ]]; then
+            # 备用安装方法1：清华源
+            echo -e "${BLUE}🔄 使用清华源进行Docker安装${RESET}"
+            if install_docker_with_tsinghua_source; then
+                docker_install_success=true
+                break
+            fi
+        elif [[ "$mirror_cmd" == "备用安装方法2" ]]; then
+            # 备用安装方法2：阿里云源
+            echo -e "${BLUE}🔄 使用阿里云源进行Docker安装${RESET}"
+            if install_docker_with_aliyun_source; then
+                docker_install_success=true
+                break
+            fi
+        else
+            # 正常的镜像源安装
+            echo -e "${CYAN}🔄 正在执行：使用 $mirror_name 安装Docker${RESET}"
+            if eval "curl -fsSL $mirror_url | $mirror_cmd"; then
+                echo -e "${GREEN}✅ $mirror_name Docker安装成功${RESET}"
+                docker_install_success=true
+                break
+            else
+                echo -e "${YELLOW}❌ $mirror_name Docker安装失败，尝试下一个镜像源...${RESET}"
+                if [ $mirror_count -lt 3 ]; then
+                    echo -e "${YELLOW}⏳ 等待3秒后尝试下一个镜像源...${RESET}"
+                    sleep 3
                 fi
-                ;;
-            pacman)
-                retry_exec "sudo pacman -S --noconfirm docker docker-compose" "安装Docker核心组件"
-                ;;
-            zypper)
-                retry_exec "sudo zypper install -y docker docker-compose" "安装Docker核心组件"
-                ;;
-            apk)
-                retry_exec "sudo apk add docker docker-compose" "安装Docker核心组件"
-                ;;
-            *)
-                retry_exec "sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || sudo yum install -y docker docker-ce-cli containerd.io docker-compose || sudo dnf install -y docker docker-ce-cli containerd.io docker-compose || sudo pacman -S --noconfirm docker docker-compose || sudo zypper install -y docker docker-compose || sudo apk add docker docker-compose" "安装Docker核心组件"
-                ;;
-        esac
-      else
-        # 备用安装方法2：手动安装
-        echo -e "${BLUE}🔄 尝试备用安装方式2：手动安装${RESET}"
-        retry_exec "sudo curl -fsSL https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/$(uname -m)/containerd.io_1.4.6-1_$(uname -m).deb -o /tmp/containerd.deb && sudo dpkg -i /tmp/containerd.deb" "安装containerd"
-        retry_exec "sudo curl -fsSL https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/$(uname -m)/docker-ce-cli_20.10.9-3-0~ubuntu-focal_$(uname -m).deb -o /tmp/docker-cli.deb && sudo dpkg -i /tmp/docker-cli.deb" "安装docker-cli"
-        retry_exec "sudo curl -fsSL https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/$(uname -m)/docker-ce_20.10.9-3-0~ubuntu-focal_$(uname -m).deb -o /tmp/docker-ce.deb && sudo dpkg -i /tmp/docker-ce.deb" "安装docker-ce"
-        retry_exec "sudo curl -fsSL https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/$(uname -m)/docker-ce-rootless-extras_20.10.9-3-0~ubuntu-focal_$(uname -m).deb -o /tmp/docker-rootless-extras.deb && sudo dpkg -i /tmp/docker-rootless-extras.deb" "安装docker-rootless-extras"
-      fi
+            fi
+        fi
+    done
+    
+    if [ "$docker_install_success" = false ]; then
+        echo -e "${YELLOW}⚠️ 所有预设镜像源都失败，尝试通用的备用安装方式...${RESET}"
+        
+        # 尝试通用备用安装方式（使用retry_exec进行有限重试）
+        echo -e "${BLUE}🔄 尝试通用备用安装方式${RESET}"
+        if retry_exec "curl -fsSL https://get.docker.com | sudo bash -s docker" "通用Docker安装方式"; then
+            echo -e "${GREEN}✅ 通用安装方式成功${RESET}"
+            docker_install_success=true
+        fi
     fi
+    
+    # 检查Docker安装是否成功
+    if [ "$docker_install_success" = false ]; then
+        echo -e "${RED}❌ Docker安装完全失败，脚本无法继续。${RESET}"
+        echo -e "${YELLOW}请检查网络连接或手动安装Docker后重试。${RESET}"
+        echo ""
+        echo -e "${CYAN}手动安装Docker命令：${RESET}"
+        echo -e "${GREEN}curl -fsSL https://get.docker.com | sudo bash${RESET}"
+        echo ""
+        echo -e "${YELLOW}安装成功后，请重新运行脚本进行配置。${RESET}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✅ Docker安装成功，开始配置...${RESET}"
     
     sudo usermod -aG docker $USER
 
@@ -541,8 +572,19 @@ check_and_install_docker() {
   fi
 }
 
+# 检查Docker是否已安装
+check_docker_installed() {
+    if ! command -v docker &> /dev/null || ! docker --version &> /dev/null; then
+        echo -e "${RED}❌ Docker未安装或安装异常，脚本无法继续${RESET}"
+        echo -e "${YELLOW}请重新运行脚本进行Docker安装，或手动安装Docker后重试${RESET}"
+        exit 1
+    fi
+    return 0
+}
+
 clean_container() {
-  echo -e "\n${BLUE}🔍 检测容器 $CONTAINER_NAME 是否存在...${RESET}"
+    check_docker_installed
+    echo -e "\n${BLUE}🔍 检测容器 $CONTAINER_NAME 是否存在...${RESET}"
   if docker ps -a --filter "name=^/${CONTAINER_NAME}$" --format "{{.Names}}" | grep -q "$CONTAINER_NAME"; then
     echo -e "${YELLOW}⚠️  容器 $CONTAINER_NAME 已存在，正在删除...${RESET}"
     retry_exec "docker rm -f $CONTAINER_NAME" "删除容器 $CONTAINER_NAME"
@@ -575,6 +617,72 @@ download_files() {
   else
     echo -e "\n${GREEN}✅ 跳过下载文件，使用现有配置文件${RESET}"
   fi
+}
+
+# 清华源Docker安装函数
+install_docker_with_tsinghua_source() {
+    echo -e "${BLUE}🔄 尝试备用安装方式1：清华源安装脚本${RESET}"
+    if curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg 2>/dev/null | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; then
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null 2>&1
+        
+        # 根据包管理器安装Docker核心组件
+        case $pkg_manager in
+            apt)
+                if sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ 清华源Docker安装成功${RESET}"
+                    return 0
+                fi
+                ;;
+            yum|dnf)
+                if command -v yum &> /dev/null; then
+                    if sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
+                        echo -e "${GREEN}✅ 清华源Docker安装成功${RESET}"
+                        return 0
+                    fi
+                else
+                    if sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
+                        echo -e "${GREEN}✅ 清华源Docker安装成功${RESET}"
+                        return 0
+                    fi
+                fi
+                ;;
+        esac
+    fi
+    echo -e "${RED}❌ 清华源Docker安装失败${RESET}"
+    return 1
+}
+
+# 阿里云源Docker安装函数
+install_docker_with_aliyun_source() {
+    echo -e "${BLUE}🔄 尝试备用安装方式2：阿里云源安装脚本${RESET}"
+    if curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg 2>/dev/null | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; then
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null 2>&1
+        
+        # 根据包管理器安装Docker核心组件
+        case $pkg_manager in
+            apt)
+                if sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ 阿里云源Docker安装成功${RESET}"
+                    return 0
+                fi
+                ;;
+            yum|dnf)
+                if command -v yum &> /dev/null; then
+                    if sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
+                        echo -e "${GREEN}✅ 阿里云源Docker安装成功${RESET}"
+                        return 0
+                    fi
+                else
+                    if sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1; then
+                        echo -e "${GREEN}✅ 阿里云源Docker安装成功${RESET}"
+                        return 0
+                    fi
+                fi
+                ;;
+        esac
+    fi
+    echo -e "${RED}❌ 阿里云源Docker安装失败${RESET}"
+    return 1
 }
 
 # 检查是否已经配置过
@@ -2066,7 +2174,8 @@ config_keys() {
 
 # ========================= 服务启动 =========================
 start_service() {
-  echo -e "\n${BLUE}🚀 开始启动服务...${RESET}"
+    check_docker_installed
+    echo -e "\n${BLUE}🚀 开始启动服务...${RESET}"
   cd "$MAIN_DIR" || { echo -e "${RED}❌ 进入目录 $MAIN_DIR 失败${RESET}"; exit 1; }
   retry_exec "docker compose up -d" "启动Docker服务"
   
