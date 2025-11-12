@@ -1719,7 +1719,8 @@ main() {
     show_connection_info
 
     echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${GREEN}🎊 小智服务器部署全流程结束！${RESET}"
+    echo -e "${GREEN}🎊  小智服务器部署成功！！ 🎊 ${RESET}"
+    echo -e "${GREEN}🥳🥳🥳 请尽情使用吧 🥳🥳🥳
     echo -e "${PURPLE}==================================================${RESET}"
 }
 
