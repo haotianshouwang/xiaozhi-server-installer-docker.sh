@@ -76,12 +76,96 @@ check_root_permission() {
     fi
 }
 
+# 检测系统包管理器
+detect_package_manager() {
+    if command -v apt-get &> /dev/null; then
+        echo "apt"
+    elif command -v yum &> /dev/null; then
+        echo "yum"
+    elif command -v dnf &> /dev/null; then
+        echo "dnf"
+    elif command -v pacman &> /dev/null; then
+        echo "pacman"
+    elif command -v zypper &> /dev/null; then
+        echo "zypper"
+    elif command -v apk &> /dev/null; then
+        echo "apk"
+    else
+        echo "unknown"
+    fi
+}
+
+# 根据包管理器安装依赖
+install_with_package_manager() {
+    local pkg_manager
+    pkg_manager=$(detect_package_manager)
+    
+    case $pkg_manager in
+        apt)
+            echo -e "${BLUE}📦 使用 APT 包管理器...${RESET}"
+            if ! sudo apt-get update; then
+                echo -e "${RED}❌ 更新软件源失败，请检查网络连接。${RESET}"
+                return 1
+            fi
+            if ! sudo apt-get install -y "$@"; then
+                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
+                return 1
+            fi
+            ;;
+        yum)
+            echo -e "${BLUE}📦 使用 YUM 包管理器...${RESET}"
+            if ! sudo yum install -y "$@"; then
+                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
+                return 1
+            fi
+            ;;
+        dnf)
+            echo -e "${BLUE}📦 使用 DNF 包管理器...${RESET}"
+            if ! sudo dnf install -y "$@"; then
+                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
+                return 1
+            fi
+            ;;
+        pacman)
+            echo -e "${BLUE}📦 使用 PACMAN 包管理器...${RESET}"
+            if ! sudo pacman -S --noconfirm "$@"; then
+                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
+                return 1
+            fi
+            ;;
+        zypper)
+            echo -e "${BLUE}📦 使用 ZYPPER 包管理器...${RESET}"
+            if ! sudo zypper install -y "$@"; then
+                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
+                return 1
+            fi
+            ;;
+        apk)
+            echo -e "${BLUE}📦 使用 APK 包管理器...${RESET}"
+            if ! sudo apk add "$@"; then
+                echo -e "${RED}❌ 安装工具失败，请手动安装后重试。${RESET}"
+                return 1
+            fi
+            ;;
+        *)
+            echo -e "${RED}❌ 未识别的包管理器，请手动安装以下工具：${RESET}"
+            echo -e "${YELLOW}需要安装的工具：$@${RESET}"
+            return 1
+            ;;
+    esac
+    return 0
+}
+
 check_dependencies() {
     echo -e "\n${CYAN}🔍 正在检查必要的系统工具...${RESET}"
     local dependencies=("curl" "jq" "sed" "awk")
     local missing=()
+    local pkg_manager
+    
+    # 检测包管理器
+    pkg_manager=$(detect_package_manager)
+    echo -e "${BLUE}🔧 检测到包管理器：${pkg_manager}${RESET}"
 
-    # 检测缺失的依赖
     for dep in "${dependencies[@]}"; do
         if ! command -v "$dep" &> /dev/null; then
             missing+=("$dep")
@@ -90,51 +174,16 @@ check_dependencies() {
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo -e "${YELLOW}⚠️  检测到缺少必要工具：${missing[*]}，正在尝试安装...${RESET}"
-        
-        # 定义包管理器及其安装命令（按优先级排序）
-        local pkg_managers=(
-            "apt-get:update:install:-y"  # Debian/Ubuntu
-            "yum:check-update:install:-y" # RHEL/CentOS
-            "dnf:check-update:install:-y" # Fedora
-            "pacman:-Sy:install:--noconfirm" # Arch
-        )
-
-        local installed=0
-        # 遍历包管理器，尝试安装
-        for pm in "${pkg_managers[@]}"; do
-            IFS=":" read -r cmd update_cmd install_cmd opts <<< "$pm"
-            
-            # 检查当前包管理器是否可用
-            if command -v "$cmd" &> /dev/null; then
-                echo -e "${CYAN}尝试使用 $cmd 安装...${RESET}"
-                
-                # 更新软件源
-                if ! sudo "$cmd" "$update_cmd" &> /dev/null; then
-                    echo -e "${YELLOW}$cmd 更新源失败，尝试下一个包管理器...${RESET}"
-                    continue
-                fi
-                
-                # 安装依赖
-                if sudo "$cmd" "$install_cmd" "$opts" "${missing[@]}" &> /dev/null; then
-                    echo -e "${GREEN}✅ 工具 ${missing[*]} 安装成功。${RESET}"
-                    installed=1
-                    break
-                else
-                    echo -e "${YELLOW}$cmd 安装失败，尝试下一个包管理器...${RESET}"
-                fi
-            fi
-        done
-
-        # 所有包管理器尝试失败，提示手动安装
-        if [ $installed -eq 0 ]; then
-            echo -e "${RED}❌ 所有包管理器均无法安装工具 ${missing[*]}，请手动安装后重试。${RESET}"
+        if ! install_with_package_manager "${missing[@]}"; then
+            echo -e "${RED}❌ 依赖安装失败，请手动安装后重试。${RESET}"
+            echo -e "${YELLOW}💡 需要安装的工具：${missing[*]}${RESET}"
             exit 1
         fi
+        echo -e "${GREEN}✅ 工具 ${missing[*]} 安装成功。${RESET}"
     else
         echo -e "${GREEN}✅ 所有必要工具均已安装。${RESET}"
     fi
 }
-
 
 exit_confirm() {
   echo -e "\n${YELLOW}⚠️  检测到退出信号，是否确认退出？(y/n)${RESET}"
