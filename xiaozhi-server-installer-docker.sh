@@ -577,6 +577,14 @@ download_files() {
   fi
 }
 
+# 检查是否已经配置过
+check_if_already_configured() {
+    if [ -f "$OVERRIDE_CONFIG_FILE" ] && grep -q "selected_module:" "$OVERRIDE_CONFIG_FILE" 2>/dev/null; then
+        return 0  # 已配置
+    fi
+    return 1  # 未配置
+}
+
 # ========================= 配置文件设置函数 =========================
 setup_config_file() {
     echo -e "\n${CYAN}📁 配置小智服务器配置文件...${RESET}"
@@ -598,13 +606,58 @@ setup_config_file() {
         
         case $config_choice in
             1)
-                echo -e "\n${GREEN}✅ 将使用现有配置文件，不进行下载${RESET}"
-                CONFIG_DOWNLOAD_NEEDED="false"
+                echo -e "\n${GREEN}✅ 检测到现有配置文件${RESET}"
+                
+                # 检查是否已经完整配置过
+                if check_if_already_configured; then
+                    echo -e "\n${CYAN}ℹ️  检测到配置文件已经完整配置过${RESET}"
+                    echo "1) 保留现有详细配置，直接使用"
+                    echo "2) 重新进行详细配置"
+                    echo "3) 保留配置文件但重新配置"
+                    read -p "请输入选择 (1-3，默认1): " detailed_choice
+                    detailed_choice=${detailed_choice:-1}
+                    
+                    case $detailed_choice in
+                        1)
+                            echo -e "\n${GREEN}✅ 将保留现有详细配置，脚本将直接使用已配置的设置${RESET}"
+                            CONFIG_DOWNLOAD_NEEDED="false"
+                            USE_EXISTING_CONFIG=true
+                            SKIP_DETAILED_CONFIG=true
+                            return
+                            ;;
+                        2)
+                            echo -e "\n${YELLOW}⚠️  将重新进行详细配置${RESET}"
+                            CONFIG_DOWNLOAD_NEEDED="false"
+                            USE_EXISTING_CONFIG=true
+                            SKIP_DETAILED_CONFIG=false
+                            ;;
+                        3)
+                            echo -e "\n${BLUE}📥 将保留配置文件但重新进行详细配置${RESET}"
+                            CONFIG_DOWNLOAD_NEEDED="false"
+                            USE_EXISTING_CONFIG=true
+                            SKIP_DETAILED_CONFIG=false
+                            ;;
+                        *)
+                            echo -e "\n${GREEN}✅ 将保留现有详细配置${RESET}"
+                            CONFIG_DOWNLOAD_NEEDED="false"
+                            USE_EXISTING_CONFIG=true
+                            SKIP_DETAILED_CONFIG=true
+                            return
+                            ;;
+                    esac
+                else
+                    echo -e "\n${GREEN}✅ 将使用现有配置文件，但需要完善详细配置${RESET}"
+                    CONFIG_DOWNLOAD_NEEDED="false"
+                    USE_EXISTING_CONFIG=true
+                    SKIP_DETAILED_CONFIG=false
+                fi
                 ;;
             2)
                 echo -e "\n${BLUE}📥 重新下载新的配置文件模板...${RESET}"
                 retry_exec "curl -fSL $CONFIG_FILE_URL -o $OVERRIDE_CONFIG_FILE" "下载配置文件到 data/.config.yaml"
                 CONFIG_DOWNLOAD_NEEDED="true"
+                USE_EXISTING_CONFIG=false
+                SKIP_DETAILED_CONFIG=false
                 ;;
             *)
                 echo -e "\n${GREEN}✅ 将使用现有配置文件，不进行下载${RESET}"
@@ -636,9 +689,9 @@ setup_config_file() {
 
 # ========================= ASR 配置（15个服务商） =========================
 config_asr() {
-    local return_to_main=false
+    local asr_return_to_prev=false
     
-    while [ "$return_to_main" = false ]; do
+    while [ "$asr_return_to_prev" = false ]; do
         echo -e "\n${GREEN}【1/5】配置 ASR (语音识别) 服务${RESET}"
         echo "请选择ASR服务商（共15个）："
         echo " 0) ${YELLOW} 返回上一步 ${RESET}"
@@ -685,8 +738,8 @@ config_asr() {
         
         # 处理返回上一步
         if [ "$asr_choice" = "0" ]; then
-            return_to_main=true
-            continue
+            asr_return_to_prev=true
+            return
         fi
 
     local asr_provider_key
@@ -1877,6 +1930,14 @@ config_server() {
 config_keys() {
     local return_to_main=false
     
+    # 如果选择了跳过详细配置，直接返回
+    if [ "${SKIP_DETAILED_CONFIG:-false}" = true ]; then
+        echo -e "\n${GREEN}✅ 检测到用户选择保留现有配置，跳过详细配置步骤${RESET}"
+        echo -e "${CYAN}ℹ️  将使用现有配置文件: $OVERRIDE_CONFIG_FILE${RESET}"
+        export KEY_CONFIG_MODE="existing"
+        return
+    fi
+    
     while [ "$return_to_main" = false ]; do
         echo -e "\n${PURPLE}==================================================${RESET}"
         echo -e "${CYAN}🔧  开始进行核心服务配置  🔧${RESET}"
@@ -2047,12 +2108,9 @@ show_connection_info() {
   
   # 先显示所有可用地址
   echo -e "${GREEN}OTA接口（内网）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-  echo -e ""
   echo -e "${GREEN}OTA接口（公网）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-  echo -e ""
-  echo -e "${GREEN}Websocket接口（内网）：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
-  echo -e ""
-  echo -e "${GREEN}Websocket接口（公网）：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+  echo -e "${GREEN}Websocket接口：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+  echo -e "${GREEN}Websocket接口：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
   echo -e "${PURPLE}--------------------------------------------------${RESET}"
   
   # 显示当前部署类型和推荐地址
