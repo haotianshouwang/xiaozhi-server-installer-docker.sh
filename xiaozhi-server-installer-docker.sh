@@ -1012,13 +1012,22 @@ config_asr() {
                 asr_provider_key="AliyunASR"
                 echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunASR。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
-                read -r -p "请输入 API Key: " api_key
-                api_key="${api_key:-}"
+                echo -e "${CYAN}🔑 Appkey地址：https://nls-portal.console.aliyun.com/applist${RESET}"
+                read -r -p "请输入 Appkey: " appkey
+                read -r -p "请输入 Access Key ID: " access_key_id
+                read -r -p "请输入 Access Key Secret: " access_key_secret
                 
                 sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$api_key" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                if [ -n "$appkey" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: \"$appkey\"/" "$CONFIG_FILE"
                 fi
+                if [ -n "$access_key_id" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$access_key_secret" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: \"$access_key_secret\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择阿里云AliyunASR。${RESET}"
                 ;;
             9)
                 asr_provider_key="AliyunStreamASR"
