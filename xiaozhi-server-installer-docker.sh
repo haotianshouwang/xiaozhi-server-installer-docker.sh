@@ -1369,6 +1369,10 @@ deploy_server() {
     setup_config_file
     download_files "$CONFIG_DOWNLOAD_NEEDED"
     config_keys
+    if [ $? -eq 1 ]; then
+        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+        return 1
+    fi
     start_service
     show_connection_info
 
@@ -1575,6 +1579,10 @@ config_only() {
     
     echo -e "${CYAN}⚙️ 开始修改配置...${RESET}"
     config_keys
+    if [ $? -eq 1 ]; then
+        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+        return 1
+    fi
     
     # 重启服务
     echo -e "${CYAN}🔄 重启服务以应用新配置...${RESET}"
