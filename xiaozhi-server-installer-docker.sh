@@ -81,6 +81,7 @@ check_dependencies() {
     local dependencies=("curl" "jq" "sed" "awk")
     local missing=()
 
+    # 检测缺失的依赖
     for dep in "${dependencies[@]}"; do
         if ! command -v "$dep" &> /dev/null; then
             missing+=("$dep")
@@ -89,19 +90,51 @@ check_dependencies() {
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo -e "${YELLOW}⚠️  检测到缺少必要工具：${missing[*]}，正在尝试安装...${RESET}"
-        if ! sudo apt-get update; then
-            echo -e "${RED}❌ 更新软件源失败，请检查网络连接。${RESET}"
+        
+        # 定义包管理器及其安装命令（按优先级排序）
+        local pkg_managers=(
+            "apt-get:update:install:-y"  # Debian/Ubuntu
+            "yum:check-update:install:-y" # RHEL/CentOS
+            "dnf:check-update:install:-y" # Fedora
+            "pacman:-Sy:install:--noconfirm" # Arch
+        )
+
+        local installed=0
+        # 遍历包管理器，尝试安装
+        for pm in "${pkg_managers[@]}"; do
+            IFS=":" read -r cmd update_cmd install_cmd opts <<< "$pm"
+            
+            # 检查当前包管理器是否可用
+            if command -v "$cmd" &> /dev/null; then
+                echo -e "${CYAN}尝试使用 $cmd 安装...${RESET}"
+                
+                # 更新软件源
+                if ! sudo "$cmd" "$update_cmd" &> /dev/null; then
+                    echo -e "${YELLOW}$cmd 更新源失败，尝试下一个包管理器...${RESET}"
+                    continue
+                fi
+                
+                # 安装依赖
+                if sudo "$cmd" "$install_cmd" "$opts" "${missing[@]}" &> /dev/null; then
+                    echo -e "${GREEN}✅ 工具 ${missing[*]} 安装成功。${RESET}"
+                    installed=1
+                    break
+                else
+                    echo -e "${YELLOW}$cmd 安装失败，尝试下一个包管理器...${RESET}"
+                fi
+            fi
+        done
+
+        # 所有包管理器尝试失败，提示手动安装
+        if [ $installed -eq 0 ]; then
+            echo -e "${RED}❌ 所有包管理器均无法安装工具 ${missing[*]}，请手动安装后重试。${RESET}"
             exit 1
         fi
-        if ! sudo apt-get install -y "${missing[@]}"; then
-            echo -e "${RED}❌ 安装工具 ${missing[*]} 失败，请手动安装后重试。${RESET}"
-            exit 1
-        fi
-        echo -e "${GREEN}✅ 工具 ${missing[*]} 安装成功。${RESET}"
     else
         echo -e "${GREEN}✅ 所有必要工具均已安装。${RESET}"
     fi
 }
+
 
 exit_confirm() {
   echo -e "\n${YELLOW}⚠️  检测到退出信号，是否确认退出？(y/n)${RESET}"
