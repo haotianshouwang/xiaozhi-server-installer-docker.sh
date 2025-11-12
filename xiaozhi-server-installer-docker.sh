@@ -214,7 +214,8 @@ main_menu() {
         echo "2) 更新服务器 (保留配置，更新到最新版本)"
         echo "3) 仅修改配置文件 (不下载服务器文件)"
         echo "4) 测试服务器连接"
-        echo "5) 删除服务器 (完全删除所有数据)"
+        echo "5) 测试服务器端口 (详细端口测试)"
+        echo "6) 删除服务器 (完全删除所有数据)"
         echo "0) 退出脚本"
     else
         echo -e "${GREEN}欢迎使用小智服务器部署脚本${RESET}"
@@ -275,6 +276,18 @@ main_menu() {
             fi
             ;;
         5)
+            if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
+                test_ports
+            else
+                echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
+                if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
+                    echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
+                fi
+                read -r -p "按回车键继续..."
+                return
+            fi
+            ;;
+        6)
             if [ "$SERVER_DIR_EXISTS" = true ] || [ "$CONTAINER_EXISTS" = true ]; then
                 delete_server
             else
@@ -1431,8 +1444,30 @@ update_server() {
     echo -e "${CYAN}1. 备份配置文件...${RESET}"
     BACKUP_DIR="/tmp/xiaozhi_backup_$(date +%s)"
     mkdir -p "$BACKUP_DIR"
-    cp -r "$MAIN_DIR/data/"* "$BACKUP_DIR/" 2>/dev/null || echo -e "${YELLOW}⚠️ 没有找到配置文件可备份${RESET}"
-    echo -e "${GREEN}✅ 配置文件已备份到: $BACKUP_DIR${RESET}"
+    
+    # 检查并备份所有配置文件
+    if [ -d "$MAIN_DIR/data" ] && [ "$(ls -A "$MAIN_DIR/data" 2>/dev/null)" ]; then
+        echo -e "${CYAN}📋 找到配置文件目录，备份内容：${RESET}"
+        ls -la "$MAIN_DIR/data/"
+        
+        # 使用shopt确保隐藏文件也被复制
+        shopt -s dotglob
+        cp -r "$MAIN_DIR/data/"* "$BACKUP_DIR/" 2>/dev/null
+        shopt -u dotglob
+        
+        echo -e "${GREEN}✅ 配置文件已备份到: $BACKUP_DIR${RESET}"
+        echo -e "${CYAN}📋 备份的文件：${RESET}"
+        ls -la "$BACKUP_DIR"
+    else
+        echo -e "${YELLOW}⚠️ 没有找到现有配置文件可备份${RESET}"
+        # 检查可能的配置文件位置
+        if [ -f "$MAIN_DIR/.config.yaml" ]; then
+            echo -e "${CYAN}🔍 找到配置文件在非标准位置，尝试备份...${RESET}"
+            cp "$MAIN_DIR/.config.yaml" "$BACKUP_DIR/"
+        fi
+        # 创建空的data目录防止后续问题
+        mkdir -p "$MAIN_DIR/data"
+    fi
     
     # 2. 停止并删除容器
     echo -e "${CYAN}2. 停止并删除容器...${RESET}"
@@ -1451,10 +1486,19 @@ update_server() {
     rm -rf "$MAIN_DIR"
     echo -e "${GREEN}✅ 已删除服务器目录${RESET}"
     
-    # 4. 重新下载（不下载配置文件）
-    echo -e "${CYAN}4. 重新下载最新版本...${RESET}"
+    # 检查数据目录是否存在（如果配置文件存在的话）
+    echo -e "${CYAN}3.5. 检查配置文件状态...${RESET}"
+    if [ -f "$HOME/xiaozhi-server/data/.config.yaml" ]; then
+        echo -e "${YELLOW}⚠️ 检测到配置文件残留，将被清理${RESET}"
+    else
+        echo -e "${GREEN}✅ 没有残留的配置文件${RESET}"
+    fi
+    
+    # 4. 重新下载docker-compose.yml（更新时必需）
+    echo -e "${CYAN}4. 重新下载docker-compose.yml...${RESET}"
     create_dirs
-    download_files "false"  # 不下载配置文件
+    echo -e "${YELLOW}🔄 正在下载docker-compose.yml...${RESET}"
+    retry_exec "curl -fSL $DOCKER_COMPOSE_URL -o $MAIN_DIR/docker-compose.yml" "下载 docker-compose.yml"
     
     # 4.5. 强制重新构建Docker镜像
     echo -e "${CYAN}4.5. 重新构建Docker镜像...${RESET}"
@@ -1466,10 +1510,31 @@ update_server() {
     # 5. 恢复配置文件
     echo -e "${CYAN}5. 恢复配置文件...${RESET}"
     if [ -d "$BACKUP_DIR" ] && [ "$(ls -A "$BACKUP_DIR" 2>/dev/null)" ]; then
+        echo -e "${CYAN}📂 从备份恢复配置文件...${RESET}"
+        echo -e "${CYAN}📋 备份文件列表：${RESET}"
+        ls -la "$BACKUP_DIR"
+        
+        # 使用shopt确保隐藏文件也被复制
+        shopt -s dotglob
         cp -r "$BACKUP_DIR/"* "$MAIN_DIR/data/" 2>/dev/null
+        shopt -u dotglob
+        
         echo -e "${GREEN}✅ 配置文件已恢复${RESET}"
+        echo -e "${CYAN}📋 恢复的文件：${RESET}"
+        ls -la "$MAIN_DIR/data/"
+        
+        # 验证配置文件恢复成功
+        if [ -f "$MAIN_DIR/data/.config.yaml" ]; then
+            echo -e "${GREEN}✅ 配置文件验证成功${RESET}"
+        else
+            echo -e "${YELLOW}⚠️ 配置文件恢复可能有问题，检查手动恢复${RESET}"
+        fi
     else
         echo -e "${YELLOW}⚠️ 没有配置文件需要恢复${RESET}"
+        echo -e "${CYAN}💡 可能的原因：${RESET}"
+        echo "  - 首次安装，没有现有配置"
+        echo "  - 配置文件在非标准位置"
+        echo "  - 备份目录创建失败"
     fi
     
     # 清理备份
@@ -1521,6 +1586,187 @@ config_only() {
     
     read -r -p "按回车键返回主菜单..."
     return  # 修复：使用return而不是递归
+}
+
+# 连接信息展示
+show_connection_info() {
+  # 等待Docker服务完全启动
+  echo -e "\n${YELLOW}⏳ Docker服务启动中，等待10秒确保服务完全启动...${RESET}"
+  echo -e "${YELLOW}🔄 倒计时：${RESET}"
+  for i in {10..1}; do
+    echo -ne "\r${YELLOW}   倒计时: ${i} 秒${RESET}"
+    sleep 1
+  done
+  echo -e "\n${GREEN}✅ 等待完成，开始进行端口检查${RESET}"
+  
+  echo -e "\n${PURPLE}==================================================${RESET}"
+  echo -e "${CYAN}📡 服务器连接地址信息${RESET}"
+  echo -e "${PURPLE}==================================================${RESET}"
+  echo -e "内网地址：$INTERNAL_IP"
+  echo -e "公网地址：$EXTERNAL_IP"
+  echo -e "${PURPLE}--------------------------------------------------${RESET}"
+  
+  # 先显示所有可用地址
+  echo -e "${GREEN}OTA接口（内网）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+  echo -e "${GREEN}OTA接口（公网）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+  echo -e "${GREEN}Websocket接口：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+  echo -e "${GREEN}Websocket接口：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+  echo -e "${PURPLE}--------------------------------------------------${RESET}"
+  
+  # 显示当前部署类型和推荐地址
+  if [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
+    echo -e "${GREEN}OTA接口（当前部署类型 - 内网环境）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+    echo -e "${YELLOW}💡 您的当前部署类型为内网环境，请使用上述OTA地址进行设备配置${RESET}"
+    echo -e "${YELLOW}💡 如果需要从公网访问，请确保路由器已配置端口映射（8000, 8003）${RESET}"
+  elif [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
+    echo -e "${YELLOW}OTA接口（当前部署类型 - 公网环境）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+    echo -e "${YELLOW}💡 您的当前部署类型为公网环境，请使用上述OTA地址进行设备配置${RESET}"
+    echo -e "${YELLOW}💡 确保路由器已配置端口映射（8000, 8003）${RESET}"
+  else
+    echo -e "${YELLOW}💡 请根据您的部署方式选择相应的OTA地址${RESET}"
+  fi
+  
+  echo -e "${PURPLE}==================================================${RESET}"
+  
+  # 根据部署类型进行端口检查
+  if [ "$CURRENT_DEPLOY_TYPE" = "public" ]; then
+      echo -e "\n${YELLOW}📋 现在进行公网端口连通性检查...${RESET}"
+      check_network_ports "$EXTERNAL_IP" "公网"
+  elif [ "$CURRENT_DEPLOY_TYPE" = "internal" ]; then
+      echo -e "\n${YELLOW}📋 现在进行内网端口连通性检查...${RESET}"
+      check_network_ports "$INTERNAL_IP" "内网"
+  else
+      echo -e "\n${YELLOW}📋 进行全面的端口连通性检查...${RESET}"
+      echo -e "${CYAN}🌐 检查内网连通性:${RESET}"
+      check_network_ports "$INTERNAL_IP" "内网"
+      echo -e "\n${CYAN}🌐 检查公网连通性:${RESET}"
+      check_network_ports "$EXTERNAL_IP" "公网"
+  fi
+  
+  # 添加端口检查方法详细说明
+  echo -e "\n${CYAN}🔧 端口检查方法详细说明${RESET}"
+  echo -e "${PURPLE}=======================================================${RESET}"
+  echo -e "${YELLOW}📊 端口检查技术原理：${RESET}"
+  echo -e "${CYAN}  公网端口查询方法：${RESET}"
+  echo -e "    • OTA端口(8003): 使用 ${BOLD}curl -s -o /dev/null -w '%{http_code}' --connect-timeout 3 http://IP:8003/xiaozhi/ota/${RESET}"
+  echo -e "    • WebSocket端口(8000): 使用 ${BOLD}timeout 5 nc -z IP 8000${RESET}"
+  echo -e "    • HTTP状态码: 200=成功连接, 404=服务存在但路径错误, 000=连接失败"
+  
+  echo -e "\n${CYAN}  内网端口查询方法：${RESET}"
+  echo -e "    • OTA端口(8003): 使用 ${BOLD}curl -s -o /dev/null -w '%{http_code}' --connect-timeout 3 http://内网IP:8003/xiaozhi/ota/${RESET}"
+  echo -e "    • WebSocket端口(8000): 使用 ${BOLD}timeout 5 nc -z 内网IP 8000${RESET}"
+  echo -e "    • nc(netcat): 检查TCP端口是否开放，无HTTP响应但能验证端口连通性"
+  
+  echo -e "\n${YELLOW}💡 手动检查命令示例：${RESET}"
+  echo -e "${CYAN}  检查OTA接口：${RESET} curl http://$INTERNAL_IP:8003/xiaozhi/ota/"
+  echo -e "${CYAN}  检查WebSocket：${RESET} timeout 3 nc -z $INTERNAL_IP 8000"
+  echo -e "${CYAN}  检查服务状态：${RESET} docker ps --filter name=$CONTAINER_NAME"
+  echo -e "${CYAN}  查看服务日志：${RESET} docker logs $CONTAINER_NAME --tail 20"
+  
+  echo -e "\n${YELLOW}🔍 连接诊断流程：${RESET}"
+  echo -e "    1. ${CYAN}HTTP连接测试：${RESET}curl 检查OTA端口返回状态码和内容"
+  echo -e "    2. ${CYAN}TCP连接测试：${RESET}nc 检查WebSocket端口是否开放"
+  echo -e "    3. ${CYAN}内容验证：${RESET}如果HTTP 200/404，获取OTA页面内容确认服务正常"
+  echo -e "    4. ${CYAN}网络诊断：${RESET}根据连接失败类型提供对应的故障排除建议"
+  
+  echo -e "\n${PURPLE}=======================================================${RESET}"
+}
+
+# 通用端口检查函数
+check_network_ports() {
+    local target_ip="$1"
+    local deploy_type="$2"
+    local ota_port=8003
+    local ws_port=8000
+    local ota_url="http://$target_ip:$ota_port/xiaozhi/ota/"
+    
+    echo -e "\n${CYAN}🔍 开始检查${deploy_type}端口连通性...${RESET}"
+    echo -e "${YELLOW}🌐 检查目标IP: $target_ip${RESET}"
+    echo -e "${CYAN}──────────────────────────────────────────────────${RESET}"
+    
+    # 检查OTA端口 (8003)
+    echo -e "${CYAN}📡 检查OTA端口 $ota_port...${RESET}"
+    if timeout 5 curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 "$ota_url" > /tmp/ota_status 2>/dev/null; then
+        local ota_status=$(cat /tmp/ota_status)
+        if [ "$ota_status" = "200" ] || [ "$ota_status" = "404" ]; then
+            echo -e "${GREEN}✅ OTA端口 $ota_port 连接正常${RESET}"
+            
+            # 获取OTA内容
+            echo -e "${CYAN}📋 获取OTA内容（使用curl命令访问）...${RESET}"
+            echo -e "${YELLOW}🔗 访问地址: $ota_url${RESET}"
+            
+            if timeout 15 curl -s "$ota_url" > /tmp/ota_content 2>/dev/null; then
+                local ota_content=$(cat /tmp/ota_content)
+                if [ -n "$ota_content" ] && [ "$ota_content" != "Connection refused" ]; then
+                    echo -e "${GREEN}📄 OTA服务器响应内容：${RESET}"
+                    echo -e "${CYAN}──────────────────────────────────────────────────${RESET}"
+                    echo "$ota_content" | head -30 | sed 's/^/    /'  # 显示前30行，每行前面加缩进
+                    if [ $(echo "$ota_content" | wc -l) -gt 30 ]; then
+                        echo -e "${CYAN}    ... (内容过长，已截取前30行)${RESET}"
+                    fi
+                    echo -e "${CYAN}──────────────────────────────────────────────────${RESET}"
+                    
+                    echo -e "${GREEN}✅ OTA服务正常运行，配置正确${RESET}"
+                    echo -e "${CYAN}💡 请使用上述OTA地址进行设备配置${RESET}"
+                    echo -e "${CYAN}💡 curl命令示例：curl $ota_url${RESET}"
+                else
+                    echo -e "${YELLOW}⚠️  OTA服务已启动但返回空内容或拒绝连接${RESET}"
+                fi
+            else
+                echo -e "${YELLOW}⚠️  无法获取OTA内容（连接超时或服务器未响应）${RESET}"
+                echo -e "${YELLOW}💡 建议手动测试：curl $ota_url${RESET}"
+            fi
+        else
+            echo -e "${YELLOW}⚠️  OTA端口连接异常 (HTTP状态码: $ota_status)${RESET}"
+        fi
+    else
+        echo -e "${RED}❌ OTA端口 $ota_port 无法访问${RESET}"
+    fi
+    
+    echo
+    
+    # 检查WebSocket端口 (8000)
+    echo -e "${CYAN}🔌 检查WebSocket端口 $ws_port...${RESET}"
+    
+    # 使用nc检查端口是否开放
+    if timeout 5 nc -z "$target_ip" "$ws_port" 2>/dev/null; then
+        echo -e "${GREEN}✅ WebSocket端口 $ws_port 连接正常${RESET}"
+    else
+        echo -e "${RED}❌ WebSocket端口 $ws_port 无法访问${RESET}"
+    fi
+    
+    echo -e "${CYAN}──────────────────────────────────────────────────${RESET}"
+    
+    # 总结端口状态
+    local ports_ok=true
+    if ! timeout 5 curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 "$ota_url" > /tmp/ota_check 2>/dev/null; then
+        ports_ok=false
+    fi
+    if ! timeout 5 nc -z "$target_ip" "$ws_port" 2>/dev/null; then
+        ports_ok=false
+    fi
+    
+    if [ "$ports_ok" = true ]; then
+        echo -e "${GREEN}✅ ${deploy_type}端口检查完成 - 所有端口连接正常${RESET}"
+    else
+        echo -e "${RED}❌ ${deploy_type}端口检查发现问题${RESET}"
+        if [ "$deploy_type" = "公网" ]; then
+            echo -e "${YELLOW}🔧 请检查以下配置：${RESET}"
+            echo -e "  ${YELLOW}• 云服务器：${RESET}在云服务器控制台安全组中放行端口 $ws_port 和 $ota_port"
+            echo -e "  ${YELLOW}• 家庭网络：${RESET}在路由器中配置端口映射或DMZ设置"
+            echo -e "  ${YELLOW}• 防火墙：${RESET}确保云防火墙或硬件防火墙未阻止这些端口"
+            echo -e "  ${YELLOW}• 服务状态：${RESET}确认Docker容器和服务正在运行"
+        else
+            echo -e "${YELLOW}🔧 请检查以下配置：${RESET}"
+            echo -e "  ${YELLOW}• Docker服务：${RESET}确认Docker容器正在运行"
+            echo -e "  ${YELLOW}• 防火墙：${RESET}确认系统防火墙未阻止端口访问"
+            echo -e "  ${YELLOW}• 网络配置：${RESET}确认内网IP配置正确"
+        fi
+        echo -e "${CYAN}💡 配置完成后，可重新运行脚本来验证端口连通性${RESET}"
+    fi
+    
+    # 清理临时文件
+    rm -f /tmp/ota_status /tmp/ota_content /tmp/ota_check
 }
 
 # 测试服务器连接
@@ -1664,6 +1910,41 @@ test_server() {
     
     read -r -p "按回车键返回主菜单..."
     return  # 修复：使用return避免递归
+}
+
+# 测试服务器端口（新的详细端口测试）
+test_ports() {
+    echo -e "${CYAN}🧪 测试服务器端口连通性${RESET}"
+    echo -e "${YELLOW}这将进行详细的端口检查：${RESET}"
+    echo "1. OTA端口(8003)HTTP连接测试"
+    echo "2. WebSocket端口(8000)TCP连接测试"
+    echo "3. 详细诊断信息显示"
+    echo "4. 故障排除建议"
+    
+    read -r -p "确认开始端口测试？(y/n，默认y): " confirm
+    confirm=${confirm:-y}
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo -e "${CYAN}✅ 已取消测试${RESET}"
+        read -r -p "按回车键返回主菜单..."
+        return
+    fi
+    
+    # 检查Docker容器状态
+    echo -e "\n${YELLOW}🔍 检查Docker容器状态${RESET}"
+    if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo -e "${GREEN}✅ 容器 $CONTAINER_NAME 正在运行${RESET}"
+    else
+        echo -e "${RED}❌ 容器 $CONTAINER_NAME 未运行${RESET}"
+        echo -e "${YELLOW}💡 请先启动服务器再进行端口测试${RESET}"
+        read -r -p "按回车键返回主菜单..."
+        return
+    fi
+    
+    # 调用连接信息展示函数
+    show_connection_info
+    
+    read -r -p "按回车键返回主菜单..."
+    return
 }
 
 # 删除服务器（完全删除所有数据）
