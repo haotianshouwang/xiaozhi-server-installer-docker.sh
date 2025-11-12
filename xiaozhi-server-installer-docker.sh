@@ -936,10 +936,146 @@ config_asr() {
                     sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
                 fi
                 ;;
-            *)
-                asr_provider_key="AliyunStreamASR"
-                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择阿里云流式ASR。${RESET}"
+            7)
+                asr_provider_key="TencentASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了腾讯云 TencentASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/asr${RESET}"
+                read -r -p "请输入 SecretId: " secret_id
+                secret_id="${secret_id:-}"
+                read -r -p "请输入 SecretKey: " secret_key
+                secret_key="${secret_key:-}"
+                
                 sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$secret_id" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_id: .*/    secret_id: \"$secret_id\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$secret_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            8)
+                asr_provider_key="AliyunASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            9)
+                asr_provider_key="AliyunStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunStreamASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择阿里云流式ASR。${RESET}"
+                ;;
+            10)
+                asr_provider_key="BaiduASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度智能云 BaiduASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai${RESET}"
+                read -r -p "请输入 APP ID: " app_id
+                app_id="${app_id:-}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                read -r -p "请输入 Secret Key: " secret_key
+                secret_key="${secret_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$app_id" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$secret_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            11)
+                asr_provider_key="OpenaiASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了OpenAI OpenaiASR。${RESET}"
+                echo -e "${CYAN}🔑 API地址：https://platform.openai.com${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            12)
+                asr_provider_key="GroqASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了Groq GroqASR。${RESET}"
+                echo -e "${CYAN}🔑 API地址：https://console.groq.com${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            13)
+                asr_provider_key="VoskASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${YELLOW}⚠️ 内存不足提醒：推荐≥2GB内存${RESET}"
+                    read -r -p "按回车继续或输入0重新选择: " confirm_memory
+                    if [ "$confirm_memory" = "0" ]; then
+                        continue
+                    fi
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
+                echo -e "${CYAN}ℹ️ 系统将自动配置 VoskASR 模型下载。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            14)
+                asr_provider_key="Qwen3ASRFlash"
+                echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen3ASRFlash。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            15)
+                asr_provider_key="XunfeiStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞 XunfeiStreamASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn${RESET}"
+                read -r -p "请输入 APP ID: " app_id
+                app_id="${app_id:-}"
+                read -r -p "请输入 API Secret: " api_secret
+                api_secret="${api_secret:-}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$app_id" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$api_secret" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            *)
+                echo -e "\n${RED}❌ 输入无效，请选择1-15范围内的数字，或输入0返回上一步${RESET}"
+                echo -e "${YELLOW}💡 提示：默认推荐选项9（阿里云流式ASR）${RESET}"
+                read -r -p "按回车键重新选择..."
+                continue
                 ;;
         esac
         
@@ -997,10 +1133,86 @@ config_llm() {
                     sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
                 ;;
-            *)
-                llm_provider_key="ChatGLMLLM"
-                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择智谱清言 ChatGLM。${RESET}"
+            3)
+                llm_provider_key="KimiLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了月之暗面 Kimi。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://platform.moonshot.cn/${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
                 sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            4)
+                llm_provider_key="SparkLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞星火 Spark。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.xfyun.cn/${RESET}"
+                read -r -p "请输入 App ID: " app_id
+                read -r -p "请输入 API Secret: " api_secret
+                read -r -p "请输入 API Key: " api_key
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$app_id" ] && [ -n "$api_secret" ] && [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            5)
+                llm_provider_key="WenxinLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度文心一言 Wenxin。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/#/ai/wenxinworkshop/app/index${RESET}"
+                read -r -p "请输入 Access Key: " access_key
+                read -r -p "请输入 Secret Key: " secret_key
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$access_key" ] && [ -n "$secret_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    access_key: .*/    access_key: \"$access_key\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            6)
+                llm_provider_key="DoubaoLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎豆包 Doubao。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/ark${RESET}"
+                read -r -p "请输入 Access Key ID: " access_key_id
+                read -r -p "请输入 Secret Access Key: " secret_access_key
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$access_key_id" ] && [ -n "$secret_access_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    secret_access_key: .*/    secret_access_key: \"$secret_access_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            7)
+                llm_provider_key="OpenaiLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            8)
+                llm_provider_key="GroqLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Groq。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.groq.com/keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            *)
+                echo -e "\n${RED}❌ 输入无效，请重新选择${RESET}"
+                continue
                 ;;
         esac
         
@@ -1054,10 +1266,34 @@ config_vllm() {
                     sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
                 ;;
-            *)
-                vllm_provider_key="ChatGLMVLLM"
-                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择智谱清言 ChatGLM VLLM。${RESET}"
+            3)
+                vllm_provider_key="WenxinVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度文心一言 Wenxin VLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/#/ai/wenxinworkshop/app/index${RESET}"
+                read -r -p "请输入 Access Key: " access_key
+                read -r -p "请输入 Secret Key: " secret_key
+                
                 sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
+                if [ -n "$access_key" ] && [ -n "$secret_key" ]; then
+                    sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    access_key: .*/    access_key: \"$access_key\"/" "$CONFIG_FILE"
+                    sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            4)
+                vllm_provider_key="OpenaiVLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI VLLM。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            *)
+                echo -e "\n${RED}❌ 输入无效，请重新选择${RESET}"
+                continue
                 ;;
         esac
         
@@ -1102,10 +1338,160 @@ config_tts() {
                 echo -e "\n${GREEN}✅ 已选择微软 EdgeTTS。${RESET}"
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
                 ;;
-            *)
-                tts_provider_key="EdgeTTS"
-                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择微软 EdgeTTS。${RESET}"
+            2)
+                tts_provider_key="DoubaoTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 Doubao TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/ark${RESET}"
+                read -r -p "请输入 Access Key ID: " access_key_id
+                read -r -p "请输入 Secret Access Key: " secret_access_key
+                
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$access_key_id" ] && [ -n "$secret_access_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_access_key: .*/    secret_access_key: \"$secret_access_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            3)
+                tts_provider_key="AliyunTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 Aliyun TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                read -r -p "请输入 Access Key ID: " access_key_id
+                read -r -p "请输入 Access Key Secret: " access_key_secret
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$access_key_id" ] && [ -n "$access_key_secret" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_access_key: .*/    secret_access_key: \"$access_key_secret\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            4)
+                tts_provider_key="BaiduTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度 Baidu TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                read -r -p "请输入 Secret Key: " secret_key
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ] && [ -n "$secret_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            5)
+                tts_provider_key="TencentTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了腾讯云 Tencent TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/asr${RESET}"
+                read -r -p "请输入 Secret ID: " secret_id
+                read -r -p "请输入 Secret Key: " secret_key
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$secret_id" ] && [ -n "$secret_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_id: .*/    secret_id: \"$secret_id\"/" "$CONFIG_FILE"
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            6)
+                tts_provider_key="OpenaiTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI TTS。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            7)
+                tts_provider_key="GizwitsTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了机智云 Gizwits TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://iot.gizwits.com/${RESET}"
+                read -r -p "请输入 Product Key: " product_key
+                read -r -p "请输入 Product Secret: " product_secret
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$product_key" ] && [ -n "$product_secret" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    product_key: .*/    product_key: \"$product_key\"/" "$CONFIG_FILE"
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    product_secret: .*/    product_secret: \"$product_secret\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            8)
+                tts_provider_key="ACGNTTS"
+                echo -e "\n${GREEN}✅ 已选择自部署 ACGN TTS。${RESET}"
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                ;;
+            9)
+                tts_provider_key="LinkeraiTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 LinkerAI TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://linkerai.cn/${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            10)
+                tts_provider_key="PaddleSpeechTTS"
+                echo -e "\n${GREEN}✅ 已选择百度飞桨 PaddleSpeech TTS。${RESET}"
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                ;;
+            11)
+                tts_provider_key="IndexStreamTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Index-TTS-vLLM。${RESET}"
+                echo -e "${CYAN}🔑 请确保已部署Index-TTS-vLLM服务${RESET}"
+                read -r -p "请输入服务地址: " service_url
+                service_url="${service_url:-}"
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$service_url" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    service_url: .*/    service_url: \"$service_url\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            12)
+                tts_provider_key="AliBLTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云百炼 AliBL TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            13)
+                tts_provider_key="XunFeiTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞 XunFei TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.xfyun.cn/${RESET}"
+                read -r -p "请输入 App ID: " app_id
+                read -r -p "请输入 API Secret: " api_secret
+                read -r -p "请输入 API Key: " api_key
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$app_id" ] && [ -n "$api_secret" ] && [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$CONFIG_FILE"
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            14)
+                tts_provider_key="Custom"
+                echo -e "\n${YELLOW}⚠️ 您选择了自定义 TTS。${RESET}"
+                echo -e "${CYAN}🔑 请输入自定义TTS服务配置${RESET}"
+                read -r -p "请输入服务名称: " service_name
+                read -r -p "请输入服务地址: " service_url
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$service_name" ] && [ -n "$service_url" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    service_name: .*/    service_name: \"$service_name\"/" "$CONFIG_FILE"
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    service_url: .*/    service_url: \"$service_url\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            *)
+                echo -e "\n${RED}❌ 输入无效，请重新选择${RESET}"
+                continue
                 ;;
         esac
         
@@ -1139,10 +1525,26 @@ config_memory() {
                 echo -e "\n${GREEN}✅ 已选择不开启记忆功能。${RESET}"
                 sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$CONFIG_FILE"
                 ;;
-            *)
-                memory_provider_key="nomem"
-                echo -e "\n${YELLOW}⚠️ 输入无效，默认选择不开启记忆功能。${RESET}"
+            2)
+                memory_provider_key="mem_local_short"
+                echo -e "\n${GREEN}✅ 已选择本地短记忆 (隐私优先)。${RESET}"
                 sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$CONFIG_FILE"
+                ;;
+            3)
+                memory_provider_key="mem0ai"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Mem0AI (支持超长记忆)。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://mem0ai.com/${RESET}"
+                read -r -p "请输入 API Key: " mem0_api_key
+                mem0_api_key="${mem0_api_key:-}"
+                
+                sed -i "/^  Memory: /c\  Memory: $memory_provider_key" "$CONFIG_FILE"
+                if [ -n "$mem0_api_key" ]; then
+                    sed -i "/^  mem0ai:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$mem0_api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            *)
+                echo -e "\n${RED}❌ 输入无效，请重新选择${RESET}"
+                continue
                 ;;
         esac
         
@@ -1277,25 +1679,25 @@ config_keys() {
         config_llm
         if [ $? -eq 1 ]; then
             echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return  # 修复：返回到上级菜单
+            return 1  # 修复：返回到上级菜单并传递正确的返回值
         fi
         
         config_vllm
         if [ $? -eq 1 ]; then
             echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return  # 修复：返回到上级菜单
+            return 1  # 修复：返回到上级菜单并传递正确的返回值
         fi
         
         config_tts
         if [ $? -eq 1 ]; then
             echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return  # 修复：返回到上级菜单
+            return 1  # 修复：返回到上级菜单并传递正确的返回值
         fi
         
         config_memory
         if [ $? -eq 1 ]; then
             echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return  # 修复：返回到上级菜单
+            return 1  # 修复：返回到上级菜单并传递正确的返回值
         fi
         
         config_server
