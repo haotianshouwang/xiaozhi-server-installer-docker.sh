@@ -210,11 +210,10 @@ main_menu() {
         fi
         echo
         echo "请选择操作："
-        echo "1) 开始部署小智服务器"
-        echo "2) 重新开始部署 (删除现有并重新部署)"
-        echo "3) 更新服务器 (保留配置，更新到最新版本)"
-        echo "4) 仅修改配置文件 (不下载服务器文件)"
-        echo "5) 删除服务器 (完全删除所有数据)"
+        echo "1) 重新开始部署 (删除现有并重新部署)"
+        echo "2) 更新服务器 (保留配置，更新到最新版本)"
+        echo "3) 仅修改配置文件 (不下载服务器文件)"
+        echo "4) 删除服务器 (完全删除所有数据)"
         echo "0) 退出脚本"
     else
         echo -e "${GREEN}欢迎使用小智服务器部署脚本${RESET}"
@@ -229,37 +228,40 @@ main_menu() {
     
     case $menu_choice in
         1)
-            deploy_server
-            ;;
-        2)
-            if [ "$SERVER_DIR_EXISTS" = true ] || [ "$CONFIG_EXISTS" = true ]; then
+            # 根据部署状态决定行为
+            if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
+                # 服务器已部署 -> 重新部署
                 redeploy_server
             else
-                echo -e "${YELLOW}⚠️ 未检测到现有服务器配置${RESET}"
+                # 服务器未部署 -> 首次部署
                 deploy_server
             fi
             ;;
-        3)
+        2)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 update_server
             else
                 echo -e "${RED}❌ 未检测到现有服务器，无法更新${RESET}"
-                echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
+                if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
+                    echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
+                fi
+                read -r -p "按回车键继续..."
+                return  # 修复：使用return避免递归
+            fi
+            ;;
+        3)
+            if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
+                config_only
+            else
+                echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
+                if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
+                    echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
+                fi
                 read -r -p "按回车键继续..."
                 return  # 修复：使用return避免递归
             fi
             ;;
         4)
-            if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
-                config_only
-            else
-                echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
-                echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
-                read -r -p "按回车键继续..."
-                return  # 修复：使用return避免递归
-            fi
-            ;;
-        5)
             if [ "$SERVER_DIR_EXISTS" = true ] || [ "$CONTAINER_EXISTS" = true ]; then
                 delete_server
             else
