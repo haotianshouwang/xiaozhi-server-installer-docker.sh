@@ -1743,6 +1743,15 @@ start_service() {
 
 # ========================= 连接信息展示 =========================
 show_connection_info() {
+  # 等待Docker服务完全启动
+  echo -e "\n${YELLOW}⏳ Docker服务启动中，等待10秒确保服务完全启动...${RESET}"
+  echo -e "${YELLOW}🔄 倒计时：${RESET}"
+  for i in {10..1}; do
+    echo -ne "\r${YELLOW}   倒计时: ${i} 秒${RESET}"
+    sleep 1
+  done
+  echo -e "\n${GREEN}✅ 等待完成，开始进行端口检查${RESET}"
+  
   echo -e "\n${PURPLE}==================================================${RESET}"
   echo -e "${CYAN}📡 服务器连接地址信息${RESET}"
   echo -e "${PURPLE}==================================================${RESET}"
@@ -1786,6 +1795,34 @@ show_connection_info() {
       echo -e "\n${CYAN}🌐 检查公网连通性:${RESET}"
       check_network_ports "$EXTERNAL_IP" "公网"
   fi
+  
+  # 添加端口检查方法详细说明
+  echo -e "\n${CYAN}🔧 端口检查方法详细说明${RESET}"
+  echo -e "${PURPLE}=======================================================${RESET}"
+  echo -e "${YELLOW}📊 端口检查技术原理：${RESET}"
+  echo -e "${CYAN}  公网端口查询方法：${RESET}"
+  echo -e "    • OTA端口(8003): 使用 ${BOLD}curl -s -o /dev/null -w '%{http_code}' --connect-timeout 3 http://IP:8003/xiaozhi/ota/${RESET}"
+  echo -e "    • WebSocket端口(8000): 使用 ${BOLD}timeout 5 nc -z IP 8000${RESET}"
+  echo -e "    • HTTP状态码: 200=成功连接, 404=服务存在但路径错误, 000=连接失败"
+  
+  echo -e "\n${CYAN}  内网端口查询方法：${RESET}"
+  echo -e "    • OTA端口(8003): 使用 ${BOLD}curl -s -o /dev/null -w '%{http_code}' --connect-timeout 3 http://内网IP:8003/xiaozhi/ota/${RESET}"
+  echo -e "    • WebSocket端口(8000): 使用 ${BOLD}timeout 5 nc -z 内网IP 8000${RESET}"
+  echo -e "    • nc(netcat): 检查TCP端口是否开放，无HTTP响应但能验证端口连通性"
+  
+  echo -e "\n${YELLOW}💡 手动检查命令示例：${RESET}"
+  echo -e "${CYAN}  检查OTA接口：${RESET} curl http://$INTERNAL_IP:8003/xiaozhi/ota/"
+  echo -e "${CYAN}  检查WebSocket：${RESET} timeout 3 nc -z $INTERNAL_IP 8000"
+  echo -e "${CYAN}  检查服务状态：${RESET} docker ps --filter name=$CONTAINER_NAME"
+  echo -e "${CYAN}  查看服务日志：${RESET} docker logs $CONTAINER_NAME --tail 20"
+  
+  echo -e "\n${YELLOW}🔍 连接诊断流程：${RESET}"
+  echo -e "    1. ${CYAN}HTTP连接测试：${RESET}curl 检查OTA端口返回状态码和内容"
+  echo -e "    2. ${CYAN}TCP连接测试：${RESET}nc 检查WebSocket端口是否开放"
+  echo -e "    3. ${CYAN}内容验证：${RESET}如果HTTP 200/404，获取OTA页面内容确认服务正常"
+  echo -e "    4. ${CYAN}网络诊断：${RESET}根据连接失败类型提供对应的故障排除建议"
+  
+  echo -e "\n${PURPLE}=======================================================${RESET}"
 }
 
 # ========================= 通用端口检查函数 =========================
@@ -1808,23 +1845,29 @@ check_network_ports() {
             echo -e "${GREEN}✅ OTA端口 $ota_port 连接正常${RESET}"
             
             # 获取OTA内容
-            echo -e "${CYAN}📋 获取OTA内容...${RESET}"
-            if timeout 10 curl -s "$ota_url" > /tmp/ota_content 2>/dev/null; then
+            echo -e "${CYAN}📋 获取OTA内容（使用curl命令访问）...${RESET}"
+            echo -e "${YELLOW}🔗 访问地址: $ota_url${RESET}"
+            
+            if timeout 15 curl -s "$ota_url" > /tmp/ota_content 2>/dev/null; then
                 local ota_content=$(cat /tmp/ota_content)
                 if [ -n "$ota_content" ] && [ "$ota_content" != "Connection refused" ]; then
-                    echo -e "${GREEN}📄 OTA内容：${RESET}"
-                    echo "$ota_content" | head -20 | sed 's/^/    /'  # 显示前20行，每行前面加缩进
-                    if [ $(echo "$ota_content" | wc -l) -gt 20 ]; then
-                        echo -e "${CYAN}    ... (内容过长，已截取前20行)${RESET}"
+                    echo -e "${GREEN}📄 OTA服务器响应内容：${RESET}"
+                    echo -e "${CYAN}──────────────────────────────────────────────────${RESET}"
+                    echo "$ota_content" | head -30 | sed 's/^/    /'  # 显示前30行，每行前面加缩进
+                    if [ $(echo "$ota_content" | wc -l) -gt 30 ]; then
+                        echo -e "${CYAN}    ... (内容过长，已截取前30行)${RESET}"
                     fi
+                    echo -e "${CYAN}──────────────────────────────────────────────────${RESET}"
                     
                     echo -e "${GREEN}✅ OTA服务正常运行，配置正确${RESET}"
                     echo -e "${CYAN}💡 请使用上述OTA地址进行设备配置${RESET}"
+                    echo -e "${CYAN}💡 curl命令示例：curl $ota_url${RESET}"
                 else
-                    echo -e "${YELLOW}⚠️  OTA服务已启动但返回空内容${RESET}"
+                    echo -e "${YELLOW}⚠️  OTA服务已启动但返回空内容或拒绝连接${RESET}"
                 fi
             else
-                echo -e "${YELLOW}⚠️  无法获取OTA内容${RESET}"
+                echo -e "${YELLOW}⚠️  无法获取OTA内容（连接超时或服务器未响应）${RESET}"
+                echo -e "${YELLOW}💡 建议手动测试：curl $ota_url${RESET}"
             fi
         else
             echo -e "${YELLOW}⚠️  OTA端口连接异常 (HTTP状态码: $ota_status)${RESET}"
