@@ -292,34 +292,34 @@ check_and_install_docker() {
     fi
     
     sudo usermod -aG docker $USER
-   sudo usermod -aG docker $USER
 
-# 使用systemd服务管理代替newgrp，避免阻塞
-echo -e "${BLUE}🚀 启动Docker服务...${RESET}"
-if sudo systemctl start docker && sudo systemctl enable docker > /dev/null 2>&1; then
-  echo -e "${GREEN}✅ Docker服务启动成功${RESET}"
-else
-  echo -e "${YELLOW}⚠️ Docker服务启动可能有问题${RESET}"
-fi
+    # 使用systemd服务管理代替newgrp，避免阻塞
+    echo -e "${BLUE}🚀 启动Docker服务...${RESET}"
+    if sudo systemctl start docker && sudo systemctl enable docker > /dev/null 2>&1; then
+      echo -e "${GREEN}✅ Docker服务启动成功${RESET}"
+    else
+      echo -e "${YELLOW}⚠️ Docker服务启动可能有问题${RESET}"
+    fi
 
-echo -e "${GREEN}✅ Docker 安装完成${RESET}"
-echo -e "${YELLOW}⚠️ 权限将在下次登录时生效，或使用 'newgrp docker' 命令激活${RESET}"
-echo ""
+    echo -e "${GREEN}✅ Docker 安装完成${RESET}"
+    echo -e "${YELLOW}⚠️ 权限将在下次登录时生效，或使用 'newgrp docker' 命令激活${RESET}"
+    echo ""
 
-# 交互式选择是否配置镜像源
-echo -e "${CYAN}💡 是否现在配置Docker镜像源以加速下载？(y/n，默认y):${RESET}"
-read -r configure_mirror
-configure_mirror=${configure_mirror:-y}
+    # 交互式选择是否配置镜像源
+    echo -e "${CYAN}💡 是否现在配置Docker镜像源以加速下载？(y/n，默认y):${RESET}"
+    read -r configure_mirror
+    configure_mirror=${configure_mirror:-y}
 
-if [[ "$configure_mirror" == "y" || "$configure_mirror" == "Y" ]]; then
-  choose_docker_mirror
-else
-  echo -e "${CYAN}⏭️  跳过镜像源配置${RESET}"
-fi
+    if [[ "$configure_mirror" == "y" || "$configure_mirror" == "Y" ]]; then
+      choose_docker_mirror
+    else
+      echo -e "${CYAN}⏭️  跳过镜像源配置${RESET}"
+    fi
 
-  if ! docker compose version &> /dev/null; then
-    echo -e "${YELLOW}❌ Docker Compose 未安装，开始安装...${RESET}"
-    retry_exec "sudo curl -SL \"https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose" "安装Docker Compose"
+    if ! docker compose version &> /dev/null; then
+      echo -e "${YELLOW}❌ Docker Compose 未安装，开始安装...${RESET}"
+      retry_exec "sudo curl -SL \"https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose" "安装Docker Compose"
+    fi
   fi
 }
 
