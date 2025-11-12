@@ -1597,8 +1597,15 @@ config_keys() {
         echo -e "${PURPLE}==================================================${RESET}"
 
         echo -e "\n${YELLOW}⚠️  注意：若您计划使用本地ASR模型（如FunASR），请确保服务器内存≥4G。${RESET}"
-        echo "1) 现在通过脚本配置密钥和服务商"
-        echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
+        
+        # 根据内存状态显示选项2的颜色
+        if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+            echo "1) 不执行docker安装 退出"
+            echo "2) 执行docker 退出"
+        else
+            echo "1) 不执行docker安装 退出"
+            echo -e "2) ${RED}执行docker 退出${RESET} ${RED}❌ 不推荐${RESET}"
+        fi
         echo "0) 退出配置（将使用默认配置）"
         read -r -p "请选择（默认1，输入0退出配置）：" key_choice
         key_choice=${key_choice:-1}
@@ -1638,21 +1645,50 @@ config_keys() {
             fi
         fi
 
+        # 处理选项1：不执行docker安装 退出
+        if [[ "$key_choice" == "1" ]]; then
+            echo -e "\n${YELLOW}⚠️  确认退出配置流程？${RESET}"
+            echo -e "${CYAN}ℹ️  将不执行docker安装，直接退出脚本。${RESET}"
+            echo ""
+            read -r -p "确认退出配置流程？(y/n，默认y): " confirm_exit
+            confirm_exit=${confirm_exit:-y}
+            
+            if [[ "$confirm_exit" == "y" || "$confirm_exit" == "Y" ]]; then
+                echo -e "${GREEN}✅ 已退出配置流程，脚本将不执行docker安装。${RESET}"
+                exit 0
+            else
+                echo -e "${GREEN}✅ 继续配置流程...${RESET}"
+                continue
+            fi
+        fi
+
+        # 处理选项2：执行docker 退出
         if [[ "$key_choice" == "2" ]]; then
-            echo -e "\n${YELLOW}⚠️  已选择稍后手动填写。${RESET}"
-            echo -e "${CYAN}ℹ️  为防止服务启动失败，脚本将自动将服务商预设为 \"AliyunStreamASR\" 和 \"ChatGLMLLM\"。${RESET}"
-            echo -e "${CYAN}ℹ️  您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$OVERRIDE_CONFIG_FILE${RESET}"
-            sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$OVERRIDE_CONFIG_FILE"
+            echo -e "\n${YELLOW}⚠️  确认执行docker安装并退出？${RESET}"
+            echo -e "${CYAN}ℹ️  将执行docker安装，但不会进行详细配置。${RESET}"
             
-            local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
-            local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
-            sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$OVERRIDE_CONFIG_FILE"
-            sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$OVERRIDE_CONFIG_FILE"
+            # 如果内存不足，显示警告
+            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                echo -e "${RED}⚠️⚠️⚠️  警告：内存不足（${MEM_TOTAL}GB < 4GB），可能导致服务卡死或崩溃！${RESET}"
+                echo -e "${RED}⚠️  强烈建议选择其他选项或升级服务器内存后再部署。${RESET}"
+            fi
             
-            CURRENT_DEPLOY_TYPE="internal"
-            export KEY_CONFIG_MODE="manual"
-            return_to_main=true
-            continue
+            echo ""
+            read -r -p "确认执行docker安装并退出？(y/n，默认n): " confirm_docker
+            confirm_docker=${confirm_docker:-n}
+            
+            if [[ "$confirm_docker" == "y" || "$confirm_docker" == "Y" ]]; then
+                echo -e "${GREEN}✅ 开始执行docker安装...${RESET}"
+                
+                # 安装docker
+                install_docker
+                
+                echo -e "${GREEN}✅ Docker安装完成，脚本将退出。${RESET}"
+                exit 0
+            else
+                echo -e "${GREEN}✅ 继续配置流程...${RESET}"
+                continue
+            fi
         fi
 
         config_asr
