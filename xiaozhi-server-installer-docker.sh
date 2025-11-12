@@ -10,6 +10,7 @@ trap exit_confirm SIGINT
 
 AUTHOR="昊天兽王"
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
+Version="1.0.1"
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/config.yaml"
 DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/docker-compose.yml"
 MAIN_DIR="$HOME/xiaozhi-server"
@@ -109,7 +110,7 @@ show_start_ui() {
   echo -e "${PURPLE}==================================================${RESET}"
   echo -e "${BLUE}作者：$AUTHOR${RESET}"
   echo -e "${BLUE}功能：$SCRIPT_DESC${RESET}"
-  echo -e "${BLUE}版本：v1.0.0"
+  echo -e "${BLUE}版本：V$Version"
   echo -e "${PURPLE}==================================================${RESET}"
   HITOKOTO=$(curl -s https://v1.hitokoto.cn?c=a | jq -r '.hitokoto') || HITOKOTO="欢迎使用小智服务器部署脚本！"
   echo -e "${YELLOW}📜 一言：$HITOKOTO${RESET}"
@@ -265,10 +266,31 @@ check_and_install_docker() {
     echo -e "${GREEN}✅ Docker 已安装${RESET}"
   else
     echo -e "${YELLOW}❌ Docker 未安装，开始安装...${RESET}"
+    
+    # 使用阿里云镜像源安装Docker
+    echo -e "${BLUE}📦 使用阿里云镜像源安装Docker...${RESET}"
     retry_exec "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
-    retry_exec "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg" "添加Docker密钥"
-    retry_exec "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null" "添加Docker源"
-    retry_exec "sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" "安装Docker核心组件"
+    
+    # 主要安装方法：使用阿里云的Docker安装脚本
+    if retry_exec "curl -fsSL https://get.docker.com | sudo bash -s docker --mirror Aliyun" "使用阿里云镜像安装Docker"; then
+      echo -e "${GREEN}✅ Docker 主安装方式成功${RESET}"
+    else
+      echo -e "${YELLOW}⚠️ 主安装方式失败，尝试备用安装方式...${RESET}"
+      
+      # 备用安装方法1：使用国内镜像源的安装脚本
+      echo -e "${BLUE}🔄 尝试备用安装方式1：清华源安装脚本${RESET}"
+      if retry_exec "curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg" "添加清华源Docker密钥"; then
+        retry_exec "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null" "添加清华源Docker源"
+        retry_exec "sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" "安装Docker核心组件"
+      else
+        # 备用安装方法2：手动安装
+        echo -e "${BLUE}🔄 尝试备用安装方式2：手动安装${RESET}"
+        retry_exec "sudo curl -fsSL https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/$(uname -m)/containerd.io_1.4.6-1_$(uname -m).deb -o /tmp/containerd.deb && sudo dpkg -i /tmp/containerd.deb" "安装containerd"
+        retry_exec "sudo curl -fsSL https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/$(uname -m)/docker-ce-cli_20.10.9-3-0~ubuntu-focal_$(uname -m).deb -o /tmp/docker-cli.deb && sudo dpkg -i /tmp/docker-cli.deb" "安装docker-cli"
+        retry_exec "sudo curl -fsSL https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/$(uname -m)/docker-ce_20.10.9-3-0~ubuntu-focal_$(uname -m).deb -o /tmp/docker-ce.deb && sudo dpkg -i /tmp/docker-ce.deb" "安装docker-ce"
+        retry_exec "sudo curl -fsSL https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/$(uname -m)/docker-ce-rootless-extras_20.10.9-3-0~ubuntu-focal_$(uname -m).deb -o /tmp/docker-rootless-extras.deb && sudo dpkg -i /tmp/docker-rootless-extras.deb" "安装docker-rootless-extras"
+      fi
+    fi
     
     sudo usermod -aG docker $USER
     newgrp docker &> /dev/null
@@ -306,7 +328,7 @@ create_dirs() {
 
 download_files() {
   echo -e "\n${BLUE}📥 开始下载配置文件...${RESET}"
-  # 直接下载到 data/.config.yaml，避免卡死问题
+  # 直接下载到 data/.config.yaml
   mkdir -p "$MAIN_DIR/data"
   retry_exec "curl -fSL $CONFIG_FILE_URL -o $OVERRIDE_CONFIG_FILE" "下载配置文件到 data/.config.yaml"
   retry_exec "curl -fSL $DOCKER_COMPOSE_URL -o $MAIN_DIR/docker-compose.yml" "下载 docker-compose.yml"
@@ -1720,9 +1742,8 @@ main() {
 
     echo -e "\n${PURPLE}==================================================${RESET}"
     echo -e "${GREEN}🎊  小智服务器部署成功！！ 🎊 ${RESET}"
-    echo -e "${GREEN}🥳🥳🥳 请尽情使用吧 🥳🥳🥳"
+    echo -e "${GREEN}🥳🥳🥳 请尽情使用吧 🥳🥳🥳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
 }
 
-# 启动主函数
-main
+main "$@"
