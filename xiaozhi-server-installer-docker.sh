@@ -1243,7 +1243,7 @@ config_keys() {
         config_asr
         if [ $? -eq 1 ]; then
             echo -e "${CYAN}🔄 用户返回上一步${RESET}"
-            return  # 修复：返回到上级菜单
+            return 1  # 修复：返回到上级菜单并传递正确的返回值
         fi
         
         config_llm
