@@ -213,7 +213,12 @@ check_server_status() {
 
 # ========================= 主菜单函数 =========================
 main_menu() {
-    check_server_status
+    # 修复：确保工作目录安全，防止执行方式不同导致的问题
+    check_working_directory
+    
+    # 修复无限循环问题：添加内部循环来处理无效输入
+    while true; do
+        check_server_status
     
     echo -e "${CYAN}🏠 主菜单${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
@@ -234,7 +239,8 @@ main_menu() {
         echo "3) 仅修改配置文件 (不下载服务器文件)"
         echo "4) 测试服务器连接"
         echo "5) 测试服务器端口 (详细端口测试)"
-        echo "6) 删除服务器 (完全删除所有数据)"
+        echo "6) 查看Docker日志"
+        echo "7) 删除服务器 (完全删除所有数据)"
         echo "0) 退出脚本"
     else
         echo -e "${GREEN}欢迎使用小智服务器部署脚本${RESET}"
@@ -247,6 +253,13 @@ main_menu() {
     echo -e "${PURPLE}==================================================${RESET}"
     read -r -p "请输入选项: " menu_choice
     
+    # 修复：处理空输入情况
+    if [ -z "$menu_choice" ]; then
+        echo -e "${YELLOW}⚠️ 请输入有效的选项编号${RESET}"
+        sleep 1
+        continue
+    fi
+    
     case $menu_choice in
         1)
             # 根据部署状态决定行为
@@ -257,63 +270,72 @@ main_menu() {
                 # 服务器未部署 -> 首次部署
                 deploy_server
             fi
+            break  # 修复：添加break退出循环
             ;;
         2)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 update_server
+                break  # 修复：添加break退出循环
             else
                 echo -e "${RED}❌ 未检测到现有服务器，无法更新${RESET}"
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
                 read -r -p "按回车键继续..."
-                return  # 修复：使用return避免递归
+                break  # 修复：添加break退出循环
             fi
             ;;
         3)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 config_only
+                break  # 修复：添加break退出循环
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
                 read -r -p "按回车键继续..."
-                return  # 修复：使用return避免递归
+                break  # 修复：添加break退出循环
             fi
             ;;
         4)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 test_server
+                break  # 修复：添加break退出循环
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
                 read -r -p "按回车键继续..."
-                return  # 修复：使用return避免递归
+                break  # 修复：添加break退出循环
             fi
             ;;
         5)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 test_ports
+                break  # 修复：添加break退出循环
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
                 read -r -p "按回车键继续..."
-                return
+                break
             fi
             ;;
         6)
+            docker_logs
+            break  # 修复：添加break退出循环
+            ;;
+        7)
             if [ "$SERVER_DIR_EXISTS" = true ] || [ "$CONTAINER_EXISTS" = true ]; then
                 delete_server
             else
                 echo -e "${YELLOW}⚠️ 未检测到服务器数据${RESET}"
                 read -r -p "按回车键继续..."
-                return  # 修复：使用return避免递归
             fi
+            break  # 修复：添加break退出循环
             ;;
         0)
             echo -e "${GREEN}👋 感谢使用，脚本退出${RESET}"
@@ -321,10 +343,17 @@ main_menu() {
             ;;
         *)
             echo -e "${RED}❌ 无效选项，请重新选择${RESET}"
-            read -r -p "按回车键继续..."
-            return  # 修复：使用return避免递归
+            if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
+                echo -e "${CYAN}💡 请输入1-7或0退出${RESET}"
+            else
+                echo -e "${CYAN}💡 请输入1或0退出${RESET}"
+            fi
+            sleep 2
+            # 不使用return，而是继续循环让用户重新输入
+            continue
             ;;
     esac
+    done
 }
 
 check_server_config() {
@@ -1104,10 +1133,21 @@ config_asr() {
 }
 
 # ========================= LLM 配置（8个服务商） =========================
+# 确保当前目录安全
+check_working_directory() {
+    if ! pwd >/dev/null 2>&1; then
+        echo -e "${RED}❌ 工作目录错误，正在重置...${RESET}"
+        cd /workspace
+    fi
+}
+
 config_llm() {
+    # 检查并修复工作目录
+    check_working_directory
+    
     while true; do
         echo -e "\n\n${GREEN}【2/5】配置 LLM (大语言模型) 服务${RESET}"
-        echo "请选择LLM服务商（共8个）："
+        echo "请选择LLM服务商（共15个）："
         echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         echo " 1) ChatGLMLLM (智谱清言) [推荐]"
         echo " 2) QwenLLM (通义千问)"
@@ -1117,6 +1157,13 @@ config_llm() {
         echo " 6) DoubaoLLM (火山引擎豆包)"
         echo " 7) OpenaiLLM (OpenAI)"
         echo " 8) GroqLLM (Groq)"
+        echo " 9) AliLLM (阿里云)"
+        echo "10) DeepSeekLLM (DeepSeek)"
+        echo "11) GeminiLLM (谷歌Gemini)"
+        echo "12) DifyLLM (Dify)"
+        echo "13) OllamaLLM (Ollama本地)"
+        echo "14) XinferenceLLM (Xinference)"
+        echo "15) FastgptLLM (FastGPT)"
         
         read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " llm_choice
         llm_choice=${llm_choice:-1}
@@ -1221,6 +1268,90 @@ config_llm() {
                 llm_provider_key="GroqLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了 Groq。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://console.groq.com/keys${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            9)
+                llm_provider_key="AliLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliLLM。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://bailian.console.aliyun.com/?apiKey=1#/api-key${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            10)
+                llm_provider_key="DeepSeekLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 DeepSeek。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://platform.deepseek.com/${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            11)
+                llm_provider_key="GeminiLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了谷歌 Gemini。${RESET}"
+                echo -e "${CYAN}🔑 密钥申请地址：https://aistudio.google.com/apikey${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            12)
+                llm_provider_key="DifyLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Dify。${RESET}"
+                echo -e "${CYAN}🔑 建议使用本地部署的dify接口，国内部分区域访问dify公有云接口可能会受限${RESET}"
+                read -r -p "请输入 API Key: " api_key
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                ;;
+            13)
+                llm_provider_key="OllamaLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Ollama本地部署。${RESET}"
+                echo -e "${CYAN}🔑 需要预先使用ollama pull下载模型${RESET}"
+                read -r -p "请输入模型名称 (默认: qwen2.5): " model_name
+                model_name="${model_name:-qwen2.5}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$model_name" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$CONFIG_FILE"
+                fi
+                ;;
+            14)
+                llm_provider_key="XinferenceLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Xinference。${RESET}"
+                echo -e "${CYAN}🔑 需要预先在Xinference启动对应模型${RESET}"
+                read -r -p "请输入模型名称 (默认: qwen2.5:72b-AWQ): " model_name
+                model_name="${model_name:-qwen2.5:72b-AWQ}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$model_name" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$CONFIG_FILE"
+                fi
+                ;;
+            15)
+                llm_provider_key="FastgptLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 FastGPT。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://cloud.tryfastgpt.ai/account/apikey${RESET}"
                 read -r -p "请输入 API Key: " api_key
                 api_key="${api_key:-}"
                 
@@ -2568,6 +2699,97 @@ test_ports() {
     return
 }
 
+# 查看Docker日志
+docker_logs() {
+    echo -e "${CYAN}📋 Docker日志查看${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    if ! [ "$SERVER_DIR_EXISTS" = true ] || ! [ "$CONFIG_EXISTS" = true ]; then
+        echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
+        if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
+            echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
+        fi
+        read -r -p "按回车键继续..."
+        return
+    fi
+    
+    # 检查Docker是否安装
+    if ! command -v docker &> /dev/null; then
+        echo -e "${RED}❌ Docker未安装${RESET}"
+        read -r -p "按回车键返回主菜单..."
+        return
+    fi
+    
+    # 检查容器是否存在
+    if ! docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo -e "${YELLOW}⚠️ 未找到小智服务器容器${RESET}"
+        read -r -p "按回车键返回主菜单..."
+        return
+    fi
+    
+    echo -e "${CYAN}选择日志查看方式：${RESET}"
+    echo "1) 查看最新50行日志"
+    echo "2) 查看最新100行日志"
+    echo "3) 查看全部日志"
+    echo "4) 实时跟踪日志 (按Ctrl+C退出)"
+    echo "5) 查看特定时间段日志"
+    echo "0) 返回主菜单"
+    
+    read -r -p "请选择日志查看方式 (0-5): " log_choice
+    
+    case $log_choice in
+        1)
+            echo -e "\n${CYAN}📜 最新50行Docker日志：${RESET}"
+            echo -e "${PURPLE}==================================================${RESET}"
+            docker logs --tail 50 "$CONTAINER_NAME"
+            ;;
+        2)
+            echo -e "\n${CYAN}📜 最新100行Docker日志：${RESET}"
+            echo -e "${PURPLE}==================================================${RESET}"
+            docker logs --tail 100 "$CONTAINER_NAME"
+            ;;
+        3)
+            echo -e "\n${CYAN}📜 全部Docker日志：${RESET}"
+            echo -e "${PURPLE}==================================================${RESET}"
+            docker logs "$CONTAINER_NAME"
+            ;;
+        4)
+            echo -e "\n${CYAN}🔄 实时跟踪Docker日志 (按Ctrl+C退出)：${RESET}"
+            echo -e "${PURPLE}==================================================${RESET}"
+            docker logs -f "$CONTAINER_NAME"
+            ;;
+        5)
+            echo -e "\n${CYAN}📅 查看特定时间段日志${RESET}"
+            echo "格式示例："
+            echo "  开始时间: 2024-01-01 12:00:00"
+            echo "  结束时间: 2024-01-01 13:00:00"
+            echo ""
+            read -r -p "开始时间 (YYYY-MM-DD HH:MM:SS): " start_time
+            read -r -p "结束时间 (YYYY-MM-DD HH:MM:SS): " end_time
+            
+            if [ -n "$start_time" ] && [ -n "$end_time" ]; then
+                echo -e "\n${CYAN}📜 $start_time 到 $end_time 的Docker日志：${RESET}"
+                echo -e "${PURPLE}==================================================${RESET}"
+                docker logs --since "$start_time" --until "$end_time" "$CONTAINER_NAME" 2>/dev/null || {
+                    echo -e "${YELLOW}⚠️ 无法获取指定时间段的日志，可能格式不正确${RESET}"
+                    echo -e "${CYAN}💡 请确保时间格式为：YYYY-MM-DD HH:MM:SS${RESET}"
+                }
+            else
+                echo -e "${YELLOW}⚠️ 时间不能为空${RESET}"
+            fi
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选择${RESET}"
+            ;;
+    esac
+    
+    read -r -p "按回车键返回主菜单..."
+    return
+}
+
 # 删除服务器（完全删除所有数据）
 delete_server() {
     echo -e "${RED}⚠️ 警告：完全删除小智服务器！${RESET}"
@@ -2660,6 +2882,9 @@ check_system() {
 
 # ========================= 主执行函数 =========================
 main() {
+    # 修复：确保工作目录安全，处理不同执行方式的环境差异
+    check_working_directory
+    
     check_root_permission
     check_system
     install_dependencies
