@@ -11,7 +11,11 @@ trap exit_confirm SIGINT
 AUTHOR="昊天兽王"
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
 Version="1.0.1"
-CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/config.yaml"
+# 主配置文件链接（优先使用）
+CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
+CONFIG_FILE_URL_BACKUP="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
+# 备用配置文件链接
+CONFIG_FILE_URL_FALLBACK="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/config.yaml"
 DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/main/xiaozhi-server/docker-compose.yml"
 MAIN_DIR="$HOME/xiaozhi-server"
 CONTAINER_NAME="xiaozhi-esp32-server"
@@ -424,7 +428,29 @@ check_and_install_docker() {
   if command -v docker &> /dev/null && docker --version &> /dev/null; then
     echo -e "${GREEN}✅ Docker 已安装${RESET}"
   else
-    echo -e "${YELLOW}❌ Docker 未安装，开始安装...${RESET}"
+    echo -e "${YELLOW}❌ Docker 未安装${RESET}"
+    
+    # 添加Docker安装确认机制
+    echo -e "\n${CYAN}📦 需要安装Docker以运行小智服务器容器${RESET}"
+    echo -e "${YELLOW}⚠️  Docker安装将包括：${RESET}"
+    echo -e "${CYAN}  - Docker Engine 安装${RESET}"
+    echo -e "${CYAN}  - Docker Compose 安装${RESET}" 
+    echo -e "${CYAN}  - 系统服务配置${RESET}"
+    echo -e "${CYAN}  - 用户权限配置${RESET}"
+    echo ""
+    read -r -p "🔧 是否安装Docker？(y/n，默认y): " docker_install_choice
+    docker_install_choice=${docker_install_choice:-y}
+    
+    if [[ "$docker_install_choice" != "y" && "$docker_install_choice" != "Y" ]]; then
+      echo -e "${YELLOW}⚠️  用户取消Docker安装，脚本无法继续${RESET}"
+      echo -e "${CYAN}💡 如需手动安装Docker，请运行：${RESET}"
+      echo -e "${GREEN}curl -fsSL https://get.docker.com | sudo bash${RESET}"
+      echo -e "${GREEN}sudo usermod -aG docker \$USER${RESET}"
+      echo -e "${GREEN}sudo systemctl enable --now docker${RESET}"
+      exit 1
+    fi
+    
+    echo -e "${GREEN}✅ 开始Docker安装...${RESET}"
     
     # 检测包管理器
     local pkg_manager
@@ -612,11 +638,70 @@ download_files() {
     echo -e "\n${BLUE}📥 开始下载配置文件...${RESET}"
     # 直接下载到 data/.config.yaml，避免卡死问题
     mkdir -p "$MAIN_DIR/data"
-    retry_exec "curl -fSL $CONFIG_FILE_URL -o $OVERRIDE_CONFIG_FILE" "下载配置文件到 data/.config.yaml"
+    download_config_with_fallback "$OVERRIDE_CONFIG_FILE"
     retry_exec "curl -fSL $DOCKER_COMPOSE_URL -o $MAIN_DIR/docker-compose.yml" "下载 docker-compose.yml"
   else
     echo -e "\n${GREEN}✅ 跳过下载文件，使用现有配置文件${RESET}"
   fi
+}
+
+# 多链接配置文件下载函数（支持备用链接切换）
+download_config_with_fallback() {
+    local output_file="$1"
+    local download_success=false
+    local mirror_count=0
+    
+    # 定义配置文件下载链接列表
+    declare -a config_urls=(
+        "主链接1|$CONFIG_FILE_URL"
+        "主链接2|$CONFIG_FILE_URL_BACKUP"
+        "备用链接|$CONFIG_FILE_URL_FALLBACK"
+    )
+    
+    echo -e "${CYAN}🔄 开始多链接配置文件下载...${RESET}"
+    
+    for url_info in "${config_urls[@]}"; do
+        mirror_count=$((mirror_count + 1))
+        IFS='|' read -r link_name config_url <<< "$url_info"
+        
+        echo -e "\n${CYAN}🎯 尝试第 $mirror_count 个链接：$link_name${RESET}"
+        echo -e "${YELLOW}📎 链接：$config_url${RESET}"
+        
+        # 使用curl下载，失败时自动切换
+        if curl -fSL --connect-timeout 10 --max-time 30 "$config_url" -o "$output_file" 2>/dev/null; then
+            # 验证下载的文件是否有效
+            if [ -f "$output_file" ] && grep -q "server:" "$output_file" 2>/dev/null; then
+                echo -e "${GREEN}✅ $link_name 下载成功${RESET}"
+                download_success=true
+                break
+            else
+                echo -e "${YELLOW}⚠️ $link_name 下载的文件无效，尝试下一个链接${RESET}"
+                rm -f "$output_file"
+            fi
+        else
+            echo -e "${RED}❌ $link_name 下载失败${RESET}"
+        fi
+        
+        # 如果不是最后一个链接，等待3秒后切换
+        if [ $mirror_count -lt ${#config_urls[@]} ]; then
+            echo -e "${YELLOW}⏳ 等待3秒后尝试下一个链接...${RESET}"
+            sleep 3
+        fi
+    done
+    
+    # 检查下载结果
+    if [ "$download_success" = true ]; then
+        echo -e "${GREEN}✅ 配置文件下载成功：$output_file${RESET}"
+        return 0
+    else
+        echo -e "${RED}❌ 所有配置文件链接都失败了${RESET}"
+        echo -e "${YELLOW}📖 请检查网络连接或手动下载配置文件${RESET}"
+        echo -e "${CYAN}💡 可用链接：${RESET}"
+        echo -e "   - $CONFIG_FILE_URL"
+        echo -e "   - $CONFIG_FILE_URL_BACKUP"
+        echo -e "   - $CONFIG_FILE_URL_FALLBACK"
+        return 1
+    fi
 }
 
 # 清华源Docker安装函数
@@ -762,10 +847,14 @@ setup_config_file() {
                 ;;
             2)
                 echo -e "\n${BLUE}📥 重新下载新的配置文件模板...${RESET}"
-                retry_exec "curl -fSL $CONFIG_FILE_URL -o $OVERRIDE_CONFIG_FILE" "下载配置文件到 data/.config.yaml"
-                CONFIG_DOWNLOAD_NEEDED="true"
-                USE_EXISTING_CONFIG=false
-                SKIP_DETAILED_CONFIG=false
+                if download_config_with_fallback "$OVERRIDE_CONFIG_FILE"; then
+                    CONFIG_DOWNLOAD_NEEDED="true"
+                    USE_EXISTING_CONFIG=false
+                    SKIP_DETAILED_CONFIG=false
+                else
+                    echo -e "${RED}❌ 配置文件下载失败，脚本无法继续${RESET}"
+                    exit 1
+                fi
                 ;;
             *)
                 echo -e "\n${GREEN}✅ 将使用现有配置文件，不进行下载${RESET}"
@@ -775,9 +864,13 @@ setup_config_file() {
         
     else
         echo -e "${BLUE}📥 未发现配置文件，正在下载模板...${RESET}"
-        retry_exec "curl -fSL $CONFIG_FILE_URL -o $OVERRIDE_CONFIG_FILE" "下载配置文件到 data/.config.yaml"
-        echo -e "${GREEN}✅ 已下载并设置配置文件: $OVERRIDE_CONFIG_FILE${RESET}"
-        CONFIG_DOWNLOAD_NEEDED="true"
+        if download_config_with_fallback "$OVERRIDE_CONFIG_FILE"; then
+            echo -e "${GREEN}✅ 已下载并设置配置文件: $OVERRIDE_CONFIG_FILE${RESET}"
+            CONFIG_DOWNLOAD_NEEDED="true"
+        else
+            echo -e "${RED}❌ 配置文件下载失败，脚本无法继续${RESET}"
+            exit 1
+        fi
     fi
     
     # 显示配置文件信息
@@ -856,8 +949,9 @@ config_asr() {
             asr_provider_key="FunASR"
             if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
                 echo -e "\n${RED}❌ 由于内存不足，无法选择FunASR本地模型，请重新选择其他ASR服务商${RESET}"
-                config_asr
-                return
+                echo -e "${YELLOW}💡 按回车键重新选择...${RESET}"
+                read -r
+                continue
             fi
             echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
             echo -e "${CYAN}ℹ️  系统将自动配置 model_dir 为 models/SenseVoiceSmall。${RESET}"
@@ -890,8 +984,9 @@ config_asr() {
             asr_provider_key="SherpaASR"
             if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
                 echo -e "\n${RED}❌ 由于内存不足，无法选择SherpaASR本地模型，请重新选择其他ASR服务商${RESET}"
-                config_asr
-                return
+                echo -e "${YELLOW}💡 按回车键重新选择...${RESET}"
+                read -r
+                continue
             fi
             echo -e "\n${YELLOW}⚠️  您选择了 SherpaASR (本地多语言)。${RESET}"
             echo -e "${CYAN}ℹ️  请手动下载模型：https://github.com/k2-fsa/sherpa-onnx/releases${RESET}"
@@ -908,8 +1003,9 @@ config_asr() {
             asr_provider_key="SherpaParaformerASR"
             if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
                 echo -e "\n${RED}❌ 由于内存不足，无法选择SherpaParaformerASR本地模型，请重新选择其他ASR服务商${RESET}"
-                config_asr
-                return
+                echo -e "${YELLOW}💡 按回车键重新选择...${RESET}"
+                read -r
+                continue
             fi
             echo -e "\n${YELLOW}⚠️  您选择了 SherpaParaformerASR (本地中文专用)。${RESET}"
             echo -e "${CYAN}ℹ️  请手动下载模型：https://github.com/k2-fsa/sherpa-onnx/releases${RESET}"
@@ -1081,7 +1177,7 @@ config_asr() {
     esac
     
     # 完成选择后退出循环
-    return_to_main=true
+    asr_return_to_prev=true
     done
 }
 
