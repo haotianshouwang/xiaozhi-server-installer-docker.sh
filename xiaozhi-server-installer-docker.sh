@@ -328,7 +328,7 @@ create_dirs() {
 
 download_files() {
   echo -e "\n${BLUE}📥 开始下载配置文件...${RESET}"
-  # 直接下载到 data/.config.yaml
+  # 直接下载到 data/.config.yaml，避免卡死问题
   mkdir -p "$MAIN_DIR/data"
   retry_exec "curl -fSL $CONFIG_FILE_URL -o $OVERRIDE_CONFIG_FILE" "下载配置文件到 data/.config.yaml"
   retry_exec "curl -fSL $DOCKER_COMPOSE_URL -o $MAIN_DIR/docker-compose.yml" "下载 docker-compose.yml"
