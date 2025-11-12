@@ -213,7 +213,9 @@ check_server_status() {
 
 # ========================= 主菜单函数 =========================
 main_menu() {
-    check_server_status
+    # 修复无限循环问题：添加内部循环来处理无效输入
+    while true; do
+        check_server_status
     
     echo -e "${CYAN}🏠 主菜单${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
@@ -258,57 +260,63 @@ main_menu() {
                 # 服务器未部署 -> 首次部署
                 deploy_server
             fi
+            break  # 修复：添加break退出循环
             ;;
         2)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 update_server
+                break  # 修复：添加break退出循环
             else
                 echo -e "${RED}❌ 未检测到现有服务器，无法更新${RESET}"
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
                 read -r -p "按回车键继续..."
-                return  # 修复：使用return避免递归
+                break  # 修复：添加break退出循环
             fi
             ;;
         3)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 config_only
+                break  # 修复：添加break退出循环
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
                 read -r -p "按回车键继续..."
-                return  # 修复：使用return避免递归
+                break  # 修复：添加break退出循环
             fi
             ;;
         4)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 test_server
+                break  # 修复：添加break退出循环
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
                 read -r -p "按回车键继续..."
-                return  # 修复：使用return避免递归
+                break  # 修复：添加break退出循环
             fi
             ;;
         5)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 test_ports
+                break  # 修复：添加break退出循环
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
                 if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
                     echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
                 fi
                 read -r -p "按回车键继续..."
-                return
+                break
             fi
             ;;
         6)
             docker_logs
+            break  # 修复：添加break退出循环
             ;;
         7)
             if [ "$SERVER_DIR_EXISTS" = true ] || [ "$CONTAINER_EXISTS" = true ]; then
@@ -316,8 +324,8 @@ main_menu() {
             else
                 echo -e "${YELLOW}⚠️ 未检测到服务器数据${RESET}"
                 read -r -p "按回车键继续..."
-                return  # 修复：使用return避免递归
             fi
+            break  # 修复：添加break退出循环
             ;;
         0)
             echo -e "${GREEN}👋 感谢使用，脚本退出${RESET}"
@@ -326,9 +334,11 @@ main_menu() {
         *)
             echo -e "${RED}❌ 无效选项，请重新选择${RESET}"
             read -r -p "按回车键继续..."
-            return  # 修复：使用return避免递归
+            # 不使用return，而是继续循环让用户重新输入
+            continue
             ;;
     esac
+    done
 }
 
 check_server_config() {
