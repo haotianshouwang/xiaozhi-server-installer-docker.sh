@@ -426,9 +426,42 @@ check_and_install_docker() {
   else
     echo -e "${YELLOW}❌ Docker 未安装，开始安装...${RESET}"
     
-    # 使用阿里云镜像源安装Docker
-    echo -e "${BLUE}📦 使用阿里云镜像源安装Docker...${RESET}"
-    retry_exec "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
+    # 检测包管理器
+    local pkg_manager
+    pkg_manager=$(detect_package_manager)
+    echo -e "${BLUE}🔧 检测到包管理器：${pkg_manager}${RESET}"
+    
+    # 根据包管理器安装Docker依赖
+    case $pkg_manager in
+        apt)
+            echo -e "${BLUE}📦 使用apt安装Docker依赖...${RESET}"
+            retry_exec "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
+            ;;
+        yum|dnf)
+            echo -e "${BLUE}📦 使用yum/dnf安装Docker依赖...${RESET}"
+            if command -v yum &> /dev/null; then
+                retry_exec "sudo yum install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
+            else
+                retry_exec "sudo dnf install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
+            fi
+            ;;
+        pacman)
+            echo -e "${BLUE}📦 使用pacman安装Docker依赖...${RESET}"
+            retry_exec "sudo pacman -S --noconfirm ca-certificates curl gnupg lsb-release" "安装Docker依赖"
+            ;;
+        zypper)
+            echo -e "${BLUE}📦 使用zypper安装Docker依赖...${RESET}"
+            retry_exec "sudo zypper install -y ca-certificates curl gnupg lsb-release" "安装Docker依赖"
+            ;;
+        apk)
+            echo -e "${BLUE}📦 使用apk安装Docker依赖...${RESET}"
+            retry_exec "sudo apk add ca-certificates curl gnupg lsb-release" "安装Docker依赖"
+            ;;
+        *)
+            echo -e "${YELLOW}⚠️ 未识别的包管理器，使用通用安装方法${RESET}"
+            retry_exec "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release || sudo yum install -y ca-certificates curl gnupg lsb-release || sudo dnf install -y ca-certificates curl gnupg lsb-release || sudo pacman -S --noconfirm ca-certificates curl gnupg lsb-release || sudo zypper install -y ca-certificates curl gnupg lsb-release || sudo apk add ca-certificates curl gnupg lsb-release" "安装Docker依赖"
+            ;;
+    esac
     
     # 主要安装方法：使用阿里云的Docker安装脚本
     if retry_exec "curl -fsSL https://get.docker.com | sudo bash -s docker --mirror Aliyun" "使用阿里云镜像安装Docker"; then
@@ -440,7 +473,32 @@ check_and_install_docker() {
       echo -e "${BLUE}🔄 尝试备用安装方式1：清华源安装脚本${RESET}"
       if retry_exec "curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg" "添加清华源Docker密钥"; then
         retry_exec "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null" "添加清华源Docker源"
-        retry_exec "sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" "安装Docker核心组件"
+        
+        # 根据包管理器安装Docker核心组件
+        case $pkg_manager in
+            apt)
+                retry_exec "sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" "安装Docker核心组件"
+                ;;
+            yum|dnf)
+                if command -v yum &> /dev/null; then
+                    retry_exec "sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin" "安装Docker核心组件"
+                else
+                    retry_exec "sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin" "安装Docker核心组件"
+                fi
+                ;;
+            pacman)
+                retry_exec "sudo pacman -S --noconfirm docker docker-compose" "安装Docker核心组件"
+                ;;
+            zypper)
+                retry_exec "sudo zypper install -y docker docker-compose" "安装Docker核心组件"
+                ;;
+            apk)
+                retry_exec "sudo apk add docker docker-compose" "安装Docker核心组件"
+                ;;
+            *)
+                retry_exec "sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || sudo yum install -y docker docker-ce-cli containerd.io docker-compose || sudo dnf install -y docker docker-ce-cli containerd.io docker-compose || sudo pacman -S --noconfirm docker docker-compose || sudo zypper install -y docker docker-compose || sudo apk add docker docker-compose" "安装Docker核心组件"
+                ;;
+        esac
       else
         # 备用安装方法2：手动安装
         echo -e "${BLUE}🔄 尝试备用安装方式2：手动安装${RESET}"
