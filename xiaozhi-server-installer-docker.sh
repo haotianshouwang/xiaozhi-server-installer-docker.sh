@@ -251,14 +251,21 @@ main_menu() {
     fi
     
     echo -e "${PURPLE}==================================================${RESET}"
-    read -r -p "请输入选项: " menu_choice
     
-    # 修复：处理空输入情况
-    if [ -z "$menu_choice" ]; then
-        echo -e "${YELLOW}⚠️ 请输入有效的选项编号${RESET}"
-        sleep 1
-        continue
-    fi
+    # 修复：更强制的输入验证机制
+    while true; do
+        read -r -p "请输入选项: " menu_choice
+        
+        if [ -z "$menu_choice" ]; then
+            echo -e "${YELLOW}⚠️ 检测到空输入，请输入有效的选项编号${RESET}"
+            echo -e "${CYAN}💡 可用选项：1-7 或 0（退出）${RESET}"
+            echo -e "${PURPLE}----------------------------------------${RESET}"
+            continue  # 重新开始输入循环
+        fi
+        
+        # 输入不为空，跳出循环处理选项
+        break
+    done
     
     case $menu_choice in
         1)
