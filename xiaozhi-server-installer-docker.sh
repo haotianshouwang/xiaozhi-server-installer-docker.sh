@@ -772,9 +772,9 @@ download_files() {
         # 下载Docker配置文件（带备用链接）
         echo -e "\n${CYAN}🐳 下载Docker配置文件...${RESET}"
         if [ ! -f "$MAIN_DIR/docker-compose.yml" ]; then
-            # Docker配置文件备用链接
+            # Docker配置文件备用链接（使用统一定义的DOCKER_COMPOSE_URL）
             local docker_urls=(
-                "https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/docker-compose.yml"
+                "$DOCKER_COMPOSE_URL"
                 "https://mirror.ghproxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/docker-compose.yml"
             )
             
@@ -924,14 +924,8 @@ read -p "请输入选择 (1-3，默认1): " detailed_choice
                 CONFIG_DOWNLOAD_NEEDED="false" ;;
         esac
     else
-        echo -e "${BLUE}📥 未发现配置文件，下载模板...${RESET}"
-        if download_config_with_fallback "$CONFIG_FILE"; then
-            echo -e "${GREEN}✅ 已下载配置文件: $CONFIG_FILE${RESET}"
-            CONFIG_DOWNLOAD_NEEDED="true"
-        else
-            echo -e "${RED}❌ 配置文件下载失败${RESET}"
-            exit 1
-        fi
+        echo -e "\n${YELLOW}📥 需要下载配置文件，稍后将统一处理...${RESET}"
+        CONFIG_DOWNLOAD_NEEDED="true"
     fi
     
     echo ""
@@ -2639,7 +2633,12 @@ deploy_server() {
     clean_container
     create_dirs
     setup_config_file
-    download_files "$CONFIG_DOWNLOAD_NEEDED"
+    # 移除重复下载，只在必要的时候调用
+    if [ "$CONFIG_DOWNLOAD_NEEDED" = "true" ]; then
+        download_files "true"
+    else
+        echo -e "${GREEN}✅ 使用现有配置文件，跳过下载${RESET}"
+    fi
     config_keys
     if [ $? -eq 1 ]; then
         echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
