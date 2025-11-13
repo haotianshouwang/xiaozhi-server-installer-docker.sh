@@ -6,8 +6,8 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.21（Docker操作工具集成版本）
-# 修复内容：添加完整的Docker操作工具菜单，集成到主菜单
+# 版本：1.2.22（Docker操作工具集成版本）
+# 修复内容：修复case语句语法错误，解决Docker工具菜单启动问题
 # v1.2.20:
 # - 修复Docker服务启动流程问题
 # - 确保用户选择Docker操作后正确执行docker-compose up -d
@@ -56,10 +56,14 @@ trap exit_confirm SIGINT
 # - Docker网络端口管理：网络查看/端口检查/连接测试
 # - Docker日志管理：查看/搜索/导出/实时跟踪日志
 # - 保持完全向后兼容，不影响现有部署功能
+# v1.2.22:
+# - 修复case语句语法错误，删除多余分号
+# - 解决Docker操作工具菜单启动时的bash语法问题
+# - 确保脚本可以在所有bash环境中正常运行
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.21"
+Version="1.2.22"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -353,7 +357,7 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
             # Docker操作工具
             docker_operation_tool_menu
             break
-            ;
+            ;;
         1)
             # 根据部署状态决定行为
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
