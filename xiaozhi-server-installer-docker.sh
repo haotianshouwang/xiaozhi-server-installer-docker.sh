@@ -600,7 +600,7 @@ check_and_install_docker() {
     # 检查Docker Compose
     if ! docker compose version &> /dev/null; then
         echo -e "${YELLOW}❌ Docker Compose 未安装，开始安装...${RESET}"
-        retry_exec "sudo curl -SL \"https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose" "安装Docker Compose"
+        retry_exec "sudo curl -SL \"https://gh-proxy.com/https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose" "安装Docker Compose"
     fi
 }
 
@@ -1320,13 +1320,63 @@ config_llm() {
                 llm_provider_key="GeminiLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了谷歌 Gemini。${RESET}"
                 echo -e "${CYAN}🔑 密钥申请地址：https://aistudio.google.com/apikey${RESET}"
-                read -r -p "请输入 API Key: " api_key
-                api_key="${api_key:-}"
                 
-                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
-                if [ -n "$api_key" ]; then
-                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
-                fi
+                # 🔥 修复：增加反向代理配置选项
+                echo -e "${CYAN}🌐 Gemini需要配置反向代理，请选择代理类型：${RESET}"
+                echo " 1) HTTP 代理"
+                echo " 2) HTTPS 代理"
+                echo " 3) 不使用代理（直接连接）"
+                
+                read -r -p "请选择代理类型 (1-3，默认3): " proxy_choice
+                proxy_choice=${proxy_choice:-3}
+                
+                case $proxy_choice in
+                    1)
+                        read -r -p "请输入HTTP代理地址: " http_proxy
+                        read -r -p "请输入API Key: " api_key
+                        api_key="${api_key:-}"
+                        
+                        sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                        if [ -n "$api_key" ]; then
+                            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                        fi
+                        if [ -n "$http_proxy" ]; then
+                            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    # http_proxy: .*/    http_proxy: \"$http_proxy\"/" "$CONFIG_FILE"
+                        fi
+                        ;;
+                    2)
+                        read -r -p "请输入HTTPS代理地址: " https_proxy
+                        read -r -p "请输入API Key: " api_key
+                        api_key="${api_key:-}"
+                        
+                        sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                        if [ -n "$api_key" ]; then
+                            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                        fi
+                        if [ -n "$https_proxy" ]; then
+                            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    # https_proxy: .*/    https_proxy: \"$https_proxy\"/" "$CONFIG_FILE"
+                        fi
+                        ;;
+                    3)
+                        read -r -p "请输入 API Key: " api_key
+                        api_key="${api_key:-}"
+                        
+                        sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                        if [ -n "$api_key" ]; then
+                            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                        fi
+                        ;;
+                    *)
+                        # 默认不配置代理
+                        read -r -p "请输入 API Key: " api_key
+                        api_key="${api_key:-}"
+                        
+                        sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                        if [ -n "$api_key" ]; then
+                            sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                        fi
+                        ;;
+                esac
                 ;;
             12)
                 llm_provider_key="DifyLLM"
