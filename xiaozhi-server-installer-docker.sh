@@ -6,16 +6,17 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.11-fixed（修复版本）
-# 修复内容：修改Docker容器管理选择逻辑 - 在用户选择退出配置时添加内存检查和Docker管理选择
+# 版本：1.2.12（修复版本）
+# 修复内容：在配置方式选择界面添加"返回上一个菜单"和"不配置所有配置"选项
 # 详细说明：
-# 1. 选择"1"：不执行docker退出，直接结束脚本
-# 2. 选择"2"：执行docker退出，显示严重警告和免责声明
-# 3. 添加服务器卡死自救指南
+# 1. 添加"-1) 返回上一个菜单"选项，直接回到主菜单
+# 2. 添加"-2) 不配置所有配置"选项，跳过配置流程并检查Docker管理选择
+# 3. 选项"-2"会检查内存，如果内存不足会触发Docker管理选择
+# 4. 进一步完善用户体验，让用户有更多选择
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.11-fixed"
+Version="1.2.12"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -2786,8 +2787,61 @@ config_keys() {
         echo "1) 现在通过脚本配置密钥和服务商"
         echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
         echo "0) 退出配置（将使用现有配置文件）"
+        echo "-1) 返回上一个菜单"
+        echo "-2) 不配置所有配置（直接返回菜单）"
         read -r -p "请选择（默认1）：" key_choice < /dev/tty
         key_choice=${key_choice:-1}
+        
+        # 处理返回上一个菜单
+        if [ "$key_choice" = "-1" ]; then
+            echo -e "\n${CYAN}🔄 返回上一个菜单${RESET}"
+            main_menu
+            return 1
+        fi
+        
+        # 处理不配置所有配置
+        if [ "$key_choice" = "-2" ]; then
+            echo -e "\n${YELLOW}⚠️ 确认不配置所有配置？${RESET}"
+            echo -e "${CYAN}ℹ️ 将跳过所有配置步骤${RESET}"
+            echo ""
+            echo "请选择："
+            echo "1) 确认不配置所有配置，直接返回菜单"
+            echo "2) 取消，返回配置选择菜单"
+            read -r -p "请选择（默认1）：" confirm_skip < /dev/tty
+            confirm_skip=${confirm_skip:-1}
+            
+            if [ "$confirm_skip" = "1" ]; then
+                echo -e "\n${GREEN}✅ 跳过所有配置，直接返回菜单${RESET}"
+                
+                # 检查系统内存并提供Docker管理选择
+                show_server_config
+                
+                # 如果内存不足 (<2GB)，提供Docker管理选择
+                if [ "$MEM_TOTAL" -lt 2 ]; then
+                    echo -e "\n${YELLOW}⚠️ 警告：您的服务器内存${MEM_TOTAL}GB不足2GB${RESET}"
+                    echo -e "${YELLOW}⚠️ 跳过所有配置可能会导致服务器卡死${RESET}"
+                    echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
+                    
+                    handle_insufficient_memory
+                    if [ $? -eq 1 ]; then
+                        echo -e "\n${CYAN}🔄 用户取消Docker操作，返回主菜单${RESET}"
+                        return 1
+                    else
+                        echo -e "\n${CYAN}🔄 正在返回主菜单...${RESET}"
+                        return 1
+                    fi
+                fi
+                
+                echo -e "\n${CYAN}🔄 正在返回主菜单...${RESET}"
+                return 1
+            elif [ "$confirm_skip" = "2" ]; then
+                echo -e "\n${BLUE}ℹ️ 已取消，返回配置选择菜单${RESET}"
+                continue
+            else
+                echo -e "\n${BLUE}ℹ️ 无效选择，请重新选择${RESET}"
+                continue
+            fi
+        fi
         
         # 处理退出配置
         if [ "$key_choice" = "0" ]; then
