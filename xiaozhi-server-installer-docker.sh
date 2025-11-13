@@ -6,12 +6,12 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.7-fixed（修复版本）
-# 修复内容：修复Docker容器管理选择逻辑 - 用户选择1时执行docker退出，选择2时直接结束脚本
+# 版本：1.2.10-fixed（修复版本）
+# 修复内容：修复选择退出配置后继续执行服务启动的问题 - 确保用户选择退出配置时正确返回主菜单
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.8-fixed"
+Version="1.2.10-fixed"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -2812,7 +2812,11 @@ config_keys() {
                 SKIP_DETAILED_CONFIG=false
                 CURRENT_DEPLOY_TYPE="internal"
                 export KEY_CONFIG_MODE="manual"
-                break  # 退出循环
+                
+                # 关键修复：直接返回到deploy_server，并返回取消状态
+                echo -e "\n${CYAN}📋 配置文件将使用：$CONFIG_FILE${RESET}"
+                echo -e "${CYAN}🔄 正在返回主菜单...${RESET}"
+                return 1  # 返回1表示用户取消配置，返回主菜单
             elif [ "$confirm_exit" = "2" ]; then
                 echo -e "\n${BLUE}ℹ️ 已取消退出，返回配置选择菜单${RESET}"
                 continue  # 继续循环，重新显示菜单
@@ -2832,7 +2836,11 @@ config_keys() {
             export USE_DEFAULT_CONFIG=true
             CURRENT_DEPLOY_TYPE="internal"
             export KEY_CONFIG_MODE="manual"
-            break  # 退出循环
+            
+            # 直接返回，不进入配置步骤循环
+            echo -e "\n${CYAN}📋 已创建默认配置文件：$CONFIG_FILE${RESET}"
+            echo -e "${CYAN}🔄 正在准备启动服务...${RESET}"
+            return 0  # 直接返回，不进入配置步骤循环
         fi
         
         # 处理选项1：详细配置
@@ -2932,6 +2940,7 @@ config_keys() {
         echo -e "\n${GREEN}✅ 配置完成！${RESET}"
         echo -e "${CYAN}ℹ️ 详细配置文件已保存至: $CONFIG_FILE${RESET}"
         export KEY_CONFIG_MODE="auto"
+        return 0  # 配置成功完成
 }
 
 # ========================= 高级TTS配置 =========================
