@@ -2066,29 +2066,27 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
     if [[ "$key_choice" == "1" ]]; then
         echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
         
-        # 恢复线性配置流程，一个接一个地配置
+        # 简化的线性配置流程，支持返回上一步
         echo -e "\n${CYAN}=== 第1步：配置 ASR (语音识别) 服务 ===${RESET}"
         config_asr
         if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
             return 1
         fi
         
         echo -e "\n${CYAN}=== 第2步：配置 LLM (大语言模型) 服务 ===${RESET}"
         config_llm
         if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+            # 重新配置ASR
             echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
             config_asr
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                 return 1
             fi
             
+            # 重新配置LLM
             echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
             config_llm
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                 return 1
             fi
         fi
@@ -2096,30 +2094,29 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         echo -e "\n${CYAN}=== 第3步：配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
         config_vllm
         if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步，重新配置 LLM 服务${RESET}"
+            # 重新配置LLM
             echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
             config_llm
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+                # 重新配置ASR
                 echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
                 config_asr
                 if [ $? -eq 1 ]; then
-                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                     return 1
                 fi
                 
+                # 重新配置LLM
                 echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
                 config_llm
                 if [ $? -eq 1 ]; then
-                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                     return 1
                 fi
             fi
             
+            # 重新配置VLLM
             echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
             config_vllm
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                 return 1
             fi
         fi
@@ -2127,42 +2124,41 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         echo -e "\n${CYAN}=== 第4步：配置 TTS (语音合成) 服务 ===${RESET}"
         config_tts
         if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步，重新配置 VLLM 服务${RESET}"
+            # 重新配置VLLM
             echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
             config_vllm
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户返回上一步，重新配置 LLM 服务${RESET}"
+                # 重新配置LLM
                 echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
                 config_llm
                 if [ $? -eq 1 ]; then
-                    echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+                    # 重新配置ASR
                     echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
                     config_asr
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                         return 1
                     fi
                     
+                    # 重新配置LLM
                     echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
                     config_llm
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                         return 1
                     fi
                 fi
                 
+                # 重新配置VLLM
                 echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
                 config_vllm
                 if [ $? -eq 1 ]; then
-                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                     return 1
                 fi
             fi
             
+            # 重新配置TTS
             echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
             config_tts
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                 return 1
             fi
         fi
@@ -2170,54 +2166,53 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         echo -e "\n${CYAN}=== 第5步：配置 Memory (记忆) 服务 ===${RESET}"
         config_memory
         if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步，重新配置 TTS 服务${RESET}"
+            # 重新配置TTS
             echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
             config_tts
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户返回上一步，重新配置 VLLM 服务${RESET}"
+                # 重新配置VLLM
                 echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
                 config_vllm
                 if [ $? -eq 1 ]; then
-                    echo -e "${CYAN}🔄 用户返回上一步，重新配置 LLM 服务${RESET}"
+                    # 重新配置LLM
                     echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
                     config_llm
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+                        # 重新配置ASR
                         echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
                         config_asr
                         if [ $? -eq 1 ]; then
-                            echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                             return 1
                         fi
                         
+                        # 重新配置LLM
                         echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
                         config_llm
                         if [ $? -eq 1 ]; then
-                            echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                             return 1
                         fi
                     fi
                     
+                    # 重新配置VLLM
                     echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
                     config_vllm
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                         return 1
                     fi
                 fi
                 
+                # 重新配置TTS
                 echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
                 config_tts
                 if [ $? -eq 1 ]; then
-                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                     return 1
                 fi
             fi
             
+            # 重新配置Memory
             echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
             config_memory
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                 return 1
             fi
         fi
@@ -2225,66 +2220,65 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         echo -e "\n${CYAN}=== 第6步：配置服务器地址 (自动生成) ===${RESET}"
         config_server
         if [ $? -eq 1 ]; then
-            echo -e "${CYAN}🔄 用户返回上一步，重新配置 Memory 服务${RESET}"
+            # 重新配置Memory
             echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
             config_memory
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户返回上一步，重新配置 TTS 服务${RESET}"
+                # 重新配置TTS
                 echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
                 config_tts
                 if [ $? -eq 1 ]; then
-                    echo -e "${CYAN}🔄 用户返回上一步，重新配置 VLLM 服务${RESET}"
+                    # 重新配置VLLM
                     echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
                     config_vllm
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户返回上一步，重新配置 LLM 服务${RESET}"
+                        # 重新配置LLM
                         echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
                         config_llm
                         if [ $? -eq 1 ]; then
-                            echo -e "${CYAN}🔄 用户返回上一步，重新配置 ASR 服务${RESET}"
+                            # 重新配置ASR
                             echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
                             config_asr
                             if [ $? -eq 1 ]; then
-                                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                                 return 1
                             fi
                             
+                            # 重新配置LLM
                             echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
                             config_llm
                             if [ $? -eq 1 ]; then
-                                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                                 return 1
                             fi
                         fi
                         
+                        # 重新配置VLLM
                         echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
                         config_vllm
                         if [ $? -eq 1 ]; then
-                            echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                             return 1
                         fi
                     fi
                     
+                    # 重新配置TTS
                     echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
                     config_tts
                     if [ $? -eq 1 ]; then
-                        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                         return 1
                     fi
                 fi
                 
+                # 重新配置Memory
                 echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
                 config_memory
                 if [ $? -eq 1 ]; then
-                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                     return 1
                 fi
             fi
             
+            # 重新配置服务器地址
             echo -e "\n${CYAN}=== 重新配置服务器地址 (自动生成) ===${RESET}"
             config_server
             if [ $? -eq 1 ]; then
-                echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
                 return 1
             fi
         fi
