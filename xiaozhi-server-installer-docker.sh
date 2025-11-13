@@ -1395,21 +1395,34 @@ config_asr_advanced() {
         echo "3) SherpaASR (本地多语言)"
         echo "4) SherpaParaformerASR (本地中文专用)"
         echo "5) VoskASR (本地离线)"
+        echo "6) AliyunStreamASR (阿里云流式，推荐)"
+        echo "7) AliyunASR (阿里云批量)"
+        echo "8) DoubaoStreamASR (火山引擎流式)"
+        echo "9) DoubaoASR (火山引擎批量)"
+        echo "10) TencentASR (腾讯云)"
+        echo "11) BaiduASR (百度智能云)"
+        echo "12) OpenaiASR (OpenAI)"
+        echo "13) GroqASR (Groq)"
+        echo "14) Qwen3ASRFlash (通义千问)"
+        echo "15) XunfeiStreamASR (讯飞流式)"
+        local prompt_range="1-15"
+    else
+        echo "1) AliyunStreamASR (阿里云流式，推荐)"
+        echo "2) AliyunASR (阿里云批量)"
+        echo "3) DoubaoStreamASR (火山引擎流式)"
+        echo "4) DoubaoASR (火山引擎批量)"
+        echo "5) TencentASR (腾讯云)"
+        echo "6) BaiduASR (百度智能云)"
+        echo "7) OpenaiASR (OpenAI)"
+        echo "8) GroqASR (Groq)"
+        echo "9) Qwen3ASRFlash (通义千问)"
+        echo "10) XunfeiStreamASR (讯飞流式)"
+        local prompt_range="1-10"
     fi
-    echo "6) AliyunStreamASR (阿里云流式，推荐)"
-    echo "7) AliyunASR (阿里云批量)"
-    echo "8) DoubaoStreamASR (火山引擎流式)"
-    echo "9) DoubaoASR (火山引擎批量)"
-    echo "10) TencentASR (腾讯云)"
-    echo "11) BaiduASR (百度智能云)"
-    echo "12) OpenaiASR (OpenAI)"
-    echo "13) GroqASR (Groq)"
-    echo "14) Qwen3ASRFlash (通义千问)"
-    echo "15) XunfeiStreamASR (讯飞流式)"
     echo "0) 返回上级菜单"
     
-    read -r -p "请选择ASR服务类型 (0-15，默认6): " asr_choice < /dev/tty
-    asr_choice=${asr_choice:-6}
+    read -r -p "请选择ASR服务类型 (0-${prompt_range}，默认1): " asr_choice < /dev/tty
+    asr_choice=${asr_choice:-1}
     
     case $asr_choice in
         0)
@@ -1419,66 +1432,111 @@ config_asr_advanced() {
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
                 config_funasr_local
             else
-                echo -e "${RED}内存不足，无法使用本地ASR${RESET}"
                 config_aliyun_asr
             fi
             ;;
         2)
-            config_funasr_server
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_funasr_server
+            else
+                config_aliyun_batch_asr
+            fi
             ;;
         3)
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
                 config_sherpa_asr
             else
-                echo -e "${RED}内存不足，无法使用本地ASR${RESET}"
-                config_aliyun_asr
+                config_doubao_stream_asr
             fi
             ;;
         4)
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
                 config_sherpa_paraformer_asr
             else
-                echo -e "${RED}内存不足，无法使用本地ASR${RESET}"
-                config_aliyun_asr
+                config_doubao_asr
             fi
             ;;
         5)
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
                 config_vosk_asr
             else
-                echo -e "${RED}内存不足，无法使用本地ASR${RESET}"
-                config_aliyun_asr
+                config_tencent_asr
             fi
             ;;
         6)
-            config_aliyun_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_aliyun_asr
+            else
+                config_baidu_asr
+            fi
             ;;
         7)
-            config_aliyun_batch_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_aliyun_batch_asr
+            else
+                config_openai_asr
+            fi
             ;;
         8)
-            config_doubao_stream_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_doubao_stream_asr
+            else
+                config_groq_asr
+            fi
             ;;
         9)
-            config_doubao_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_doubao_asr
+            else
+                config_qwen_asr
+            fi
             ;;
         10)
-            config_tencent_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_tencent_asr
+            else
+                config_xunfei_asr
+            fi
             ;;
         11)
-            config_baidu_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_baidu_asr
+            else
+                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
+                config_aliyun_asr
+            fi
             ;;
         12)
-            config_openai_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_openai_asr
+            else
+                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
+                config_aliyun_asr
+            fi
             ;;
         13)
-            config_groq_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_groq_asr
+            else
+                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
+                config_aliyun_asr
+            fi
             ;;
         14)
-            config_qwen_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_qwen_asr
+            else
+                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
+                config_aliyun_asr
+            fi
             ;;
         15)
-            config_xunfei_asr
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_xunfei_asr
+            else
+                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
+                config_aliyun_asr
+            fi
             ;;
         *)
             echo -e "${YELLOW}⚠️ 无效选择，使用默认阿里云ASR${RESET}"
@@ -3172,6 +3230,158 @@ config_llm_advanced() {
                     sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
                 fi
                 echo -e "${GREEN}✅ Wenxin配置完成${RESET}"
+                return 0
+                ;;
+            6)
+                llm_provider_key="DoubaoLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎豆包 Doubao。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/console/doubao${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Doubao配置完成${RESET}"
+                return 0
+                ;;
+            7)
+                llm_provider_key="OpenaiLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://platform.openai.com/api-keys${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ OpenAI配置完成${RESET}"
+                return 0
+                ;;
+            8)
+                llm_provider_key="GroqLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Groq。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.groq.com/keys${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Groq配置完成${RESET}"
+                return 0
+                ;;
+            9)
+                llm_provider_key="AliLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com/apiKey${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ 阿里云配置完成${RESET}"
+                return 0
+                ;;
+            10)
+                llm_provider_key="DeepSeekLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 DeepSeek。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://platform.deepseek.com/api_keys${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ DeepSeek配置完成${RESET}"
+                return 0
+                ;;
+            11)
+                llm_provider_key="GeminiLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了谷歌 Gemini。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://aistudio.google.com/app/apikey${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Gemini配置完成${RESET}"
+                return 0
+                ;;
+            12)
+                llm_provider_key="DifyLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Dify。${RESET}"
+                echo -e "${CYAN}ℹ️ 请确保您的 Dify 服务已正确配置${RESET}"
+                read -r -p "请输入 Dify API URL: " dify_url < /dev/tty
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                dify_url="${dify_url:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ] && [ -n "$dify_url" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_url: .*/    api_url: \"$dify_url\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Dify配置完成${RESET}"
+                return 0
+                ;;
+            13)
+                llm_provider_key="OllamaLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Ollama 本地。${RESET}"
+                echo -e "${CYAN}ℹ️ 请确保 Ollama 服务已在本地运行${RESET}"
+                read -r -p "请输入 Ollama URL (默认 http://localhost:11434): " ollama_url < /dev/tty
+                read -r -p "请输入模型名称 (如 llama2): " model_name < /dev/tty
+                ollama_url="${ollama_url:-http://localhost:11434}"
+                model_name="${model_name:-llama2}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$model_name" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_url: .*/    api_url: \"$ollama_url\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model: .*/    model: \"$model_name\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Ollama配置完成${RESET}"
+                return 0
+                ;;
+            14)
+                llm_provider_key="XinferenceLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Xinference。${RESET}"
+                echo -e "${CYAN}ℹ️ 请确保 Xinference 服务已正确配置${RESET}"
+                read -r -p "请输入 Xinference URL (默认 http://localhost:9997): " xinference_url < /dev/tty
+                read -r -p "请输入模型ID: " model_id < /dev/tty
+                xinference_url="${xinference_url:-http://localhost:9997}"
+                model_id="${model_id:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$model_id" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_url: .*/    api_url: \"$xinference_url\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model: .*/    model: \"$model_id\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Xinference配置完成${RESET}"
+                return 0
+                ;;
+            15)
+                llm_provider_key="FastgptLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了 FastGPT。${RESET}"
+                echo -e "${CYAN}ℹ️ 请确保 FastGPT 服务已正确配置${RESET}"
+                read -r -p "请输入 FastGPT API URL: " fastgpt_url < /dev/tty
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                fastgpt_url="${fastgpt_url:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ] && [ -n "$fastgpt_url" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_url: .*/    api_url: \"$fastgpt_url\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ FastGPT配置完成${RESET}"
                 return 0
                 ;;
             *)
