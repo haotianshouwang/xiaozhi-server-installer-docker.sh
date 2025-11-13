@@ -728,7 +728,7 @@ download_config_with_fallback() {
     
     # 配置文件链接列表
     declare -a config_urls=(
-        "haotianshouwang主源|$CONFIG_FILE_URL"
+        "GitHub主源|$CONFIG_FILE_URL"
         "xinnan-tech备用源|$CONFIG_FILE_URL_BACKUP"
         "镜像源备用|$CONFIG_FILE_URL_FALLBACK"
     )
