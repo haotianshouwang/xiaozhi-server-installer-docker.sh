@@ -786,7 +786,7 @@ download_files() {
                 echo -e "${YELLOW}🎯 尝试第$docker_mirror_count个Docker链接${RESET}"
                 echo -e "${YELLOW}📎 链接：$docker_url${RESET}"
                 
-                if curl -fSL --connect-timeout 10 --max-time 30 "$docker_url" -o "$MAIN_DIR/docker-compose.yml" 2>/dev/null; then
+                if curl -fSL --connect-timeout 10 --max-time 30 "$docker_url" -o "$MAIN_DIR/docker-compose.yml" --progress-bar; then
                     if [ -f "$MAIN_DIR/docker-compose.yml" ] && [ -s "$MAIN_DIR/docker-compose.yml" ]; then
                         echo -e "${GREEN}✅ Docker配置文件下载成功${RESET}"
                         echo -e "${GREEN}✅ 文件大小：$(du -h "$MAIN_DIR/docker-compose.yml" 2>/dev/null | cut -f1 || echo '未知')${RESET}"
@@ -1350,6 +1350,111 @@ read -r -p "按回车键重新选择..." < /dev/tty
         return 0
     done
 }
+
+# ========================= 高级ASR配置 =========================
+config_asr_advanced() {
+    echo -e "${YELLOW}🎤 语音识别(ASR)服务详细配置${RESET}"
+    echo -e "${CYAN}请选择ASR服务类型：${RESET}"
+    
+    if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+        echo "1) FunASR (本地SenseVoiceSmall，推荐)"
+        echo "2) FunASRServer (独立部署服务)"
+        echo "3) SherpaASR (本地多语言)"
+        echo "4) SherpaParaformerASR (本地中文专用)"
+        echo "5) VoskASR (本地离线)"
+    fi
+    echo "6) AliyunStreamASR (阿里云流式，推荐)"
+    echo "7) AliyunASR (阿里云批量)"
+    echo "8) DoubaoStreamASR (火山引擎流式)"
+    echo "9) DoubaoASR (火山引擎批量)"
+    echo "10) TencentASR (腾讯云)"
+    echo "11) BaiduASR (百度智能云)"
+    echo "12) OpenaiASR (OpenAI)"
+    echo "13) GroqASR (Groq)"
+    echo "14) Qwen3ASRFlash (通义千问)"
+    echo "15) XunfeiStreamASR (讯飞流式)"
+    echo "0) 返回上级菜单"
+    
+    read -r -p "请选择ASR服务类型 (0-15，默认6): " asr_choice < /dev/tty
+    asr_choice=${asr_choice:-6}
+    
+    case $asr_choice in
+        0)
+            return 1
+            ;;
+        1)
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_funasr_local
+            else
+                echo -e "${RED}内存不足，无法使用本地ASR${RESET}"
+                config_aliyun_asr
+            fi
+            ;;
+        2)
+            config_funasr_server
+            ;;
+        3)
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_sherpa_asr
+            else
+                echo -e "${RED}内存不足，无法使用本地ASR${RESET}"
+                config_aliyun_asr
+            fi
+            ;;
+        4)
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_sherpa_paraformer_asr
+            else
+                echo -e "${RED}内存不足，无法使用本地ASR${RESET}"
+                config_aliyun_asr
+            fi
+            ;;
+        5)
+            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+                config_vosk_asr
+            else
+                echo -e "${RED}内存不足，无法使用本地ASR${RESET}"
+                config_aliyun_asr
+            fi
+            ;;
+        6)
+            config_aliyun_asr
+            ;;
+        7)
+            config_aliyun_batch_asr
+            ;;
+        8)
+            config_doubao_stream_asr
+            ;;
+        9)
+            config_doubao_asr
+            ;;
+        10)
+            config_tencent_asr
+            ;;
+        11)
+            config_baidu_asr
+            ;;
+        12)
+            config_openai_asr
+            ;;
+        13)
+            config_groq_asr
+            ;;
+        14)
+            config_qwen_asr
+            ;;
+        15)
+            config_xunfei_asr
+            ;;
+        *)
+            echo -e "${YELLOW}⚠️ 无效选择，使用默认阿里云ASR${RESET}"
+            config_aliyun_asr
+            ;;
+    esac
+}
+
+# ========================= LLM 配置（8个服务商） =========================
 
 # ========================= LLM 配置（8个服务商） =========================
 # 确保当前目录安全
@@ -2453,13 +2558,13 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         
         # 简化的线性配置流程，支持返回上一步
         echo -e "\n${CYAN}=== 第1步：配置 ASR (语音识别) 服务 ===${RESET}"
-        config_asr
+        config_asr_advanced
         if [ $? -eq 1 ]; then
             return 1
         fi
         
         echo -e "\n${CYAN}=== 第2步：配置 LLM (大语言模型) 服务 ===${RESET}"
-        config_llm
+        config_llm_advanced
         if [ $? -eq 1 ]; then
             # 重新配置ASR
             echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
@@ -2507,7 +2612,7 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         fi
         
         echo -e "\n${CYAN}=== 第4步：配置 TTS (语音合成) 服务 ===${RESET}"
-        config_tts
+        config_tts_advanced
         if [ $? -eq 1 ]; then
             # 重新配置VLLM
             echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
@@ -2572,6 +2677,472 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         echo -e "${CYAN}ℹ️ 详细配置文件已保存至: $CONFIG_FILE${RESET}"
         export KEY_CONFIG_MODE="auto"
     fi
+}
+
+# ========================= 高级TTS配置 =========================
+config_tts_advanced() {
+    echo -e "${YELLOW}🎤 语音合成(TTS)服务详细配置${RESET}"
+    echo -e "${CYAN}请选择TTS服务类型：${RESET}"
+    echo "1) EdgeTTS (微软Edge浏览器语音，免费)"
+    echo "2) DoubaoTTS (火山引擎语音，需要购买)"
+    echo "3) HuoshanDoubleStreamTTS (火山大模型语音)"
+    echo "4) GPT_SOVITS_V2 (自定义声音克隆)"
+    echo "5) GPT_SOVITS_V3 (GPT-SoVITS v3版本)"
+    echo "6) OpenAITTS (OpenAI官方语音)"
+    echo "7) 阿里云TTS"
+    echo "8) 讯飞TTS"
+    echo "9) 本地FishSpeech (需要独立部署)"
+    echo "10) 其他TTS服务"
+    echo "0) 返回上级菜单"
+    
+    read -r -p "请选择TTS服务类型 (0-10，默认1): " tts_choice < /dev/tty
+    tts_choice=${tts_choice:-1}
+    
+    case $tts_choice in
+        0)
+            return 1
+            ;;
+        1)
+            config_edge_tts
+            ;;
+        2)
+            config_doubao_tts
+            ;;
+        3)
+            config_huoshan_tts
+            ;;
+        4)
+            config_gpt_sovits_v2
+            ;;
+        5)
+            config_gpt_sovits_v3
+            ;;
+        6)
+            config_openai_tts
+            ;;
+        7)
+            config_aliyun_tts
+            ;;
+        8)
+            config_xunfei_tts
+            ;;
+        9)
+            config_fish_speech
+            ;;
+        10)
+            config_other_tts
+            ;;
+        *)
+            echo -e "${YELLOW}⚠️ 无效选择，使用默认EdgeTTS${RESET}"
+            config_edge_tts
+            ;;
+    esac
+}
+
+# EdgeTTS配置
+config_edge_tts() {
+    echo -e "\n${CYAN}🎭 配置EdgeTTS (微软语音)${RESET}"
+    echo -e "${YELLOW}EdgeTTS提供多种免费音色，支持中英文等多种语言${RESET}"
+    
+    echo -e "\n${CYAN}推荐的中文音色：${RESET}"
+    echo "1) zh-CN-XiaoxiaoNeural (小晓 - 女声，温柔)"
+    echo "2) zh-CN-YunxiNeural (云希 - 男声，清朗)"
+    echo "3) zh-CN-YunjianNeural (云健 - 男声，磁性)"
+    echo "4) zh-CN-XiaoyiNeural (小艺 - 女声，活泼)"
+    echo "5) zh-CN-XiaohanNeural (小涵 - 女声，知性)"
+    echo "6) 自定义音色名称"
+    
+    read -r -p "请选择音色 (1-6，默认1): " voice_choice < /dev/tty
+    voice_choice=${voice_choice:-1}
+    
+    case $voice_choice in
+        1) voice="zh-CN-XiaoxiaoNeural" ;;
+        2) voice="zh-CN-YunxiNeural" ;;
+        3) voice="zh-CN-YunjianNeural" ;;
+        4) voice="zh-CN-XiaoyiNeural" ;;
+        5) voice="zh-CN-XiaohanNeural" ;;
+        6)
+            echo -e "${CYAN}请输入自定义音色名称：${RESET}"
+            read -r voice < /dev/tty
+            [ -z "$voice" ] && voice="zh-CN-XiaoxiaoNeural"
+            ;;
+        *)
+            voice="zh-CN-XiaoxiaoNeural"
+            ;;
+    esac
+    
+    # 更新配置文件
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    # 写入EdgeTTS配置
+    cat >> "$CONFIG_FILE" << EOF
+
+TTS:
+  EdgeTTS:
+    type: edge
+    voice: $voice
+    output_dir: tmp/
+EOF
+    
+    echo -e "${GREEN}✅ EdgeTTS配置完成，使用音色：$voice${RESET}"
+}
+
+# DoubaoTTS配置
+config_doubao_tts() {
+    echo -e "\n${CYAN}🔥 配置DoubaoTTS (火山引擎)${RESET}"
+    echo -e "${YELLOW}需要购买服务，起步价30元，100并发。免费版仅2并发${RESET}"
+    
+    echo -e "\n${CYAN}请输入火山引擎语音配置信息：${RESET}"
+    read -r -p "AppID: " appid < /dev/tty
+    read -r -p "Access Token: " access_token < /dev/tty
+    
+    if [ -z "$appid" ] || [ -z "$access_token" ]; then
+        echo -e "${YELLOW}⚠️ 缺少必要配置，使用默认配置${RESET}"
+        appid="你的火山引擎语音合成服务appid"
+        access_token="你的火山引擎语音合成服务access_token"
+    fi
+    
+    echo -e "\n${CYAN}音色选择：${RESET}"
+    echo "1) BV001_streaming (默认)"
+    echo "2) zh_female_wanwanxiaohe_moon_bigtts (湾湾小何)"
+    echo "3) 自定义音色"
+    
+    read -r -p "请选择音色 (1-3，默认1): " doubao_voice_choice < /dev/tty
+    doubao_voice_choice=${doubao_voice_choice:-1}
+    
+    case $doubao_voice_choice in
+        1) voice="BV001_streaming" ;;
+        2) voice="zh_female_wanwanxiaohe_moon_bigtts" ;;
+        3)
+            echo -e "${CYAN}请输入自定义音色名称：${RESET}"
+            read -r voice < /dev/tty
+            [ -z "$voice" ] && voice="BV001_streaming"
+            ;;
+        *)
+            voice="BV001_streaming"
+            ;;
+    esac
+    
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: DoubaoTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    cat >> "$CONFIG_FILE" << EOF
+
+TTS:
+  DoubaoTTS:
+    type: doubao
+    api_url: https://openspeech.bytedance.com/api/v1/tts
+    voice: $voice
+    output_dir: tmp/
+    authorization: "Bearer;"
+    appid: $appid
+    access_token: $access_token
+    cluster: volcano_tts
+    speed_ratio: 1.0
+    volume_ratio: 1.0
+    pitch_ratio: 1.0
+EOF
+    
+    echo -e "${GREEN}✅ DoubaoTTS配置完成${RESET}"
+}
+
+# GPT-SoVITS V2配置
+config_gpt_sovits_v2() {
+    echo -e "\n${CYAN}🎙️ 配置GPT-SoVITS V2 (声音克隆)${RESET}"
+    echo -e "${YELLOW}GPT-SoVITS是开源的声音克隆工具，需要先本地部署TTS服务${RESET}"
+    
+    echo -e "\n${CYAN}服务启动方法：${RESET}"
+    echo "1. 下载并配置GPT-SoVITS"
+    echo "2. 启动TTS服务：python api_v2.py -a 127.0.0.1 -p 9880 -c GPT_SoVITS/configs/demo.yaml"
+    echo "3. 准备参考音频和文本"
+    
+    echo -e "\n${CYAN}请输入配置信息：${RESET}"
+    read -r -p "TTS服务地址 (默认127.0.0.1:9880): " sovits_url < /dev/tty
+    sovits_url=${sovits_url:-127.0.0.1:9880}
+    
+    read -r -p "参考音频路径 (默认demo.wav): " ref_audio < /dev/tty
+    ref_audio=${ref_audio:-demo.wav}
+    
+    read -r -p "提示文本 (可选): " prompt_text < /dev/tty
+    
+    echo -e "\n${CYAN}高级参数设置：${RESET}"
+    read -r -p "TopK (默认5): " top_k < /dev/tty
+    top_k=${top_k:-5}
+    
+    read -r -p "Temperature (默认1): " temperature < /dev/tty
+    temperature=${temperature:-1}
+    
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: GPT_SOVITS_V2\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    cat >> "$CONFIG_FILE" << EOF
+
+TTS:
+  GPT_SOVITS_V2:
+    type: gpt_sovits_v2
+    url: "http://$sovits_url/tts"
+    output_dir: tmp/
+    text_lang: "auto"
+    ref_audio_path: "$ref_audio"
+    prompt_text: "$prompt_text"
+    prompt_lang: "zh"
+    top_k: $top_k
+    top_p: 1
+    temperature: $temperature
+    text_split_method: "cut0"
+    batch_size: 1
+    batch_threshold: 0.75
+    split_bucket: true
+    return_fragment: false
+    speed_factor: 1.0
+    streaming_mode: false
+    seed: -1
+    parallel_infer: true
+    repetition_penalty: 1.35
+    aux_ref_audio_paths: []
+EOF
+    
+    echo -e "${GREEN}✅ GPT-SoVITS V2配置完成${RESET}"
+    echo -e "${YELLOW}💡 请确保TTS服务已启动在 $sovits_url${RESET}"
+}
+
+# GPT-SoVITS V3配置
+config_gpt_sovits_v3() {
+    echo -e "\n${CYAN}🎙️ 配置GPT-SoVITS V3 (最新版本)${RESET}"
+    echo -e "${YELLOW}GPT-SoVITS-v3lora版本，提供更好的声音克隆效果${RESET}"
+    
+    echo -e "\n${CYAN}服务启动方法：${RESET}"
+    echo "1. 下载并配置GPT-SoVITS V3"
+    echo "2. 启动服务：python api.py"
+    echo "3. 访问 http://127.0.0.1:9880"
+    
+    echo -e "\n${CYAN}请输入配置信息：${RESET}"
+    read -r -p "服务地址 (默认127.0.0.1:9880): " sovits_v3_url < /dev/tty
+    sovits_v3_url=${sovits_v3_url:-127.0.0.1:9880}
+    
+    read -r -p "参考音频路径: " refer_wav < /dev/tty
+    
+    read -r -p "提示文本 (可选): " prompt_text_v3 < /dev/tty
+    
+    echo -e "\n${CYAN}高级参数设置：${RESET}"
+    read -r -p "TopK (默认15): " top_k_v3 < /dev/tty
+    top_k_v3=${top_k_v3:-15}
+    
+    read -r -p "Temperature (默认1.0): " temp_v3 < /dev/tty
+    temp_v3=${temp_v3:-1.0}
+    
+    read -r -p "Speed (默认1.0): " speed_v3 < /dev/tty
+    speed_v3=${speed_v3:-1.0}
+    
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: GPT_SOVITS_V3\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    cat >> "$CONFIG_FILE" << EOF
+
+TTS:
+  GPT_SOVITS_V3:
+    type: gpt_sovits_v3
+    url: "http://$sovits_v3_url"
+    output_dir: tmp/
+    text_language: "auto"
+    refer_wav_path: "$refer_wav"
+    prompt_language: "zh"
+    prompt_text: "$prompt_text_v3"
+    top_k: $top_k_v3
+    top_p: 1.0
+    temperature: $temp_v3
+    cut_punc: ""
+    speed: $speed_v3
+    inp_refs: []
+    sample_steps: 32
+    if_sr: false
+EOF
+    
+    echo -e "${GREEN}✅ GPT-SoVITS V3配置完成${RESET}"
+    echo -e "${YELLOW}💡 请确保服务已启动在 $sovits_v3_url${RESET}"
+}
+
+# 其他TTS服务配置（简化版本）
+config_openai_tts() {
+    echo -e "\n${CYAN}🤖 配置OpenAI TTS${RESET}"
+    read -r -p "OpenAI API Key: " openai_key < /dev/tty
+    
+    echo -e "\n${CYAN}语音选择：${RESET}"
+    echo "1) onyx (深沉男声)"
+    echo "2) nova (年轻女声)"
+    echo "3) alloy (中性声音)"
+    echo "4) fable (英式口音)"
+    echo "5) shimmer (温暖女声)"
+    echo "6) echo (年轻男声)"
+    
+    read -r -p "选择语音 (1-6，默认1): " openai_voice_choice < /dev/tty
+    openai_voice_choice=${openai_voice_choice:-1}
+    
+    case $openai_voice_choice in
+        1) voice="onyx" ;;
+        2) voice="nova" ;;
+        3) voice="alloy" ;;
+        4) voice="fable" ;;
+        5) voice="shimmer" ;;
+        6) voice="echo" ;;
+        *) voice="onyx" ;;
+    esac
+    
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: OpenAITTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    cat >> "$CONFIG_FILE" << EOF
+
+TTS:
+  OpenAITTS:
+    type: openai
+    api_key: $openai_key
+    api_url: https://api.openai.com/v1/audio/speech
+    model: tts-1
+    voice: $voice
+    speed: 1
+    output_dir: tmp/
+EOF
+    
+    echo -e "${GREEN}✅ OpenAI TTS配置完成${RESET}"
+}
+
+# 简化的其他TTS配置函数
+config_huoshan_tts() {
+    echo -e "\n${CYAN}🔥 配置火山大模型TTS${RESET}"
+    read -r -p "AppID: " huoshan_appid < /dev/tty
+    read -r -p "Access Token: " huoshan_token < /dev/tty
+    
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: HuoshanDoubleStreamTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    cat >> "$CONFIG_FILE" << EOF
+
+TTS:
+  HuoshanDoubleStreamTTS:
+    type: huoshan_double_stream
+    ws_url: wss://openspeech.bytedance.com/api/v3/tts/bidirection
+    appid: $huoshan_appid
+    access_token: $huoshan_token
+    resource_id: volc.service_type.10029
+    speaker: zh_female_wanwanxiaohe_moon_bigtts
+    speech_rate: 0
+    loudness_rate: 0
+    pitch: 0
+EOF
+    echo -e "${GREEN}✅ 火山大模型TTS配置完成${RESET}"
+}
+
+config_aliyun_tts() {
+    echo -e "\n${CYAN}☁️ 配置阿里云TTS${RESET}"
+    read -r -p "AppKey: " aliyun_appkey < /dev/tty
+    read -r -p "Access Key ID: " aliyun_id < /dev/tty
+    read -r -p "Access Key Secret: " aliyun_secret < /dev/tty
+    
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: AliyunTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    cat >> "$CONFIG_FILE" << EOF
+
+TTS:
+  AliyunTTS:
+    type: aliyun
+    output_dir: tmp/
+    appkey: $aliyun_appkey
+    voice: xiaoyun
+    access_key_id: $aliyun_id
+    access_key_secret: $aliyun_secret
+EOF
+    echo -e "${GREEN}✅ 阿里云TTS配置完成${RESET}"
+}
+
+config_xunfei_tts() {
+    echo -e "\n${CYAN}🗣️ 配置讯飞TTS${RESET}"
+    read -r -p "App ID: " xunfei_appid < /dev/tty
+    read -r -p "API Secret: " xunfei_secret < /dev/tty
+    read -r -p "API Key: " xunfei_key < /dev/tty
+    
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: XunFeiTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    cat >> "$CONFIG_FILE" << EOF
+
+TTS:
+  XunFeiTTS:
+    type: xunfei_stream
+    api_url: wss://cbm01.cn-huabei-1.xf-yun.com/v1/private/mcd9m97e6
+    app_id: $xunfei_appid
+    api_secret: $xunfei_secret
+    api_key: $xunfei_key
+    voice: x5_lingxiaoxuan_flow
+    output_dir: tmp/
+EOF
+    echo -e "${GREEN}✅ 讯飞TTS配置完成${RESET}"
+}
+
+config_fish_speech() {
+    echo -e "\n${CYAN}🐟 配置FishSpeech (本地声音克隆)${RESET}"
+    echo -e "${YELLOW}需要先独立部署FishSpeech服务${RESET}"
+    
+    read -r -p "服务地址 (默认http://127.0.0.1:8080): " fish_url < /dev/tty
+    fish_url=${fish_url:-http://127.0.0.1:8080}
+    
+    read -r -p "参考音频路径: " fish_ref_audio < /dev/tty
+    
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: FishSpeech\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    cat >> "$CONFIG_FILE" << EOF
+
+TTS:
+  FishSpeech:
+    type: fishspeech
+    output_dir: tmp/
+    response_format: wav
+    reference_id: null
+    reference_audio: ["$fish_ref_audio"]
+    reference_text: ["哈啰啊，我是小智啦，声音好听的中国台湾女孩一枚，超开心认识你耶"]
+    normalize: true
+    max_new_tokens: 1024
+    chunk_length: 200
+    top_p: 0.7
+    repetition_penalty: 1.2
+    temperature: 0.7
+    streaming: false
+    use_memory_cache: "on"
+    seed: null
+    channels: 1
+    rate: 44100
+    api_url: "$fish_url/v1/tts"
+EOF
+    echo -e "${GREEN}✅ FishSpeech配置完成${RESET}"
+}
+
+config_other_tts() {
+    echo -e "\n${CYAN}🔧 配置其他TTS服务${RESET}"
+    echo "支持的TTS服务："
+    echo "1) CosyVoiceSiliconflow (硅基流动)"
+    echo "2) CozeCnTTS (Coze中国)"
+    echo "3) VolcesAiGatewayTTS (火山网关)"
+    echo "4) TTS302AI"
+    echo "5) GizwitsTTS"
+    echo "6) ACGNTTS"
+    echo "7) CustomTTS (自定义)"
+    
+    read -r -p "请选择 (1-7): " other_choice < /dev/tty
+    
+    case $other_choice in
+        1)
+            read -r -p "Access Token: " token < /dev/tty
+            sed -i "s/TTS:.*/TTS: CosyVoiceSiliconflow/" "$CONFIG_FILE"
+            echo "TTS配置已更新为CosyVoiceSiliconflow"
+            ;;
+        2)
+            read -r -p "Access Token: " token < /dev/tty
+            sed -i "s/TTS:.*/TTS: CozeCnTTS/" "$CONFIG_FILE"
+            echo "TTS配置已更新为CozeCnTTS"
+            ;;
+        3)
+            read -r -p "API Key: " token < /dev/tty
+            sed -i "s/TTS:.*/TTS: VolcesAiGatewayTTS/" "$CONFIG_FILE"
+            echo "TTS配置已更新为VolcesAiGatewayTTS"
+            ;;
+        *)
+            echo -e "${YELLOW}其他TTS服务需要手动配置，请查看配置文件${RESET}"
+            ;;
+    esac
 }
 
 # ========================= 服务启动 =========================
