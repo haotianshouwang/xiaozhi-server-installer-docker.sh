@@ -6,12 +6,12 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.3-fixed（修复版本）
-# 修复内容：修复退出配置时被setup_config_file重新下载覆盖默认配置的问题
+# 版本：1.2.7-fixed（修复版本）
+# 修复内容：修复ASR配置返回主菜单功能 - 用户输入0时真正返回主菜单而非重新配置
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.5-fixed"
+Version="1.2.7-fixed"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -1050,9 +1050,18 @@ setup_config_file() {
     mkdir -p "$MAIN_DIR/data"
     echo -e "${GREEN}✅ 已创建 data 目录: $MAIN_DIR/data${RESET}"
     
-    # 检查是否用户选择退出配置并创建了默认配置
+    # 检查是否用户选择退出配置并使用现有配置文件
+    if [ "${USE_EXISTING_CONFIG:-false}" = "true" ]; then
+        echo -e "${GREEN}✅ 检测到用户选择退出配置，使用现有的配置文件${RESET}"
+        CONFIG_DOWNLOAD_NEEDED="false"
+        USE_EXISTING_CONFIG=true
+        SKIP_DETAILED_CONFIG=false
+        return
+    fi
+    
+    # 检查是否用户选择稍后手动填写并创建了默认配置
     if [ "${USE_DEFAULT_CONFIG:-false}" = "true" ]; then
-        echo -e "${GREEN}✅ 检测到用户选择退出配置，使用已创建的默认配置文件${RESET}"
+        echo -e "${GREEN}✅ 检测到用户选择稍后手动填写，使用已创建的默认配置文件${RESET}"
         CONFIG_DOWNLOAD_NEEDED="false"
         USE_EXISTING_CONFIG=true
         SKIP_DETAILED_CONFIG=false
@@ -1629,7 +1638,8 @@ config_asr_advanced() {
     
     case $asr_choice in
         0)
-            return 1
+            echo -e "${CYAN}🔄 取消配置，返回主菜单${RESET}"
+            return 2  # 返回码2表示完全退出配置
             ;;
         1)
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
@@ -2755,35 +2765,30 @@ config_keys() {
         echo -e "${PURPLE}==================================================${RESET}"
         echo "1) 现在通过脚本配置密钥和服务商"
         echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
-        echo "0) 退出配置（将使用默认配置）"
+        echo "0) 退出配置（将使用现有配置文件）"
         read -r -p "请选择（默认1）：" key_choice < /dev/tty
         key_choice=${key_choice:-1}
         
         # 处理退出配置
         if [ "$key_choice" = "0" ]; then
             echo -e "\n${YELLOW}⚠️ 确认退出详细配置流程？${RESET}"
-            echo -e "${CYAN}ℹ️ 退出后将使用以下默认配置：${RESET}"
-            echo -e "${CYAN}  - ASR: AliyunStreamASR (阿里云流式)${RESET}"
-            echo -e "${CYAN}  - LLM: ChatGLMLLM (智谱清言)${RESET}"
-            echo -e "${CYAN}  - VLLM: ChatGLMVLLM (智谱清言)${RESET}"
-            echo -e "${CYAN}  - TTS: EdgeTTS (微软)${RESET}"
-            echo -e "${CYAN}  - Memory: nomem (无记忆)${RESET}"
-            echo -e "${CYAN}ℹ️ 默认配置路径：$CONFIG_FILE${RESET}"
+            echo -e "${CYAN}ℹ️ 退出后将直接使用现有的配置文件${RESET}"
+            echo -e "${CYAN}ℹ️ 配置文件路径：$CONFIG_FILE${RESET}"
             echo ""
             echo "请选择："
-            echo "1) 确认退出配置，使用默认配置"
+            echo "1) 确认退出配置，使用现有配置"
             echo "2) 取消，返回配置选择菜单"
             read -r -p "请选择（默认1）：" confirm_exit < /dev/tty
             confirm_exit=${confirm_exit:-1}
             
             if [ "$confirm_exit" = "1" ]; then
-                echo -e "\n${GREEN}✅ 使用默认配置，退出详细配置流程${RESET}"
+                echo -e "\n${GREEN}✅ 使用现有配置文件，退出详细配置流程${RESET}"
                 
-                # 创建完全干净的默认配置文件
-                create_default_config_file
-                
-                # 设置标志，告知setup_config_file使用默认配置
-                export USE_DEFAULT_CONFIG=true
+                # 设置标志，告知setup_config_file使用现有配置
+                export USE_EXISTING_CONFIG=true
+                CONFIG_DOWNLOAD_NEEDED="false"
+                USE_EXISTING_CONFIG=true
+                SKIP_DETAILED_CONFIG=false
                 CURRENT_DEPLOY_TYPE="internal"
                 export KEY_CONFIG_MODE="manual"
                 break  # 退出循环
@@ -2828,7 +2833,7 @@ config_keys() {
                     local asr_result=$?
                     if [ $asr_result -eq 2 ]; then
                         echo -e "\n${YELLOW}⚠️ 用户取消配置${RESET}"
-                        return 1
+                        return 1  # 完全退出配置
                     elif [ $asr_result -eq 1 ]; then
                         echo -e "\n${CYAN}🔄 重新开始配置流程${RESET}"
                         config_step=1
