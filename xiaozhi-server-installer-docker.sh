@@ -7,11 +7,11 @@ trap exit_confirm SIGINT
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
 # 版本：1.2.3-fixed（修复版本）
-# 修复内容：修复内存不足时Docker操作的用户确认逻辑
+# 修复内容：修复退出配置时被setup_config_file重新下载覆盖默认配置的问题
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.3-fixed"
+Version="1.2.5-fixed"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -962,11 +962,102 @@ check_if_already_configured() {
     return 1  # 未配置
 }
 
+create_default_config_file() {
+    echo -e "\n${YELLOW}⚠️ 正在创建完全干净的默认配置文件${RESET}"
+    
+    # 创建目录
+    mkdir -p "$(dirname "$CONFIG_FILE")"
+    
+    # 创建完全干净的默认配置文件，只包含基本模块配置
+    cat > "$CONFIG_FILE" << 'EOF'
+# 小智服务器默认配置文件
+# 此文件包含基础的模块配置，不包含任何API密钥
+# 用户可以稍后在此文件中添加必要的API密钥
+
+# 模块选择配置
+selected_module:
+  VAD: SileroVAD
+  ASR: AliyunStreamASR
+  LLM: ChatGLMLLM
+  VLLM: ChatGLMVLLM
+  TTS: EdgeTTS
+  Memory: nomem
+  Intent: function_call
+
+# VAD配置
+VAD:
+  SileroVAD:
+    type: silero_vad
+    sample_rate: 16000
+
+# ASR配置 (阿里云流式)
+ASR:
+  AliyunStreamASR:
+    type: aliyun_stream
+    appkey: ""  # 需要用户填入
+    token: ""   # 需要用户填入
+    audio_format: PCM
+    sample_rate: 16000
+    channel: 1
+    encoding: linear16
+
+# LLM配置 (智谱清言)
+LLM:
+  ChatGLMLLM:
+    type: zhipuai
+    api_key: ""     # 需要用户填入
+    api_url: "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    model: "glm-4"
+
+# VLLM配置 (智谱清言)
+VLLM:
+  ChatGLMVLLM:
+    type: zhipuai
+    api_key: ""     # 需要用户填入
+    api_url: "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    model: "glm-4"
+
+# TTS配置 (微软Edge)
+TTS:
+  EdgeTTS:
+    type: edge
+    voice: "zh-CN-XiaoxiaoNeural"
+    output_dir: tmp/
+
+# Memory配置
+Memory:
+  nomem:
+    type: no_memory
+
+# Intent配置
+Intent:
+  function_call:
+    type: function_call
+
+# WebSocket配置
+websocket: "ws://localhost:8000/xiaozhi/v1/"
+vision_explain: "http://localhost:8003/mcp/vision/explain"
+EOF
+    
+    echo -e "${GREEN}✅ 已创建干净的默认配置文件${RESET}"
+    echo -e "${CYAN}📝 配置文件位置：$CONFIG_FILE${RESET}"
+    echo -e "${YELLOW}⚠️ 请注意：此文件仅包含基础配置，所有API密钥都需要您手动填入${RESET}"
+}
+
 setup_config_file() {
     echo -e "\n${CYAN}📁 配置小智服务器配置文件...${RESET}"
     
     mkdir -p "$MAIN_DIR/data"
     echo -e "${GREEN}✅ 已创建 data 目录: $MAIN_DIR/data${RESET}"
+    
+    # 检查是否用户选择退出配置并创建了默认配置
+    if [ "${USE_DEFAULT_CONFIG:-false}" = "true" ]; then
+        echo -e "${GREEN}✅ 检测到用户选择退出配置，使用已创建的默认配置文件${RESET}"
+        CONFIG_DOWNLOAD_NEEDED="false"
+        USE_EXISTING_CONFIG=true
+        SKIP_DETAILED_CONFIG=false
+        return
+    fi
     
     if [ -f "$CONFIG_FILE" ]; then
         echo -e "${YELLOW}📋 发现现有配置文件${RESET}"
@@ -2688,14 +2779,11 @@ config_keys() {
             if [ "$confirm_exit" = "1" ]; then
                 echo -e "\n${GREEN}✅ 使用默认配置，退出详细配置流程${RESET}"
                 
-                # 设置默认配置
-                sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+                # 创建完全干净的默认配置文件
+                create_default_config_file
                 
-                local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
-                local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
-                sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$CONFIG_FILE"
-                sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$CONFIG_FILE"
-                
+                # 设置标志，告知setup_config_file使用默认配置
+                export USE_DEFAULT_CONFIG=true
                 CURRENT_DEPLOY_TYPE="internal"
                 export KEY_CONFIG_MODE="manual"
                 break  # 退出循环
@@ -2708,15 +2796,14 @@ config_keys() {
             fi
         elif [ "$key_choice" = "2" ]; then
             echo -e "\n${YELLOW}⚠️ 已选择稍后手动填写。${RESET}"
-            echo -e "${CYAN}ℹ️ 为防止服务启动失败，脚本将自动将服务商预设为 \"AliyunStreamASR\" 和 \"ChatGLMLLM\"。${RESET}"
+            echo -e "${CYAN}ℹ️ 为防止服务启动失败，脚本将创建干净的默认配置文件。${RESET}"
             echo -e "${CYAN}ℹ️ 您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$CONFIG_FILE${RESET}"
-            sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
             
-            local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
-            local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
-            sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$CONFIG_FILE"
-            sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$CONFIG_FILE"
+            # 创建干净的默认配置文件
+            create_default_config_file
             
+            # 设置标志，告知setup_config_file使用默认配置
+            export USE_DEFAULT_CONFIG=true
             CURRENT_DEPLOY_TYPE="internal"
             export KEY_CONFIG_MODE="manual"
             break  # 退出循环
