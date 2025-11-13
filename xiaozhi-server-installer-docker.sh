@@ -6,11 +6,12 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.1.4
+# 版本：1.1.4-fixed（修复版本）
+# 修复内容：修复讯飞ASR配置函数缺失和VLLM返回逻辑问题
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.1.4"
+Version="1.1.4-fixed"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -1516,7 +1517,7 @@ config_asr_advanced() {
             config_qwen_asr
             ;;
         15)
-            config_xunfei_asr
+            config_xunfei_stream_asr
             ;;
         *)
             echo -e "${YELLOW}⚠️ 无效选择，请重新选择${RESET}"
@@ -3594,6 +3595,57 @@ TTS:
     access_key_secret: $aliyun_secret
 EOF
     echo -e "${GREEN}✅ 阿里云TTS配置完成${RESET}"
+}
+
+# 讯飞ASR配置
+config_xunfei_stream_asr() {
+    echo -e "\n${CYAN}🎤 配置讯飞流式ASR${RESET}"
+    
+    local app_id=""
+    local api_secret=""
+    local api_key=""
+    
+    # 使用默认值检查
+    local default_app_id=$(grep -A5 -B1 "XunfeiStreamASR:" "$CONFIG_FILE" 2>/dev/null | grep "app_id:" | awk '{print $2}' || echo "")
+    local default_api_secret=$(grep -A5 -B1 "XunfeiStreamASR:" "$CONFIG_FILE" 2>/dev/null | grep "api_secret:" | awk '{print $2}' || echo "")
+    local default_api_key=$(grep -A5 -B1 "XunfeiStreamASR:" "$CONFIG_FILE" 2>/dev/null | grep "api_key:" | awk '{print $2}' || echo "")
+    
+    read -r -p "App ID ${default_app_id:+[默认: $default_app_id]}: " app_id < /dev/tty
+    app_id=${app_id:-$default_app_id}
+    
+    read -r -p "API Secret ${default_api_secret:+[默认: $default_api_secret]}: " api_secret < /dev/tty
+    api_secret=${api_secret:-$default_api_secret}
+    
+    read -r -p "API Key ${default_api_key:+[默认: $default_api_key]}: " api_key < /dev/tty
+    api_key=${api_key:-$default_api_key}
+    
+    if [ -z "$app_id" ] || [ -z "$api_secret" ] || [ -z "$api_key" ]; then
+        echo -e "${RED}❌ 缺少必要的参数，请重新配置${RESET}"
+        return 1
+    fi
+    
+    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: XunfeiStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: LinkeraiTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    
+    cat >> "$CONFIG_FILE" << EOF
+
+ASR:
+  XunfeiStreamASR:
+    type: xunfei_stream
+    api_url: wss://rtasr.xfyun.cn/v1/ws
+    app_id: $app_id
+    api_secret: $api_secret
+    api_key: $api_key
+    language: zh_cn
+    domain: rtasr
+    vinfo: 1
+    vinfo_prompt: 
+    vinfo_enable: 1
+    voinfo_enable: 1
+    voice_type: 
+    voice_languages: 
+    output_dir: tmp/
+EOF
+    echo -e "${GREEN}✅ 讯飞流式ASR配置完成${RESET}"
 }
 
 config_xunfei_tts() {
