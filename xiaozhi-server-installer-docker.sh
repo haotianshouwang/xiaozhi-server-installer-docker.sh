@@ -6,12 +6,12 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.1.9-fixed（修复版本）
-# 修复内容：修复 FunASRServer 配置，支持独立部署服务
+# 版本：1.2.3-fixed（修复版本）
+# 修复内容：修复内存不足时Docker操作的用户确认逻辑
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.1.9-fixed"
+Version="1.2.3-fixed"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -401,9 +401,11 @@ check_server_config() {
     [ -z "$INTERNAL_IP" ] && INTERNAL_IP="127.0.0.1"
     EXTERNAL_IP=$(curl -s --max-time 5 https://api.ip.sb/ip || curl -s --max-time 5 https://ifconfig.me || curl -s --max-time 5 https://ipinfo.io/ip || echo "$INTERNAL_IP")
 
-    # 获取硬件信息
+    # 获取硬件信息（四舍五入处理内存，避免系统预留内存导致误判）
     MEM_TOTAL=$(free -g | awk '/Mem:/ {print $2}')
-    [ -z "$MEM_TOTAL" ] || [ "$MEM_TOTAL" = "0" ] && MEM_TOTAL=$(free -m | awk '/Mem:/ {print int($2/1024)}')
+    [ -z "$MEM_TOTAL" ] || [ "$MEM_TOTAL" = "0" ] && MEM_TOTAL=$(echo "$(free -m | awk '/Mem:/ {print $2}') / 1024" | bc -l)
+    # 四舍五入到整数，避免4GB系统因预留内存显示3.9GB导致误判
+    MEM_TOTAL=$(echo "$MEM_TOTAL" | awk '{printf("%.0f", $1+0.5)}')
     CPU_MODEL=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ *//')
     CPU_CORES=$(grep -c '^processor' /proc/cpuinfo)
     DISK_AVAIL=$(df -h / | awk '/\// {print $4}')
@@ -447,6 +449,72 @@ check_server_config() {
     fi
 }
 
+# 内存不足处理函数
+handle_insufficient_memory() {
+    echo -e "${RED}⚠️ 严重警告 - 内存不足风险${RESET}"
+    echo -e "${RED}❌ 您的服务器内存${MEM_TOTAL}GB小于2GB${RESET}"
+    echo -e "${YELLOW}⚠️ 当前脚本已配置为使用本地ASR模型${RESET}"
+    echo -e "${YELLOW}⚠️ Docker容器默认设置自动启动${RESET}"
+    echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
+    
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}🐳 Docker容器管理选择  🐳${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    echo "1) 执行docker退出"
+    echo "2) 不执行docker退出"
+    echo ""
+    
+    # 显示安全建议
+    echo -e "${PURPLE}🔒 脚本将自动选择：1) 执行docker退出${RESET}"
+    echo -e "${YELLOW}💡 这将停止并删除Docker容器，避免系统卡死${RESET}"
+    
+    echo -e "\n${PURPLE}⚖️ 免责声明：${RESET}"
+    echo -e "${CYAN}脚本已尽最大努力保护您的服务器安全${RESET}"
+    echo -e "${YELLOW}如果您坚持选择选项2，您将承担服务器卡死的全部风险${RESET}"
+    echo -e "${YELLOW}作者不承担因您的选择导致的任何损失${RESET}"
+    
+    echo -e "\n${PURPLE}⏰ 3秒后自动执行docker退出...${RESET}"
+    echo ""
+    
+    # 倒数计时
+    for i in 3 2 1; do
+        echo -ne "\r${YELLOW}倒计时：${i} 秒${RESET}"
+        sleep 1
+    done
+    
+    echo -e "\n\n${YELLOW}⚠️ 警告：即将执行Docker操作${RESET}"
+    echo -e "${YELLOW}如果您的服务器出现卡死情况，请尝试以下自救方式：${RESET}"
+    echo "1. 如果您使用的是云服务器，请尝试VNC登录，执行：sudo systemctl stop docker"
+    echo "2. 如果您使用的是云服务器，请检查控制台是否有远程指令"
+    echo "3. 如果您使用的是云服务器，请配置远程指令：sudo systemctl stop docker"
+    echo "4. 如果上述方法都无效，请自行百度解决方案"
+    echo "5. 作为最后手段，可能需要重装系统"
+    
+    echo -e "\n${YELLOW}⚠️ 继续执行Docker操作...${RESET}"
+    echo ""
+    
+    # 自动执行docker退出
+    echo -e "${CYAN}🔍 检查容器状态...${RESET}"
+    if command -v docker &> /dev/null; then
+        if docker ps | grep -q "$CONTAINER_NAME"; then
+            echo -e "${YELLOW}⚠️ 正在停止Docker容器...${RESET}"
+            docker stop "$CONTAINER_NAME" 2>/dev/null
+            docker rm "$CONTAINER_NAME" 2>/dev/null
+            echo -e "${GREEN}✅ Docker容器已停止并删除${RESET}"
+        else
+            echo -e "${GREEN}✅ 未发现运行中的Docker容器${RESET}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️ Docker未安装，跳过容器操作${RESET}"
+    fi
+    
+    echo -e "\n${GREEN}✅ 内存不足风险处理完成${RESET}"
+    echo -e "${YELLOW}💡 建议升级服务器内存后重新部署${RESET}"
+    
+    read -r -p "按回车键返回主菜单..." < /dev/tty
+    return 1
+}
+
 show_server_config() {
     echo -e "${PURPLE}==================================================${RESET}"
     echo -e "${CYAN}💻 服务器配置详情${RESET}"
@@ -481,6 +549,10 @@ show_server_config() {
         echo -e "${RED}⚠️ 最低内存要求：SherpaParaformerASR需≥2GB，其他本地模型需≥4GB${RESET}"
         IS_MEMORY_SUFFICIENT=false
         IS_SHERPA_PARAFORMER_AVAILABLE=false
+        
+        # 调用内存不足处理函数
+        handle_insufficient_memory
+        return $?
     fi
     echo
 }
@@ -1056,9 +1128,9 @@ read -r -p "请输入序号 (默认推荐 9，输入0返回上一步): " asr_cho
             1)
                 asr_provider_key="FunASR"
                 if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足，无法选择FunASR本地模型，请重新选择其他ASR服务商${RESET}"
-                    echo -e "${YELLOW}💡 按回车键重新选择...${RESET}"
-read -r < /dev/tty
+                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择FunASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
                     continue
                 fi
                 echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
@@ -1082,8 +1154,9 @@ read -r -p "请输入 FunASR Server 地址 (默认 http://localhost:10095): " se
             3)
                 asr_provider_key="SherpaASR"
                 if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足，无法选择SherpaASR本地模型${RESET}"
-read -r < /dev/tty
+                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择SherpaASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
                     continue
                 fi
                 echo -e "\n${YELLOW}⚠️ 您选择了 SherpaASR。${RESET}"
@@ -1117,8 +1190,8 @@ read -r -p "请输入模型类型 (默认: sense_voice): " model_type < /dev/tty
                 asr_provider_key="SherpaParaformerASR"
                 if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = false ]; then
                     echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)，无法选择SherpaParaformerASR本地模型${RESET}"
-                    echo -e "${RED}⚠️ SherpaParaformerASR需要≥2GB内存${RESET}"
-read -r < /dev/tty
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
                     continue
                 fi
                 echo -e "\n${YELLOW}⚠️ 您选择了 SherpaParaformerASR。${RESET}"
@@ -2584,128 +2657,77 @@ config_keys() {
 
     echo -e "\n${YELLOW}⚠️ 注意：若您计划使用本地ASR模型（如FunASR），请确保服务器内存≥4G。${RESET}"
     
-    echo "1) 现在通过脚本配置密钥和服务商"
-    echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
-    echo "0) 退出配置（将使用默认配置）"
-read -r -p "请选择（默认1）：" key_choice < /dev/tty
-    key_choice=${key_choice:-1}
-    
-    # 处理退出配置
-    if [ "$key_choice" = "0" ]; then
-        echo -e "\n${YELLOW}⚠️ 确认退出详细配置流程？${RESET}"
-        echo -e "${CYAN}ℹ️ 退出后将使用以下默认配置：${RESET}"
-        echo -e "${CYAN}  - ASR: AliyunStreamASR (阿里云流式)${RESET}"
-        echo -e "${CYAN}  - LLM: ChatGLMLLM (智谱清言)${RESET}"
-        echo -e "${CYAN}  - VLLM: ChatGLMVLLM (智谱清言)${RESET}"
-        echo -e "${CYAN}  - TTS: EdgeTTS (微软)${RESET}"
-        echo -e "${CYAN}  - Memory: nomem (无记忆)${RESET}"
-        echo -e "${CYAN}ℹ️ 默认配置路径：$CONFIG_FILE${RESET}"
-        
-        # 检查内存大小
-        echo -e "\n${BLUE}🔍 检查系统内存...${RESET}"
-        local memory_sufficient=true
-        if ! check_memory_size; then
-            memory_sufficient=false
-            echo -e "${WHITE_RED}⚠️ 内存小于4G 不推荐${RESET}"
-        else
-            echo -e "${GREEN}✅ 内存检查通过${RESET}"
-        fi
-        
-        # Docker退出选择菜单
+    # 使用while循环包装配置选择逻辑，支持用户取消后重新选择
+    while true; do
         echo -e "\n${PURPLE}==================================================${RESET}"
-        echo -e "${CYAN}🐳 Docker容器管理选择  🐳${RESET}"
+        echo -e "${CYAN}🔑 选择配置方式  🔑${RESET}"
         echo -e "${PURPLE}==================================================${RESET}"
+        echo "1) 现在通过脚本配置密钥和服务商"
+        echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
+        echo "0) 退出配置（将使用默认配置）"
+        read -r -p "请选择（默认1）：" key_choice < /dev/tty
+        key_choice=${key_choice:-1}
         
-        echo "1) 执行docker退出"
-        echo "2) 不执行docker退出"
-        
-        # 处理内存不足的情况
-        if [ "$memory_sufficient" = false ]; then
-            echo -e "${WHITE_RED}==================================================${RESET}"
-            echo -e "${WHITE_RED}⚠️ 严重警告 - 内存不足风险${RESET}"
-            echo -e "${WHITE_RED}==================================================${RESET}"
-            echo -e "${RED}❌ 您的服务器内存小于4GB${RESET}"
-            echo -e "${YELLOW}⚠️ 当前脚本已配置为使用本地ASR模型${RESET}"
-            echo -e "${YELLOW}⚠️ Docker容器默认设置自动启动${RESET}"
-            echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
-            echo -e ""
-            echo -e "${CYAN}🔒 脚本将自动选择：1) 执行docker退出${RESET}"
-            echo -e "${CYAN}💡 这将停止并删除Docker容器，避免系统卡死${RESET}"
-            echo -e ""
-            echo -e "${WHITE_RED}⚖️ 免责声明：${RESET}"
-            echo -e "${WHITE_RED}脚本已尽最大努力保护您的服务器安全${RESET}"
-            echo -e "${WHITE_RED}如果您坚持选择选项2，您将承担服务器卡死的全部风险${RESET}"
-            echo -e "${WHITE_RED}作者不承担因您的选择导致的任何损失${RESET}"
-            echo -e "${WHITE_RED}==================================================${RESET}"
+        # 处理退出配置
+        if [ "$key_choice" = "0" ]; then
+            echo -e "\n${YELLOW}⚠️ 确认退出详细配置流程？${RESET}"
+            echo -e "${CYAN}ℹ️ 退出后将使用以下默认配置：${RESET}"
+            echo -e "${CYAN}  - ASR: AliyunStreamASR (阿里云流式)${RESET}"
+            echo -e "${CYAN}  - LLM: ChatGLMLLM (智谱清言)${RESET}"
+            echo -e "${CYAN}  - VLLM: ChatGLMVLLM (智谱清言)${RESET}"
+            echo -e "${CYAN}  - TTS: EdgeTTS (微软)${RESET}"
+            echo -e "${CYAN}  - Memory: nomem (无记忆)${RESET}"
+            echo -e "${CYAN}ℹ️ 默认配置路径：$CONFIG_FILE${RESET}"
+            echo ""
+            echo "请选择："
+            echo "1) 确认退出配置，使用默认配置"
+            echo "2) 取消，返回配置选择菜单"
+            read -r -p "请选择（默认1）：" confirm_exit < /dev/tty
+            confirm_exit=${confirm_exit:-1}
             
-            # 等待3秒让用户阅读警告
-            echo -e "${YELLOW}⏰ 3秒后自动执行docker退出...${RESET}"
-            sleep 3
-            
-            local docker_choice=1
-        else
-            read -r -p "请选择（默认2）：" docker_choice < /dev/tty
-            docker_choice=${docker_choice:-2}
-        fi
-        
-        # 处理Docker退出选择
-        if [ "$docker_choice" = "1" ]; then
-            echo -e "\n${RED}⚠️ 警告：即将执行Docker操作${RESET}"
-            echo -e "${YELLOW}如果您的服务器出现卡死情况，请尝试以下自救方式：${RESET}"
-            echo -e "${CYAN}1. 如果您使用的是云服务器，请尝试VNC登录，执行：sudo systemctl stop docker${RESET}"
-            echo -e "${CYAN}2. 如果您使用的是云服务器，请检查控制台是否有远程指令${RESET}"
-            echo -e "${CYAN}3. 如果您使用的是云服务器，请配置远程指令：sudo systemctl stop docker${RESET}"
-            echo -e "${CYAN}4. 如果上述方法都无效，请自行百度解决方案${RESET}"
-            echo -e "${CYAN}5. 作为最后手段，可能需要重装系统${RESET}"
-            echo -e ""
-            echo -e "${YELLOW}⚠️ 继续执行Docker操作...${RESET}"
-            
-            echo -e "\n${BLUE}🔍 检查容器状态...${RESET}"
-            if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-                echo -e "${YELLOW}⚠️ 正在停止并删除容器 $CONTAINER_NAME...${RESET}"
-                if docker stop "$CONTAINER_NAME" >/dev/null 2>&1 && docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
-                    echo -e "${GREEN}✅ 容器 $CONTAINER_NAME 已成功停止并删除${RESET}"
-                else
-                    echo -e "${RED}❌ 容器 $CONTAINER_NAME 操作失败${RESET}"
-                fi
+            if [ "$confirm_exit" = "1" ]; then
+                echo -e "\n${GREEN}✅ 使用默认配置，退出详细配置流程${RESET}"
+                
+                # 设置默认配置
+                sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+                
+                local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
+                local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
+                sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$CONFIG_FILE"
+                sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$CONFIG_FILE"
+                
+                CURRENT_DEPLOY_TYPE="internal"
+                export KEY_CONFIG_MODE="manual"
+                break  # 退出循环
+            elif [ "$confirm_exit" = "2" ]; then
+                echo -e "\n${BLUE}ℹ️ 已取消退出，返回配置选择菜单${RESET}"
+                continue  # 继续循环，重新显示菜单
             else
-                echo -e "${GREEN}✅ 容器 $CONTAINER_NAME 不存在或未运行${RESET}"
+                echo -e "\n${BLUE}ℹ️ 无效选择，请重新选择${RESET}"
+                continue  # 继续循环，重新显示菜单
             fi
-        elif [ "$docker_choice" = "2" ]; then
-            echo -e "\n${GREEN}✅ 跳过Docker容器操作${RESET}"
-        else
-            echo -e "${YELLOW}⚠️ 无效选择，跳过Docker容器操作${RESET}"
+        elif [ "$key_choice" = "2" ]; then
+            echo -e "\n${YELLOW}⚠️ 已选择稍后手动填写。${RESET}"
+            echo -e "${CYAN}ℹ️ 为防止服务启动失败，脚本将自动将服务商预设为 \"AliyunStreamASR\" 和 \"ChatGLMLLM\"。${RESET}"
+            echo -e "${CYAN}ℹ️ 您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$CONFIG_FILE${RESET}"
+            sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+            
+            local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
+            local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
+            sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$CONFIG_FILE"
+            sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$CONFIG_FILE"
+            
+            CURRENT_DEPLOY_TYPE="internal"
+            export KEY_CONFIG_MODE="manual"
+            break  # 退出循环
         fi
         
-        # 设置默认配置
-        sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
-        
-        local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
-        local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
-        sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$CONFIG_FILE"
-        sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$CONFIG_FILE"
-        
-        CURRENT_DEPLOY_TYPE="internal"
-        export KEY_CONFIG_MODE="manual"
-        return
-    elif [ "$key_choice" = "2" ]; then
-        echo -e "\n${YELLOW}⚠️ 已选择稍后手动填写。${RESET}"
-        echo -e "${CYAN}ℹ️ 为防止服务启动失败，脚本将自动将服务商预设为 \"AliyunStreamASR\" 和 \"ChatGLMLLM\"。${RESET}"
-        echo -e "${CYAN}ℹ️ 您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$CONFIG_FILE${RESET}"
-        sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
-        
-        local ws_url="ws://$INTERNAL_IP:8000/xiaozhi/v1/"
-        local vision_url="http://$INTERNAL_IP:8003/mcp/vision/explain"
-        sed -i "s|^[[:space:]]*websocket:[[:space:]]*.*$|  websocket: \"$ws_url\"|" "$CONFIG_FILE"
-        sed -i "s|^[[:space:]]*vision_explain:[[:space:]]*.*$|  vision_explain: \"$vision_url\"|" "$CONFIG_FILE"
-        
-        CURRENT_DEPLOY_TYPE="internal"
-        export KEY_CONFIG_MODE="manual"
-        return
-    fi
-
-    if [[ "$key_choice" == "1" ]]; then
-        echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
+        # 处理选项1：详细配置
+        if [[ "$key_choice" == "1" ]]; then
+            echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
+            break  # 退出循环，进入详细配置
+        fi
+    done
         
         # 简化的线性配置流程，支持返回上一步
         local config_step=1
@@ -2797,7 +2819,6 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         echo -e "\n${GREEN}✅ 配置完成！${RESET}"
         echo -e "${CYAN}ℹ️ 详细配置文件已保存至: $CONFIG_FILE${RESET}"
         export KEY_CONFIG_MODE="auto"
-    fi
 }
 
 # ========================= 高级TTS配置 =========================
