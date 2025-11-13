@@ -1035,8 +1035,32 @@ read -r -p "请输入 FunASR Server 地址 (默认 http://localhost:10095): " se
 read -r < /dev/tty
                     continue
                 fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaASR。${RESET}"
+                echo -e "\n${YELLOW}⚠️ 您选择了 SherpaASR。${RESET}"
+                echo -e "${CYAN}🔑 SherpaASR配置需要以下参数：${RESET}"
+                echo "  - API类型: sherpa_onnx_local (固定值)"
+                echo "  - 模型目录: 模型存放路径 (默认: models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17)"
+                echo "  - 输出目录: 临时文件输出路径 (默认: tmp/)"
+                echo "  - 模型类型: sense_voice (多语言) 或 paraformer (中文专用) (默认: sense_voice)"
+                echo -e "${CYAN}💡 需要手动下载模型文件到指定目录${RESET}"
+                
+read -r -p "请输入模型目录 (默认: models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17): " model_dir < /dev/tty
+                model_dir="${model_dir:-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17}"
+read -r -p "请输入输出目录 (默认: tmp/): " output_dir < /dev/tty
+                output_dir="${output_dir:-tmp/}"
+read -r -p "请输入模型类型 (默认: sense_voice): " model_type < /dev/tty
+                model_type="${model_type:-sense_voice}"
+                
                 sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$model_dir" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_dir: .*|    model_dir: \"$model_dir\"|" "$CONFIG_FILE"
+                fi
+                if [ -n "$output_dir" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    output_dir: .*|    output_dir: \"$output_dir\"|" "$CONFIG_FILE"
+                fi
+                if [ -n "$model_type" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    model_type: .*/    model_type: $model_type/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaASR。${RESET}"
                 ;;
             4)
                 asr_provider_key="SherpaParaformerASR"
@@ -1045,8 +1069,28 @@ read -r < /dev/tty
 read -r < /dev/tty
                     continue
                 fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaParaformerASR。${RESET}"
+                echo -e "\n${YELLOW}⚠️ 您选择了 SherpaParaformerASR。${RESET}"
+                echo -e "${CYAN}🔑 SherpaParaformerASR配置需要以下参数：${RESET}"
+                echo "  - API类型: sherpa_onnx_local (固定值)"
+                echo "  - 模型目录: 模型存放路径 (默认: models/sherpa-onnx-paraformer-zh-small-2024-03-09)"
+                echo "  - 输出目录: 临时文件输出路径 (默认: tmp/)"
+                echo "  - 模型类型: paraformer (中文专用)"
+                echo -e "${CYAN}💡 中文专用模型，适合低性能设备${RESET}"
+                echo -e "${CYAN}💡 需要手动下载模型文件到指定目录${RESET}"
+                
+read -r -p "请输入模型目录 (默认: models/sherpa-onnx-paraformer-zh-small-2024-03-09): " model_dir < /dev/tty
+                model_dir="${model_dir:-models/sherpa-onnx-paraformer-zh-small-2024-03-09}"
+read -r -p "请输入输出目录 (默认: tmp/): " output_dir < /dev/tty
+                output_dir="${output_dir:-tmp/}"
+                
                 sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$model_dir" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_dir: .*|    model_dir: \"$model_dir\"|" "$CONFIG_FILE"
+                fi
+                if [ -n "$output_dir" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    output_dir: .*|    output_dir: \"$output_dir\"|" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaParaformerASR。${RESET}"
                 ;;
             5)
                 asr_provider_key="DoubaoASR"
@@ -1244,9 +1288,27 @@ read -r -p "按回车继续或输入0重新选择: " confirm_memory < /dev/tty
                         continue
                     fi
                 fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
-                echo -e "${CYAN}ℹ️ 系统将自动配置 VoskASR 模型下载。${RESET}"
+                echo -e "\n${YELLOW}⚠️ 您选择了 VoskASR。${RESET}"
+                echo -e "${CYAN}🔑 VoskASR配置需要以下参数：${RESET}"
+                echo "  - API类型: vosk (固定值)"
+                echo "  - 模型路径: 语音识别模型路径 (必需，如: models/vosk/vosk-model-small-cn-0.22)"
+                echo "  - 输出目录: 临时文件输出路径 (默认: tmp/)"
+                echo -e "${CYAN}💡 完全离线运行，无需网络连接${RESET}"
+                echo -e "${CYAN}💡 下载地址：https://alphacephei.com/vosk/models${RESET}"
+                
+read -r -p "请输入模型路径 (如: models/vosk/vosk-model-small-cn-0.22): " model_path < /dev/tty
+                model_path="${model_path:-}"
+read -r -p "请输入输出目录 (默认: tmp/): " output_dir < /dev/tty
+                output_dir="${output_dir:-tmp/}"
+                
                 sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$model_path" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_path: .*|    model_path: \"$model_path\"|" "$CONFIG_FILE"
+                fi
+                if [ -n "$output_dir" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    output_dir: .*|    output_dir: \"$output_dir\"|" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
                 ;;
             14)
                 asr_provider_key="Qwen3ASRFlash"
@@ -1529,50 +1591,118 @@ read -r -p "请输入 API Key: " api_key < /dev/tty
             12)
                 llm_provider_key="DifyLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了 Dify。${RESET}"
-                echo -e "${CYAN}🔑 建议使用本地部署的dify接口，国内部分区域访问dify公有云接口可能会受限${RESET}"
+                echo -e "${CYAN}🔑 Dify配置需要以下参数：${RESET}"
+                echo "  - API类型: dify (固定值)"
+                echo "  - 服务地址: Dify服务地址 (默认: https://api.dify.ai/v1)"
+                echo "  - API Key: Dify API密钥"
+                echo "  - 对话模式: chat-messages/workflows/run/completion-messages (默认: chat-messages)"
+                echo -e "${CYAN}💡 建议使用本地部署的dify接口，国内部分区域访问dify公有云接口可能会受限${RESET}"
+                echo -e "${CYAN}💡 如果使用Dify，配置文件里prompt(提示词)是无效的，需要在dify控制台设置提示词${RESET}"
+                
+read -r -p "请输入服务地址 (默认: https://api.dify.ai/v1): " base_url < /dev/tty
+                base_url="${base_url:-https://api.dify.ai/v1}"
 read -r -p "请输入 API Key: " api_key < /dev/tty
                 api_key="${api_key:-}"
+read -r -p "请输入对话模式 (默认: chat-messages): " mode < /dev/tty
+                mode="${mode:-chat-messages}"
                 
                 sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$base_url" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: \"$base_url\"|" "$CONFIG_FILE"
+                fi
                 if [ -n "$api_key" ]; then
                     sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
+                if [ -n "$mode" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    mode: .*/    mode: \"$mode\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择Dify并配置完成。${RESET}"
                 ;;
             13)
                 llm_provider_key="OllamaLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了 Ollama本地部署。${RESET}"
-                echo -e "${CYAN}🔑 需要预先使用ollama pull下载模型${RESET}"
+                echo -e "${CYAN}🔑 Ollama配置需要以下参数：${RESET}"
+                echo "  - API类型: ollama (固定值)"
+                echo "  - 服务地址: Ollama服务地址 (默认: http://localhost:11434)"
+                echo "  - 模型名称: 已下载的模型名称 (默认: qwen2.5)"
+                echo -e "${CYAN}💡 请确保Ollama服务已运行，并使用 'ollama pull <model>' 下载了模型${RESET}"
+read -r -p "请输入服务地址 (默认: http://localhost:11434): " service_url < /dev/tty
+                service_url="${service_url:-http://localhost:11434}"
 read -r -p "请输入模型名称 (默认: qwen2.5): " model_name < /dev/tty
                 model_name="${model_name:-qwen2.5}"
                 
                 sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
-                if [ -n "$model_name" ]; then
-                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$CONFIG_FILE"
+                if [ -n "$service_url" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    service_url: .*/    service_url: \"$service_url\"/" "$CONFIG_FILE"
                 fi
+                if [ -n "$model_name" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: \"$model_name\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择Ollama本地部署并配置完成。${RESET}"
                 ;;
             14)
                 llm_provider_key="XinferenceLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了 Xinference。${RESET}"
-                echo -e "${CYAN}🔑 需要预先在Xinference启动对应模型${RESET}"
+                echo -e "${CYAN}🔑 Xinference配置需要以下参数：${RESET}"
+                echo "  - 服务地址: Xinference服务地址 (默认: http://localhost:9997)"
+                echo "  - 模型名称: 已启动的模型名称 (默认: qwen2.5:72b-AWQ)"
+                echo -e "${CYAN}💡 请确保Xinference服务已运行，并已启动对应模型${RESET}"
+read -r -p "请输入服务地址 (默认: http://localhost:9997): " service_url < /dev/tty
+                service_url="${service_url:-http://localhost:9997}"
 read -r -p "请输入模型名称 (默认: qwen2.5:72b-AWQ): " model_name < /dev/tty
                 model_name="${model_name:-qwen2.5:72b-AWQ}"
                 
                 sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
-                if [ -n "$model_name" ]; then
-                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: $model_name/" "$CONFIG_FILE"
+                if [ -n "$service_url" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    service_url: .*/    service_url: \"$service_url\"/" "$CONFIG_FILE"
                 fi
+                if [ -n "$model_name" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    model_name: .*/    model_name: \"$model_name\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择Xinference并配置完成。${RESET}"
                 ;;
             15)
                 llm_provider_key="FastgptLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了 FastGPT。${RESET}"
+                echo -e "${CYAN}🔑 FastGPT配置需要以下参数：${RESET}"
+                echo "  - API类型: fastgpt (固定值)"
+                echo "  - 服务地址: FastGPT服务地址 (必需，如: http://localhost:3000/api/v1)"
+                echo "  - API Key: FastGPT API密钥"
+                echo "  - 自定义变量: 可选的键值对配置 (格式: k1=v1,k2=v2)"
                 echo -e "${CYAN}🔑 密钥获取地址：https://cloud.tryfastgpt.ai/account/apikey${RESET}"
+                echo -e "${CYAN}💡 如果使用FastGPT，配置文件里prompt(提示词)是无效的，需要在fastgpt控制台设置提示词${RESET}"
+                
+read -r -p "请输入服务地址 (如: http://localhost:3000/api/v1): " base_url < /dev/tty
+                base_url="${base_url:-}"
 read -r -p "请输入 API Key: " api_key < /dev/tty
                 api_key="${api_key:-}"
+read -r -p "请输入自定义变量 (可选，格式: k1=v1,k2=v2): " variables < /dev/tty
+                variables="${variables:-}"
                 
                 sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$base_url" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s|^    base_url: .*|    base_url: \"$base_url\"|" "$CONFIG_FILE"
+                fi
                 if [ -n "$api_key" ]; then
                     sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
+                if [ -n "$variables" ]; then
+                    # 解析变量并写入配置文件
+                    IFS=',' read -ra VAR_ARRAY <<< "$variables"
+                    for var_pair in "${VAR_ARRAY[@]}"; do
+                        if [[ $var_pair == *"="* ]]; then
+                            key="${var_pair%%=*}"
+                            value="${var_pair#*=}"
+                            echo "      $key: \"$value\"" >> /tmp/vars_temp.txt
+                        fi
+                    done
+                    # 删除现有的variables部分并替换
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ { /^  $llm_provider_key:/,/^  [A-Za-z]/ { /^    variables:/,/^    [a-z]/d; } }" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ { /^    api_key:/a\    variables:" "$CONFIG_FILE"
+                    cat /tmp/vars_temp.txt >> "$CONFIG_FILE"
+                    rm -f /tmp/vars_temp.txt
+                fi
+                echo -e "\n${GREEN}✅ 已选择FastGPT并配置完成。${RESET}"
                 ;;
             *)
                 echo -e "\n${RED}❌ 输入无效，请重新选择${RESET}"
@@ -1611,13 +1741,32 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " vllm_ch
                 vllm_provider_key="ChatGLMVLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了智谱清言 ChatGLM VLLM。${RESET}"
                 echo -e "${CYAN}🔑 密钥获取地址：https://open.bigmodel.cn/usercenter/apikeys${RESET}"
-                safe_read "请输入 API Key: " api_key
-                api_key="${api_key:-}"
+                
+                # 检查是否已配置智谱LLM，如果已配置则复用API Key
+                existing_llm=$(grep "^  LLM:" "$CONFIG_FILE" | head -1 | cut -d: -f2 | xargs 2>/dev/null || echo "")
+                if [ "$existing_llm" = "ChatGLMLLM" ]; then
+                    echo -e "${CYAN}🔄 检测到已配置智谱LLM，尝试复用API Key...${RESET}"
+                    existing_api_key=$(grep -A 10 "^  ChatGLMLLM:" "$CONFIG_FILE" 2>/dev/null | grep "api_key:" | head -1 | sed 's/.*api_key: "\(.*\)".*/\1/' 2>/dev/null || echo "")
+                    
+                    if [ -n "$existing_api_key" ] && [ "$existing_api_key" != '""' ] && [ "$existing_api_key" != '""' ]; then
+                        echo -e "${GREEN}✅ 已自动复用智谱LLM的API Key: ${existing_api_key:0:10}...${RESET}"
+                        api_key="$existing_api_key"
+                    else
+                        echo -e "${YELLOW}⚠️ 未找到有效的智谱LLM API Key，请重新输入${RESET}"
+                        safe_read "请输入 API Key: " api_key
+                        api_key="${api_key:-}"
+                    fi
+                else
+                    echo -e "${YELLOW}💡 提示：建议配置智谱LLM以复用API Key${RESET}"
+                    safe_read "请输入 API Key: " api_key
+                    api_key="${api_key:-}"
+                fi
                 
                 sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
                 if [ -n "$api_key" ]; then
                     sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
+                echo -e "\n${GREEN}✅ 已选择智谱清言VLLM并配置完成。${RESET}"
                 ;;
             2)
                 vllm_provider_key="QwenVLLM"
@@ -1688,9 +1837,11 @@ config_tts() {
         echo " 9) LinkeraiTTS (LinkerAI)"
         echo "10) PaddleSpeechTTS (百度飞桨)"
         echo "11) IndexStreamTTS (Index-TTS-vLLM)"
-        echo "12) AliBLTTS (阿里云百炼)"
-        echo "13) XunFeiTTS (讯飞)"
-        echo "14) 自定义TTS (Custom)"
+        echo "12) GPT-Sovits (自部署)"
+        echo "13) AliBLTTS (阿里云百炼)"
+        echo "14) XunFeiTTS (讯飞)"
+        echo "15) 自定义TTS (Custom)"
+        echo "16) 返回主菜单"
         
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_choice < /dev/tty
         tts_choice=${tts_choice:-1}
@@ -1813,8 +1964,39 @@ read -r -p "请输入 Product Secret: " product_secret < /dev/tty
                 ;;
             8)
                 tts_provider_key="ACGNTTS"
-                echo -e "\n${GREEN}✅ 已选择自部署 ACGN TTS。${RESET}"
+                echo -e "\n${YELLOW}⚠️ 您选择了自部署 ACGN TTS。${RESET}"
+                echo -e "${CYAN}🔑 ACGN TTS配置需要以下参数：${RESET}"
+                echo "  - API类型: ttson (固定值)"
+                echo "  - Token: ACGN TTS API Token"
+                echo "  - 角色ID: 语音角色ID (默认: 1695)"
+                echo "  - 语速倍数: 语速调节倍数 (默认: 1)"
+                echo "  - 音调倍数: 音调调节倍数 (默认: 0)"
+                echo -e "${CYAN}🔑 在线网址：https://acgn.ttson.cn/${RESET}"
+                echo -e "${CYAN}🔑 Token购买：www.ttson.cn${RESET}"
+                
+read -r -p "请输入 Token: " token < /dev/tty
+                token="${token:-}"
+read -r -p "请输入角色ID (默认: 1695): " voice_id < /dev/tty
+                voice_id="${voice_id:-1695}"
+read -r -p "请输入语速倍数 (默认: 1): " speed_factor < /dev/tty
+                speed_factor="${speed_factor:-1}"
+read -r -p "请输入音调倍数 (默认: 0): " pitch_factor < /dev/tty
+                pitch_factor="${pitch_factor:-0}"
+                
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$token" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    token: .*/    token: \"$token\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$voice_id" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    voice_id: .*/    voice_id: $voice_id/" "$CONFIG_FILE"
+                fi
+                if [ -n "$speed_factor" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    speed_factor: .*/    speed_factor: $speed_factor/" "$CONFIG_FILE"
+                fi
+                if [ -n "$pitch_factor" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    pitch_factor: .*/    pitch_factor: $pitch_factor/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择自部署 ACGN TTS。${RESET}"
                 ;;
             9)
                 tts_provider_key="LinkeraiTTS"
@@ -1830,8 +2012,39 @@ read -r -p "请输入 API Key: " api_key < /dev/tty
                 ;;
             10)
                 tts_provider_key="PaddleSpeechTTS"
-                echo -e "\n${GREEN}✅ 已选择百度飞桨 PaddleSpeech TTS。${RESET}"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度飞桨 PaddleSpeech TTS。${RESET}"
+                echo -e "${CYAN}🔑 PaddleSpeech TTS配置需要以下参数：${RESET}"
+                echo "  - API类型: paddle_speech (固定值)"
+                echo "  - 协议类型: websocket/http (默认: websocket)"
+                echo "  - 服务地址: TTS服务地址 (默认: ws://127.0.0.1:8092/paddlespeech/tts/streaming)"
+                echo "  - 发音人ID: 语音角色ID (默认: 0)"
+                echo "  - 采样率: 音频采样率 (默认: 24000)"
+                echo -e "${CYAN}💡 百度飞桨 PaddleSpeech 支持本地离线部署${RESET}"
+                echo -e "${CYAN}💡 项目地址：https://github.com/PaddlePaddle/PaddleSpeech${RESET}"
+                
+read -r -p "请输入协议类型 (默认: websocket): " protocol < /dev/tty
+                protocol="${protocol:-websocket}"
+read -r -p "请输入服务地址 (默认: ws://127.0.0.1:8092/paddlespeech/tts/streaming): " url < /dev/tty
+                url="${url:-ws://127.0.0.1:8092/paddlespeech/tts/streaming}"
+read -r -p "请输入发音人ID (默认: 0): " spk_id < /dev/tty
+                spk_id="${spk_id:-0}"
+read -r -p "请输入采样率 (默认: 24000): " sample_rate < /dev/tty
+                sample_rate="${sample_rate:-24000}"
+                
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$protocol" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    protocol: .*/    protocol: $protocol/" "$CONFIG_FILE"
+                fi
+                if [ -n "$url" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    url: .*|    url: $url|" "$CONFIG_FILE"
+                fi
+                if [ -n "$spk_id" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    spk_id: .*/    spk_id: $spk_id/" "$CONFIG_FILE"
+                fi
+                if [ -n "$sample_rate" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    sample_rate: .*/    sample_rate: $sample_rate/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择百度飞桨 PaddleSpeech TTS。${RESET}"
                 ;;
             11)
                 tts_provider_key="IndexStreamTTS"
@@ -1846,6 +2059,88 @@ read -r -p "请输入服务地址: " service_url < /dev/tty
                 fi
                 ;;
             12)
+                echo -e "\n${YELLOW}⚠️ 您选择了 GPT-SoVITS。${RESET}"
+                echo -e "${CYAN}🔑 请选择GPT-SoVITS版本：${RESET}"
+                echo "  1) GPT_SOVITS_V2"
+                echo "  2) GPT_SOVITS_V3"
+                read -r -p "请选择版本 (默认1): " sovits_version
+                sovits_version=${sovits_version:-1}
+                
+                if [ "$sovits_version" = "2" ]; then
+                    tts_provider_key="GPT_SOVITS_V3"
+                    echo -e "\n${GREEN}✅ 已选择 GPT_SOVITS_V3。${RESET}"
+                    echo "  - 服务地址: TTS服务地址 (默认: http://localhost:9880)"
+                    echo "  - 文本语言: auto/zh/en/ja/ko/zh-hans/zh-hant/粤 (默认: auto)"
+                    echo "  - 参考音频: 参考音频文件路径 (默认: caixukun.wav)"
+                    echo "  - 提示语言: zh/en/ja/ko/zh-hans/zh-hant/粤 (默认: zh)"
+                    echo "  - 提示文本: 提示文本内容 (可选)"
+                    echo -e "${CYAN}💡 启动方法：python api.py${RESET}"
+                    
+                    read -r -p "请输入服务地址 (默认: http://localhost:9880): " url
+                    url="${url:-http://localhost:9880}"
+                    read -r -p "请输入文本语言 (默认: auto): " text_language
+                    text_language="${text_language:-auto}"
+                    read -r -p "请输入参考音频路径 (默认: caixukun.wav): " refer_wav_path
+                    refer_wav_path="${refer_wav_path:-caixukun.wav}"
+                    read -r -p "请输入提示语言 (默认: zh): " prompt_language
+                    prompt_language="${prompt_language:-zh}"
+                    read -r -p "请输入提示文本 (可选): " prompt_text
+                    
+                    sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                    if [ -n "$url" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    url: .*|    url: \"$url\"|" "$CONFIG_FILE"
+                    fi
+                    if [ -n "$text_language" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    text_language: .*|    text_language: \"$text_language\"|" "$CONFIG_FILE"
+                    fi
+                    if [ -n "$refer_wav_path" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    refer_wav_path: .*|    refer_wav_path: \"$refer_wav_path\"|" "$CONFIG_FILE"
+                    fi
+                    if [ -n "$prompt_language" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    prompt_language: .*|    prompt_language: \"$prompt_language\"|" "$CONFIG_FILE"
+                    fi
+                    if [ -n "$prompt_text" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    prompt_text: .*|    prompt_text: \"$prompt_text\"|" "$CONFIG_FILE"
+                    fi
+                else
+                    tts_provider_key="GPT_SOVITS_V2"
+                    echo -e "\n${GREEN}✅ 已选择 GPT_SOVITS_V2。${RESET}"
+                    echo "  - 服务地址: TTS服务地址 (默认: http://localhost:9880/tts)"
+                    echo "  - 文本语言: auto/zh/en/ja/ko/zh-hans/zh-hant/粤 (默认: auto)"
+                    echo "  - 参考音频: 参考音频文件路径 (默认: demo.wav)"
+                    echo "  - 提示语言: zh/en/ja/ko/zh-hans/zh-hant/粤 (默认: zh)"
+                    echo "  - 提示文本: 提示文本内容 (可选)"
+                    echo -e "${CYAN}💡 启动方法：python api_v2.py -a 127.0.0.1 -p 9880 -c GPT_SoVITS/configs/demo.yaml${RESET}"
+                    
+                    read -r -p "请输入服务地址 (默认: http://localhost:9880/tts): " url
+                    url="${url:-http://localhost:9880/tts}"
+                    read -r -p "请输入文本语言 (默认: auto): " text_lang
+                    text_lang="${text_lang:-auto}"
+                    read -r -p "请输入参考音频路径 (默认: demo.wav): " ref_audio_path
+                    ref_audio_path="${ref_audio_path:-demo.wav}"
+                    read -r -p "请输入提示语言 (默认: zh): " prompt_lang
+                    prompt_lang="${prompt_lang:-zh}"
+                    read -r -p "请输入提示文本 (可选): " prompt_text
+                    
+                    sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                    if [ -n "$url" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    url: .*|    url: \"$url\"|" "$CONFIG_FILE"
+                    fi
+                    if [ -n "$text_lang" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    text_lang: .*|    text_lang: \"$text_lang\"|" "$CONFIG_FILE"
+                    fi
+                    if [ -n "$ref_audio_path" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    ref_audio_path: .*|    ref_audio_path: \"$ref_audio_path\"|" "$CONFIG_FILE"
+                    fi
+                    if [ -n "$prompt_lang" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    prompt_lang: .*|    prompt_lang: \"$prompt_lang\"|" "$CONFIG_FILE"
+                    fi
+                    if [ -n "$prompt_text" ]; then
+                        sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    prompt_text: .*|    prompt_text: \"$prompt_text\"|" "$CONFIG_FILE"
+                    fi
+                fi
+                ;;
+            13)
                 tts_provider_key="AliBLTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了阿里云百炼 AliBL TTS。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
@@ -1857,7 +2152,7 @@ read -r -p "请输入 API Key: " api_key < /dev/tty
                     sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
                 ;;
-            13)
+            14)
                 tts_provider_key="XunFeiTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了讯飞 XunFei TTS。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://console.xfyun.cn/${RESET}"
@@ -1872,7 +2167,7 @@ read -r -p "请输入 API Key: " api_key < /dev/tty
                     sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
                 ;;
-            14)
+            15)
                 tts_provider_key="Custom"
                 echo -e "\n${YELLOW}⚠️ 您选择了自定义 TTS。${RESET}"
                 echo -e "${CYAN}🔑 请输入自定义TTS服务配置${RESET}"
