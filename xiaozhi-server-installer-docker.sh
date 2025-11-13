@@ -6,17 +6,23 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.12（修复版本）
-# 修复内容：在配置方式选择界面添加"返回上一个菜单"和"不配置所有配置"选项
+# 版本：1.2.16（修复版本）
+# 修复内容：修正Docker警告逻辑，Docker选择界面都会显示，警告信息根据内存决定
 # 详细说明：
-# 1. 添加"-1) 返回上一个菜单"选项，直接回到主菜单
-# 2. 添加"-2) 不配置所有配置"选项，跳过配置流程并检查Docker管理选择
-# 3. 选项"-2"会检查内存，如果内存不足会触发Docker管理选择
-# 4. 进一步完善用户体验，让用户有更多选择
+# 0) 现在通过脚本配置密钥和服务商（默认）
+# 1) 稍后手动填写所有配置
+# 2) 退出配置（将使用现有配置文件）
+# 3) 不配置所有配置，直接返回菜单（无论内存都显示Docker选择，警告视内存而定）
+# 4) 返回上一个菜单
+# 修正内容：
+# - 选项2和选项3无论内存大小都显示Docker选择界面
+# - 内存<4GB时显示完整警告信息，内存>=4GB时只显示提示信息
+# - 添加了完整的免责声明和自救指南
+# - 确保所有警告在Docker操作选项2后显示
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.12"
+Version="1.2.16"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -2784,56 +2790,61 @@ config_keys() {
         echo -e "\n${PURPLE}==================================================${RESET}"
         echo -e "${CYAN}🔑 选择配置方式  🔑${RESET}"
         echo -e "${PURPLE}==================================================${RESET}"
-        echo "1) 现在通过脚本配置密钥和服务商"
-        echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
-        echo "0) 退出配置（将使用现有配置文件）"
-        echo "-1) 返回上一个菜单"
-        echo "-2) 不配置所有配置（直接返回菜单）"
-        read -r -p "请选择（默认1）：" key_choice < /dev/tty
-        key_choice=${key_choice:-1}
+        echo "0) 现在通过脚本配置密钥和服务商"
+        echo "1) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
+        echo "2) 退出配置（将使用现有配置文件）"
+        echo "3) 不配置所有配置，直接返回菜单"
+        echo "4) 返回上一个菜单"
+        read -r -p "请选择（默认0）：" key_choice < /dev/tty
+        key_choice=${key_choice:-0}
         
         # 处理返回上一个菜单
-        if [ "$key_choice" = "-1" ]; then
+        if [ "$key_choice" = "4" ]; then
             echo -e "\n${CYAN}🔄 返回上一个菜单${RESET}"
             main_menu
             return 1
         fi
         
         # 处理不配置所有配置
-        if [ "$key_choice" = "-2" ]; then
+        if [ "$key_choice" = "3" ]; then
             echo -e "\n${YELLOW}⚠️ 确认不配置所有配置？${RESET}"
             echo -e "${CYAN}ℹ️ 将跳过所有配置步骤${RESET}"
             echo ""
             echo "请选择："
-            echo "1) 确认不配置所有配置，直接返回菜单"
+            echo "1) 确认不配置所有配置"
             echo "2) 取消，返回配置选择菜单"
             read -r -p "请选择（默认1）：" confirm_skip < /dev/tty
             confirm_skip=${confirm_skip:-1}
             
             if [ "$confirm_skip" = "1" ]; then
-                echo -e "\n${GREEN}✅ 跳过所有配置，直接返回菜单${RESET}"
+                echo -e "\n${GREEN}✅ 跳过所有配置${RESET}"
                 
                 # 检查系统内存并提供Docker管理选择
                 show_server_config
                 
-                # 如果内存不足 (<2GB)，提供Docker管理选择
-                if [ "$MEM_TOTAL" -lt 2 ]; then
-                    echo -e "\n${YELLOW}⚠️ 警告：您的服务器内存${MEM_TOTAL}GB不足2GB${RESET}"
-                    echo -e "${YELLOW}⚠️ 跳过所有配置可能会导致服务器卡死${RESET}"
+                # 根据内存大小决定是否显示警告，但Docker选择界面都会显示
+                if [ "$MEM_TOTAL" -lt 4 ]; then
+                    echo -e "\n${YELLOW}⚠️ 警告：您没有配置任何密钥和服务商${RESET}"
+                    echo -e "${YELLOW}⚠️ 因为您没有改过配置文件，服务器配置可能执行docker不够就会导致服务器卡死${RESET}"
+                    echo -e "${RED}💀 配置文件默认使用本地ASR模型，并使用docker启动，docker默认设置自动启动${RESET}"
                     echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
-                    
-                    handle_insufficient_memory
-                    if [ $? -eq 1 ]; then
-                        echo -e "\n${CYAN}🔄 用户取消Docker操作，返回主菜单${RESET}"
-                        return 1
-                    else
-                        echo -e "\n${CYAN}🔄 正在返回主菜单...${RESET}"
-                        return 1
-                    fi
+                    echo -e "\n${RED}❌ 免责声明：本操作可能导致您的服务器卡死或无法正常使用${RESET}"
+                    echo -e "${RED}❌ 请确保您已备份重要数据，并了解可能的风险${RESET}"
+                    echo -e "${RED}❌ 作者不承担因使用此功能导致的任何损失和后果${RESET}"
+                else
+                    echo -e "\n${GREEN}✅ 内存充足（${MEM_TOTAL}GB ≥ 4GB）${RESET}"
+                    echo -e "${CYAN}ℹ️ 建议在Docker操作前确认配置文件设置${RESET}"
                 fi
                 
-                echo -e "\n${CYAN}🔄 正在返回主菜单...${RESET}"
-                return 1
+                # 无论内存大小都提供Docker管理选择
+                handle_insufficient_memory
+                if [ $? -eq 1 ]; then
+                    echo -e "\n${CYAN}🔄 用户取消Docker操作，返回主菜单${RESET}"
+                    return 1
+                else
+                    echo -e "\n${CYAN}🔄 正在返回主菜单...${RESET}"
+                    return 1
+                fi
             elif [ "$confirm_skip" = "2" ]; then
                 echo -e "\n${BLUE}ℹ️ 已取消，返回配置选择菜单${RESET}"
                 continue
@@ -2843,8 +2854,34 @@ config_keys() {
             fi
         fi
         
-        # 处理退出配置
+        # 处理详细配置选项（选项0）
         if [ "$key_choice" = "0" ]; then
+            echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
+            break  # 退出循环，进入详细配置
+        fi
+        
+        # 处理默认配置选项（选项1）
+        if [ "$key_choice" = "1" ]; then
+            echo -e "\n${YELLOW}⚠️ 已选择稍后手动填写。${RESET}"
+            echo -e "${CYAN}ℹ️ 为防止服务启动失败，脚本将创建干净的默认配置文件。${RESET}"
+            echo -e "${CYAN}ℹ️ 您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$CONFIG_FILE${RESET}"
+            
+            # 创建干净的默认配置文件
+            create_default_config_file
+            
+            # 设置标志，告知setup_config_file使用默认配置
+            export USE_DEFAULT_CONFIG=true
+            CURRENT_DEPLOY_TYPE="internal"
+            export KEY_CONFIG_MODE="manual"
+            
+            # 直接返回，不进入配置步骤循环
+            echo -e "\n${CYAN}📋 已创建默认配置文件：$CONFIG_FILE${RESET}"
+            echo -e "${CYAN}🔄 正在准备启动服务...${RESET}"
+            return 0  # 直接返回，不进入配置步骤循环
+        fi
+        
+        # 处理退出配置
+        if [ "$key_choice" = "2" ]; then
             echo -e "\n${YELLOW}⚠️ 确认退出详细配置流程？${RESET}"
             echo -e "${CYAN}ℹ️ 退出后将直接使用现有的配置文件${RESET}"
             echo -e "${CYAN}ℹ️ 配置文件路径：$CONFIG_FILE${RESET}"
@@ -2862,21 +2899,29 @@ config_keys() {
                 # 因为使用现有配置可能包含本地ASR模型，在低内存服务器上会导致卡死
                 show_server_config
                 
-                # 如果内存不足 (<2GB)，提供Docker管理选择
-                if [ "$MEM_TOTAL" -lt 2 ]; then
-                    echo -e "\n${YELLOW}⚠️ 警告：您的服务器内存${MEM_TOTAL}GB不足2GB${RESET}"
-                    echo -e "${YELLOW}⚠️ 使用现有配置文件可能包含本地ASR模型${RESET}"
+                # 根据内存大小决定是否显示警告，但Docker选择界面都会显示
+                if [ "$MEM_TOTAL" -lt 4 ]; then
+                    echo -e "\n${YELLOW}⚠️ 警告：您没有配置任何密钥和服务商${RESET}"
+                    echo -e "${YELLOW}⚠️ 因为您没有改过配置文件，服务器配置可能执行docker不够就会导致服务器卡死${RESET}"
+                    echo -e "${RED}💀 配置文件默认使用本地ASR模型，并使用docker启动，docker默认设置自动启动${RESET}"
                     echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
-                    
-                    handle_insufficient_memory
-                    if [ $? -eq 1 ]; then
-                        echo -e "\n${CYAN}🔄 用户取消Docker操作，返回主菜单${RESET}"
-                        return 1
-                    else
-                        echo -e "\n${CYAN}📋 配置文件将使用：$CONFIG_FILE${RESET}"
-                        echo -e "${CYAN}🔄 正在返回主菜单...${RESET}"
-                        return 1
-                    fi
+                    echo -e "\n${RED}❌ 免责声明：本操作可能导致您的服务器卡死或无法正常使用${RESET}"
+                    echo -e "${RED}❌ 请确保您已备份重要数据，并了解可能的风险${RESET}"
+                    echo -e "${RED}❌ 作者不承担因使用此功能导致的任何损失和后果${RESET}"
+                else
+                    echo -e "\n${GREEN}✅ 内存充足（${MEM_TOTAL}GB ≥ 4GB）${RESET}"
+                    echo -e "${CYAN}ℹ️ 建议在Docker操作前确认配置文件设置${RESET}"
+                fi
+                
+                # 无论内存大小都提供Docker管理选择
+                handle_insufficient_memory
+                if [ $? -eq 1 ]; then
+                    echo -e "\n${CYAN}🔄 用户取消Docker操作，返回主菜单${RESET}"
+                    return 1
+                else
+                    echo -e "\n${CYAN}📋 配置文件将使用：$CONFIG_FILE${RESET}"
+                    echo -e "${CYAN}🔄 正在返回主菜单...${RESET}"
+                    return 1
                 fi
                 
                 # 设置标志，告知setup_config_file使用现有配置
@@ -2898,30 +2943,9 @@ config_keys() {
                 echo -e "\n${BLUE}ℹ️ 无效选择，请重新选择${RESET}"
                 continue  # 继续循环，重新显示菜单
             fi
-        elif [ "$key_choice" = "2" ]; then
-            echo -e "\n${YELLOW}⚠️ 已选择稍后手动填写。${RESET}"
-            echo -e "${CYAN}ℹ️ 为防止服务启动失败，脚本将创建干净的默认配置文件。${RESET}"
-            echo -e "${CYAN}ℹ️ 您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$CONFIG_FILE${RESET}"
-            
-            # 创建干净的默认配置文件
-            create_default_config_file
-            
-            # 设置标志，告知setup_config_file使用默认配置
-            export USE_DEFAULT_CONFIG=true
-            CURRENT_DEPLOY_TYPE="internal"
-            export KEY_CONFIG_MODE="manual"
-            
-            # 直接返回，不进入配置步骤循环
-            echo -e "\n${CYAN}📋 已创建默认配置文件：$CONFIG_FILE${RESET}"
-            echo -e "${CYAN}🔄 正在准备启动服务...${RESET}"
-            return 0  # 直接返回，不进入配置步骤循环
         fi
         
-        # 处理选项1：详细配置
-        if [[ "$key_choice" == "1" ]]; then
-            echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
-            break  # 退出循环，进入详细配置
-        fi
+
     done
         
         # 简化的线性配置流程，支持返回上一步
