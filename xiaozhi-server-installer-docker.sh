@@ -16,7 +16,7 @@ Version="1.0.7-pipeline-support"
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
 CONFIG_FILE_URL_BACKUP="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
 CONFIG_FILE_URL_FALLBACK="https://mirror.ghproxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
-DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/docker-compose.yml"
+DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/docker-compose.yml"
 
 MAIN_DIR="$HOME/xiaozhi-server"
 CONTAINER_NAME="xiaozhi-esp32-server"
@@ -774,8 +774,8 @@ download_files() {
         if [ ! -f "$MAIN_DIR/docker-compose.yml" ]; then
             # Docker配置文件备用链接
             local docker_urls=(
-                "https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/docker-compose.yml"
-                "https://mirror.ghproxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/docker-compose.yml"
+                "https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/docker-compose.yml"
+                "https://mirror.ghproxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/docker-compose.yml"
             )
             
             local docker_download_success=false
@@ -806,8 +806,37 @@ download_files() {
             done
             
             if [ "$docker_download_success" != "true" ]; then
-                echo -e "${RED}❌ Docker配置文件所有链接都失败${RESET}"
-                echo -e "${YELLOW}💡 可以稍后手动创建或下载Docker配置文件${RESET}"
+                echo -e "${RED}❌ Docker配置文件下载失败，使用默认模板${RESET}"
+                echo -e "${YELLOW}💡 创建默认docker-compose.yml模板${RESET}"
+                
+                # 创建默认的docker-compose.yml
+                cat > "$MAIN_DIR/docker-compose.yml" << 'EOF'
+version: '3.8'
+services:
+  xiaozhi-esp32-server:
+    image: xiaozhi-esp32-server:latest
+    container_name: xiaozhi-esp32-server
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./music:/app/music
+    environment:
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    # 如果需要GPU支持，取消注释下面两行
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+EOF
+                echo -e "${GREEN}✅ 已创建默认docker-compose.yml模板${RESET}"
             fi
         else
             echo -e "${GREEN}✅ Docker配置文件已存在，跳过下载${RESET}"
@@ -965,8 +994,9 @@ config_asr() {
 read -r -p "请输入序号 (默认推荐 9，输入0返回上一步): " asr_choice < /dev/tty
         asr_choice=${asr_choice:-9}
         
-        # 修复：处理返回上一步 - 返回1表示需要返回上一步
+        # ASR是第一步，输入0直接返回主菜单
         if [ "$asr_choice" = "0" ]; then
+            echo -e "${CYAN}🔄 取消配置，返回主菜单${RESET}"
             return 1
         fi
 
@@ -1284,8 +1314,9 @@ config_llm() {
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " llm_choice < /dev/tty
         llm_choice=${llm_choice:-1}
         
-        # 修复：处理返回上一步
+        # 修复：处理返回上一步，返回1表示返回ASR配置
         if [ "$llm_choice" = "0" ]; then
+            echo -e "${CYAN}🔄 返回上一步，重新配置 ASR 服务${RESET}"
             return 1
         fi
 
@@ -1551,8 +1582,9 @@ config_vllm() {
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " vllm_choice < /dev/tty
         vllm_choice=${vllm_choice:-1}
         
-        # 修复：处理返回上一步
+        # 修复：处理返回上一步，返回1表示返回LLM配置
         if [ "$vllm_choice" = "0" ]; then
+            echo -e "${CYAN}🔄 返回上一步，重新配置 LLM 服务${RESET}"
             return 1
         fi
 
@@ -1646,8 +1678,9 @@ config_tts() {
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_choice < /dev/tty
         tts_choice=${tts_choice:-1}
         
-        # 修复：处理返回上一步
+        # 修复：处理返回上一步，TTS返回VLLM配置
         if [ "$tts_choice" = "0" ]; then
+            echo -e "${CYAN}🔄 返回上一步，重新配置 VLLM 服务${RESET}"
             return 1
         fi
 
@@ -1859,8 +1892,9 @@ config_memory() {
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " memory_choice < /dev/tty
         memory_choice=${memory_choice:-1}
         
-        # 修复：处理返回上一步
+        # 修复：处理返回上一步，Memory返回TTS配置
         if [ "$memory_choice" = "0" ]; then
+            echo -e "${CYAN}🔄 返回上一步，重新配置 TTS 服务${RESET}"
             return 1
         fi
 
