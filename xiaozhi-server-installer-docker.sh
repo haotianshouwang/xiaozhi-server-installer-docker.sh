@@ -1118,13 +1118,29 @@ read -r < /dev/tty
                 echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunASR。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
                 echo -e "${CYAN}🔑 Appkey地址：https://nls-portal.console.aliyun.com/applist${RESET}"
-read -r -p "请输入 Appkey: " appkey < /dev/tty
-read -r -p "请输入 Access Key ID: " access_key_id < /dev/tty
-read -r -p "请输入 Access Key Secret: " access_key_secret < /dev/tty
+                
+                echo -e "${CYAN}📝 阿里云ASR需要以下参数：${RESET}"
+                echo "  - Appkey: 语音交互服务项目Appkey（必填）"
+                echo "  - Token: 临时AccessToken，24小时有效（必填）"
+                echo -e "${YELLOW}💡 长期使用建议设置下方Access Key（可选）：${RESET}"
+                echo "  - Access Key ID: 阿里云账号访问密钥ID（可选，长期使用推荐）"
+                echo "  - Access Key Secret: 阿里云账号访问密钥（可选，长期使用推荐）"
+                
+                safe_read "请输入 Appkey: " appkey
+                safe_read "请输入 Token: " token
+                
+                echo -e "\n${YELLOW}💡 是否要配置长期使用的Access Key？${RESET}"
+                echo "如需长期使用（避免Token过期），建议配置Access Key:"
+read -r -p "请输入 Access Key ID (留空跳过): " access_key_id < /dev/tty
+read -r -p "请输入 Access Key Secret (留空跳过): " access_key_secret < /dev/tty
                 
                 sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                
                 if [ -n "$appkey" ]; then
                     sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: \"$appkey\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$token" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    token: .*/    token: \"$token\"/" "$CONFIG_FILE"
                 fi
                 if [ -n "$access_key_id" ]; then
                     sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
@@ -1132,7 +1148,8 @@ read -r -p "请输入 Access Key Secret: " access_key_secret < /dev/tty
                 if [ -n "$access_key_secret" ]; then
                     sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: \"$access_key_secret\"/" "$CONFIG_FILE"
                 fi
-                echo -e "\n${GREEN}✅ 已选择阿里云AliyunASR。${RESET}"
+                
+                echo -e "\n${GREEN}✅ 已选择阿里云ASR并配置完成。${RESET}"
                 ;;
             9)
                 asr_provider_key="AliyunStreamASR"
