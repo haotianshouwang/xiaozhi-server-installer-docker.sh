@@ -1389,39 +1389,45 @@ config_asr_advanced() {
     echo -e "${YELLOW}🎤 语音识别(ASR)服务详细配置${RESET}"
     echo -e "${CYAN}请选择ASR服务类型：${RESET}"
     
-    if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-        echo "1) FunASR (本地SenseVoiceSmall，推荐)"
-        echo "2) FunASRServer (独立部署服务)"
-        echo "3) SherpaASR (本地多语言)"
-        echo "4) SherpaParaformerASR (本地中文专用)"
-        echo "5) VoskASR (本地离线)"
-        echo "6) AliyunStreamASR (阿里云流式，推荐)"
-        echo "7) AliyunASR (阿里云批量)"
-        echo "8) DoubaoStreamASR (火山引擎流式)"
-        echo "9) DoubaoASR (火山引擎批量)"
-        echo "10) TencentASR (腾讯云)"
-        echo "11) BaiduASR (百度智能云)"
-        echo "12) OpenaiASR (OpenAI)"
-        echo "13) GroqASR (Groq)"
-        echo "14) Qwen3ASRFlash (通义千问)"
-        echo "15) XunfeiStreamASR (讯飞流式)"
-        local prompt_range="1-15"
-    else
-        echo "1) AliyunStreamASR (阿里云流式，推荐)"
-        echo "2) AliyunASR (阿里云批量)"
-        echo "3) DoubaoStreamASR (火山引擎流式)"
-        echo "4) DoubaoASR (火山引擎批量)"
-        echo "5) TencentASR (腾讯云)"
-        echo "6) BaiduASR (百度智能云)"
-        echo "7) OpenaiASR (OpenAI)"
-        echo "8) GroqASR (Groq)"
-        echo "9) Qwen3ASRFlash (通义千问)"
-        echo "10) XunfeiStreamASR (讯飞流式)"
-        local prompt_range="1-10"
+    # 始终显示所有选项，根据内存情况显示警告
+    echo "1) FunASR (本地SenseVoiceSmall，推荐)"
+    if [ "$IS_MEMORY_SUFFICIENT" != true ]; then
+        echo -e "${RED}   ⚠️ 内存不足 无法使用${RESET}"
     fi
+    
+    echo "2) FunASRServer (独立部署服务)"
+    if [ "$IS_MEMORY_SUFFICIENT" != true ]; then
+        echo -e "${RED}   ⚠️ 内存不足 无法使用${RESET}"
+    fi
+    
+    echo "3) SherpaASR (本地多语言)"
+    if [ "$IS_MEMORY_SUFFICIENT" != true ]; then
+        echo -e "${RED}   ⚠️ 内存不足 无法使用${RESET}"
+    fi
+    
+    echo "4) SherpaParaformerASR (本地中文专用)"
+    if [ "$IS_MEMORY_SUFFICIENT" != true ]; then
+        echo -e "${RED}   ⚠️ 内存不足 无法使用${RESET}"
+    fi
+    
+    echo "5) VoskASR (本地离线)"
+    if [ "$IS_MEMORY_SUFFICIENT" != true ]; then
+        echo -e "${RED}   ⚠️ 内存不足 无法使用${RESET}"
+    fi
+    
+    echo "6) AliyunStreamASR (阿里云流式，推荐)"
+    echo "7) AliyunASR (阿里云批量)"
+    echo "8) DoubaoStreamASR (火山引擎流式)"
+    echo "9) DoubaoASR (火山引擎批量)"
+    echo "10) TencentASR (腾讯云)"
+    echo "11) BaiduASR (百度智能云)"
+    echo "12) OpenaiASR (OpenAI)"
+    echo "13) GroqASR (Groq)"
+    echo "14) Qwen3ASRFlash (通义千问)"
+    echo "15) XunfeiStreamASR (讯飞流式)"
     echo "0) 返回上级菜单"
     
-    read -r -p "请选择ASR服务类型 (0-${prompt_range}，默认1): " asr_choice < /dev/tty
+    read -r -p "请选择ASR服务类型 (0-15，默认1): " asr_choice < /dev/tty
     asr_choice=${asr_choice:-1}
     
     case $asr_choice in
@@ -1432,115 +1438,85 @@ config_asr_advanced() {
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
                 config_funasr_local
             else
-                config_aliyun_asr
+                echo -e "${RED}💀 内存不足无法选择${RESET}"
+                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
+                sleep 2
+                config_asr_advanced
             fi
             ;;
         2)
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
                 config_funasr_server
             else
-                config_aliyun_batch_asr
+                echo -e "${RED}💀 内存不足无法选择${RESET}"
+                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
+                sleep 2
+                config_asr_advanced
             fi
             ;;
         3)
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
                 config_sherpa_asr
             else
-                config_doubao_stream_asr
+                echo -e "${RED}💀 内存不足无法选择${RESET}"
+                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
+                sleep 2
+                config_asr_advanced
             fi
             ;;
         4)
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
                 config_sherpa_paraformer_asr
             else
-                config_doubao_asr
+                echo -e "${RED}💀 内存不足无法选择${RESET}"
+                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
+                sleep 2
+                config_asr_advanced
             fi
             ;;
         5)
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
                 config_vosk_asr
             else
-                config_tencent_asr
+                echo -e "${RED}💀 内存不足无法选择${RESET}"
+                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
+                sleep 2
+                config_asr_advanced
             fi
             ;;
         6)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_aliyun_asr
-            else
-                config_baidu_asr
-            fi
+            config_aliyun_asr
             ;;
         7)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_aliyun_batch_asr
-            else
-                config_openai_asr
-            fi
+            config_aliyun_batch_asr
             ;;
         8)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_doubao_stream_asr
-            else
-                config_groq_asr
-            fi
+            config_doubao_stream_asr
             ;;
         9)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_doubao_asr
-            else
-                config_qwen_asr
-            fi
+            config_doubao_asr
             ;;
         10)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_tencent_asr
-            else
-                config_xunfei_asr
-            fi
+            config_tencent_asr
             ;;
         11)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_baidu_asr
-            else
-                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
-                config_aliyun_asr
-            fi
+            config_baidu_asr
             ;;
         12)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_openai_asr
-            else
-                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
-                config_aliyun_asr
-            fi
+            config_openai_asr
             ;;
         13)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_groq_asr
-            else
-                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
-                config_aliyun_asr
-            fi
+            config_groq_asr
             ;;
         14)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_qwen_asr
-            else
-                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
-                config_aliyun_asr
-            fi
+            config_qwen_asr
             ;;
         15)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_xunfei_asr
-            else
-                echo -e "${YELLOW}⚠️ 无效选择${RESET}"
-                config_aliyun_asr
-            fi
+            config_xunfei_asr
             ;;
         *)
-            echo -e "${YELLOW}⚠️ 无效选择，使用默认阿里云ASR${RESET}"
-            config_aliyun_asr
+            echo -e "${YELLOW}⚠️ 无效选择，请重新选择${RESET}"
+            config_asr_advanced
             ;;
     esac
 }
