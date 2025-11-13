@@ -1824,24 +1824,30 @@ read -r -p "请输入 API Key: " api_key < /dev/tty
 config_tts() {
     while true; do
         echo -e "\n\n${GREEN}【4/5】配置 TTS (语音合成) 服务${RESET}"
-        echo "请选择TTS服务商（共16个）："
+        echo "请选择TTS服务商（共22个）："
         echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         echo " 1) EdgeTTS (微软) [推荐]"
         echo " 2) DoubaoTTS (火山引擎)"
-        echo " 3) AliyunTTS (阿里云)"
-        echo " 4) BaiduTTS (百度)"
-        echo " 5) TencentTTS (腾讯云)"
-        echo " 6) OpenaiTTS (OpenAI)"
-        echo " 7) GizwitsTTS (机智云)"
-        echo " 8) ACGNTTS (自部署)"
-        echo " 9) LinkeraiTTS (LinkerAI)"
-        echo "10) PaddleSpeechTTS (百度飞桨)"
-        echo "11) IndexStreamTTS (Index-TTS-vLLM)"
-        echo "12) GPT-Sovits (自部署)"
-        echo "13) AliBLTTS (阿里云百炼)"
-        echo "14) XunFeiTTS (讯飞)"
-        echo "15) 自定义TTS (Custom)"
-        echo "16) 返回主菜单"
+        echo " 3) HuoshanDoubleStreamTTS (火山双流)"
+        echo " 4) CosyVoiceSiliconflow (SiliconFlow)"
+        echo " 5) CozeCnTTS (Coze中文)"
+        echo " 6) VolcesAiGatewayTTS (火山网关)"
+        echo " 7) FishSpeech (自部署)"
+        echo " 8) AliyunTTS (阿里云)"
+        echo " 9) AliyunStreamTTS (阿里云流式)"
+        echo "10) TencentTTS (腾讯云)"
+        echo "11) TTS302AI (302AI)"
+        echo "12) GizwitsTTS (机智云)"
+        echo "13) ACGNTTS (自部署)"
+        echo "14) OpenaiTTS (OpenAI)"
+        echo "15) MinimaxTTSHTTPStream (MiniMax流式)"
+        echo "16) 自定义TTS (Custom)"
+        echo "17) LinkeraiTTS (LinkerAI)"
+        echo "18) PaddleSpeechTTS (百度飞桨)"
+        echo "19) IndexStreamTTS (Index-TTS-vLLM)"
+        echo "20) GPT-Sovits (自部署)"
+        echo "21) AliBLTTS (阿里云百炼)"
+        echo "22) XunFeiTTS (讯飞)"
         
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_choice < /dev/tty
         tts_choice=${tts_choice:-1}
@@ -1880,6 +1886,84 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
                 echo -e "\n${GREEN}✅ 已选择火山引擎Doubao TTS。${RESET}"
                 ;;
             3)
+                tts_provider_key="HuoshanDoubleStreamTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山双流 HuoshanDoubleStreamTTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/ark${RESET}"
+                echo -e "${CYAN}📝 需要以下参数：${RESET}"
+                echo "  - AppID: 火山引擎语音合成服务AppID"
+                echo "  - Access Token: 火山引擎语音合成服务Access Token"
+                
+                safe_read "请输入 AppID: " appid
+                safe_read "请输入 Access Token: " access_token
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$appid" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    appid: .*/    appid: \"$appid\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$access_token" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: \"$access_token\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择火山双流TTS。${RESET}"
+                ;;
+            4)
+                tts_provider_key="CosyVoiceSiliconflow"
+                echo -e "\n${YELLOW}⚠️ 您选择了 CosyVoiceSiliconflow。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://cloud.siliconflow.cn/${RESET}"
+                echo -e "${CYAN}📝 需要以下参数：${RESET}"
+                echo "  - Access Token: SiliconFlow访问令牌"
+                
+                safe_read "请输入 Access Token: " access_token
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$access_token" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: \"$access_token\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择CosyVoiceSiliconflow。${RESET}"
+                ;;
+            5)
+                tts_provider_key="CozeCnTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 CozeCnTTS。${RESET}"
+                echo -e "${CYAN}🔑 需要Coze访问令牌${RESET}"
+                echo -e "${CYAN}📝 需要以下参数：${RESET}"
+                echo "  - Access Token: Coze访问令牌"
+                
+                safe_read "请输入 Access Token: " access_token
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$access_token" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: \"$access_token\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择CozeCnTTS。${RESET}"
+                ;;
+            6)
+                tts_provider_key="VolcesAiGatewayTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 VolcesAiGatewayTTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/doubao${RESET}"
+                echo -e "${CYAN}📝 需要以下参数：${RESET}"
+                echo "  - API Key: API密钥"
+                
+                safe_read "请输入 API Key: " api_key
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择VolcesAiGatewayTTS。${RESET}"
+                ;;
+            7)
+                tts_provider_key="FishSpeech"
+                echo -e "\n${YELLOW}⚠️ 您选择了 FishSpeech。${RESET}"
+                echo -e "${CYAN}🔧 需要部署 FishSpeech 服务：https://fish.audio${RESET}"
+                echo -e "${CYAN}📝 需要API密钥和服务地址${RESET}"
+                safe_read "请输入 API Key: " api_key
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择FishSpeech。${RESET}"
+                ;;
+            8)
                 tts_provider_key="AliyunTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了阿里云 Aliyun TTS。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
@@ -1899,20 +1983,27 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
                 fi
                 echo -e "\n${GREEN}✅ 已选择阿里云Aliyun TTS。${RESET}"
                 ;;
-            4)
-                tts_provider_key="BaiduTTS"
-                echo -e "\n${YELLOW}⚠️ 您选择了百度 Baidu TTS。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/${RESET}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-read -r -p "请输入 Secret Key: " secret_key < /dev/tty
+            9)
+                tts_provider_key="AliyunStreamTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunStreamTTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                echo -e "${CYAN}📝 需要以下参数：${RESET}"
+                echo "  - Access Key ID: 阿里云账号访问密钥ID"
+                echo "  - Access Key Secret: 阿里云账号访问密钥"
+                
+                safe_read "请输入 Access Key ID: " access_key_id
+                safe_read "请输入 Access Key Secret: " access_key_secret
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
-                if [ -n "$api_key" ] && [ -n "$secret_key" ]; then
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
+                if [ -n "$access_key_id" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
                 fi
+                if [ -n "$access_key_secret" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: \"$access_key_secret\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择阿里云AliyunStreamTTS。${RESET}"
                 ;;
-            5)
+            10)
                 tts_provider_key="TencentTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了腾讯云 Tencent TTS。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/tts${RESET}"
@@ -1937,36 +2028,40 @@ read -r -p "请输入 Secret Key: " secret_key < /dev/tty
                 fi
                 echo -e "\n${GREEN}✅ 已选择腾讯云Tencent TTS。${RESET}"
                 ;;
-            6)
-                tts_provider_key="OpenaiTTS"
-                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI TTS。${RESET}"
-                echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/api-keys${RESET}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
+            11)
+                tts_provider_key="TTS302AI"
+                echo -e "\n${YELLOW}⚠️ 您选择了 TTS302AI。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.302.ai/${RESET}"
+                echo -e "${CYAN}📝 需要以下参数：${RESET}"
+                echo "  - Access Token: 302AI访问令牌"
+                
+                safe_read "请输入 Access Token: " access_token
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
-                if [ -n "$api_key" ]; then
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                if [ -n "$access_token" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: \"$access_token\"/" "$CONFIG_FILE"
                 fi
+                echo -e "\n${GREEN}✅ 已选择TTS302AI。${RESET}"
                 ;;
-            7)
+            12)
                 tts_provider_key="GizwitsTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了机智云 Gizwits TTS。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://iot.gizwits.com/${RESET}"
-read -r -p "请输入 Product Key: " product_key < /dev/tty
-read -r -p "请输入 Product Secret: " product_secret < /dev/tty
+                echo -e "${CYAN}📝 需要以下参数：${RESET}"
+                echo "  - Access Token: 火山引擎访问令牌"
+                
+                safe_read "请输入 Access Token: " access_token
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
-                if [ -n "$product_key" ] && [ -n "$product_secret" ]; then
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    product_key: .*/    product_key: \"$product_key\"/" "$CONFIG_FILE"
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    product_secret: .*/    product_secret: \"$product_secret\"/" "$CONFIG_FILE"
+                if [ -n "$access_token" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: \"$access_token\"/" "$CONFIG_FILE"
                 fi
+                echo -e "\n${GREEN}✅ 已选择机智云Gizwits TTS。${RESET}"
                 ;;
-            8)
+            13)
                 tts_provider_key="ACGNTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了自部署 ACGN TTS。${RESET}"
                 echo -e "${CYAN}🔑 ACGN TTS配置需要以下参数：${RESET}"
-                echo "  - API类型: ttson (固定值)"
                 echo "  - Token: ACGN TTS API Token"
                 echo "  - 角色ID: 语音角色ID (默认: 1695)"
                 echo "  - 语速倍数: 语速调节倍数 (默认: 1)"
@@ -1974,14 +2069,10 @@ read -r -p "请输入 Product Secret: " product_secret < /dev/tty
                 echo -e "${CYAN}🔑 在线网址：https://acgn.ttson.cn/${RESET}"
                 echo -e "${CYAN}🔑 Token购买：www.ttson.cn${RESET}"
                 
-read -r -p "请输入 Token: " token < /dev/tty
-                token="${token:-}"
-read -r -p "请输入角色ID (默认: 1695): " voice_id < /dev/tty
-                voice_id="${voice_id:-1695}"
-read -r -p "请输入语速倍数 (默认: 1): " speed_factor < /dev/tty
-                speed_factor="${speed_factor:-1}"
-read -r -p "请输入音调倍数 (默认: 0): " pitch_factor < /dev/tty
-                pitch_factor="${pitch_factor:-0}"
+                safe_read "请输入 Token: " token
+                safe_read "请输入角色ID (默认: 1695): " voice_id
+                safe_read "请输入语速倍数 (默认: 1): " speed_factor
+                safe_read "请输入音调倍数 (默认: 0): " pitch_factor
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
                 if [ -n "$token" ]; then
@@ -1998,67 +2089,88 @@ read -r -p "请输入音调倍数 (默认: 0): " pitch_factor < /dev/tty
                 fi
                 echo -e "\n${GREEN}✅ 已选择自部署 ACGN TTS。${RESET}"
                 ;;
-            9)
-                tts_provider_key="LinkeraiTTS"
-                echo -e "\n${YELLOW}⚠️ 您选择了 LinkerAI TTS。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://linkerai.cn/${RESET}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
+            14)
+                tts_provider_key="OpenaiTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI TTS。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://platform.openai.com/api-keys${RESET}"
+                safe_read "请输入 API Key: " api_key
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
                 if [ -n "$api_key" ]; then
                     sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
+                echo -e "\n${GREEN}✅ 已选择OpenAI TTS。${RESET}"
                 ;;
-            10)
-                tts_provider_key="PaddleSpeechTTS"
-                echo -e "\n${YELLOW}⚠️ 您选择了百度飞桨 PaddleSpeech TTS。${RESET}"
-                echo -e "${CYAN}🔑 PaddleSpeech TTS配置需要以下参数：${RESET}"
-                echo "  - API类型: paddle_speech (固定值)"
-                echo "  - 协议类型: websocket/http (默认: websocket)"
-                echo "  - 服务地址: TTS服务地址 (默认: ws://127.0.0.1:8092/paddlespeech/tts/streaming)"
-                echo "  - 发音人ID: 语音角色ID (默认: 0)"
-                echo "  - 采样率: 音频采样率 (默认: 24000)"
-                echo -e "${CYAN}💡 百度飞桨 PaddleSpeech 支持本地离线部署${RESET}"
-                echo -e "${CYAN}💡 项目地址：https://github.com/PaddlePaddle/PaddleSpeech${RESET}"
+            15)
+                tts_provider_key="MinimaxTTSHTTPStream"
+                echo -e "\n${YELLOW}⚠️ 您选择了 MiniMax流式TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://platform.minimaxi.cn/${RESET}"
+                echo -e "${CYAN}📝 需要以下参数：${RESET}"
+                echo "  - Group ID: MiniMax分组ID"
+                echo "  - API Key: MiniMax API密钥"
                 
-read -r -p "请输入协议类型 (默认: websocket): " protocol < /dev/tty
-                protocol="${protocol:-websocket}"
-read -r -p "请输入服务地址 (默认: ws://127.0.0.1:8092/paddlespeech/tts/streaming): " url < /dev/tty
-                url="${url:-ws://127.0.0.1:8092/paddlespeech/tts/streaming}"
-read -r -p "请输入发音人ID (默认: 0): " spk_id < /dev/tty
-                spk_id="${spk_id:-0}"
-read -r -p "请输入采样率 (默认: 24000): " sample_rate < /dev/tty
-                sample_rate="${sample_rate:-24000}"
+                safe_read "请输入 Group ID: " group_id
+                safe_read "请输入 API Key: " api_key
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
-                if [ -n "$protocol" ]; then
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    protocol: .*/    protocol: $protocol/" "$CONFIG_FILE"
+                if [ -n "$group_id" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    group_id: .*/    group_id: \"$group_id\"/" "$CONFIG_FILE"
                 fi
-                if [ -n "$url" ]; then
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    url: .*|    url: $url|" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
-                if [ -n "$spk_id" ]; then
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    spk_id: .*/    spk_id: $spk_id/" "$CONFIG_FILE"
-                fi
-                if [ -n "$sample_rate" ]; then
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    sample_rate: .*/    sample_rate: $sample_rate/" "$CONFIG_FILE"
-                fi
-                echo -e "\n${GREEN}✅ 已选择百度飞桨 PaddleSpeech TTS。${RESET}"
+                echo -e "\n${GREEN}✅ 已选择MiniMax流式TTS。${RESET}"
                 ;;
-            11)
-                tts_provider_key="IndexStreamTTS"
-                echo -e "\n${YELLOW}⚠️ 您选择了 Index-TTS-vLLM。${RESET}"
-                echo -e "${CYAN}🔑 请确保已部署Index-TTS-vLLM服务${RESET}"
-read -r -p "请输入服务地址: " service_url < /dev/tty
-                service_url="${service_url:-}"
+            16)
+                tts_provider_key="CustomTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了自定义 TTS。${RESET}"
+                echo -e "${CYAN}🔑 请输入自定义TTS服务配置${RESET}"
+                safe_read "请输入服务名称: " service_name
+                safe_read "请输入服务地址: " service_url
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
-                if [ -n "$service_url" ]; then
+                if [ -n "$service_name" ] && [ -n "$service_url" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    service_name: .*/    service_name: \"$service_name\"/" "$CONFIG_FILE"
                     sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    service_url: .*/    service_url: \"$service_url\"/" "$CONFIG_FILE"
                 fi
+                echo -e "\n${GREEN}✅ 已选择自定义TTS。${RESET}"
                 ;;
-            12)
+            17)
+                tts_provider_key="LinkeraiTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 LinkerAI TTS。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://linkerai.cn/${RESET}"
+                safe_read "请输入 API Key: " api_key
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择LinkerAI TTS。${RESET}"
+                ;;
+            18)
+                tts_provider_key="PaddleSpeechTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度飞桨 PaddleSpeech TTS。${RESET}"
+                echo -e "${CYAN}🔧 需要部署 PaddleSpeech 服务：https://github.com/PaddlePaddle/PaddleSpeech${RESET}"
+                echo -e "${CYAN}📝 默认服务地址：ws://127.0.0.1:8092/paddlespeech/tts/streaming${RESET}"
+                safe_read "请输入服务地址 (默认: ws://127.0.0.1:8092/paddlespeech/tts/streaming): " url
+                url="${url:-ws://127.0.0.1:8092/paddlespeech/tts/streaming}"
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    url: .*|    url: \"$url\"|" "$CONFIG_FILE"
+                echo -e "\n${GREEN}✅ 已选择百度飞桨 PaddleSpeech TTS。${RESET}"
+                ;;
+            19)
+                tts_provider_key="IndexStreamTTS"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Index-TTS-vLLM。${RESET}"
+                echo -e "${CYAN}🔧 需要部署 Index-TTS-vLLM 服务${RESET}"
+                safe_read "请输入服务地址 (默认: http://127.0.0.1:11996/tts): " api_url
+                api_url="${api_url:-http://127.0.0.1:11996/tts}"
+                
+                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
+                sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    api_url: .*|    api_url: \"$api_url\"|" "$CONFIG_FILE"
+                echo -e "\n${GREEN}✅ 已选择Index-TTS-vLLM。${RESET}"
+                ;;
+            20)
                 echo -e "\n${YELLOW}⚠️ 您选择了 GPT-SoVITS。${RESET}"
                 echo -e "${CYAN}🔑 请选择GPT-SoVITS版本：${RESET}"
                 echo "  1) GPT_SOVITS_V2"
@@ -2069,9 +2181,9 @@ read -r -p "请输入服务地址: " service_url < /dev/tty
                 if [ "$sovits_version" = "2" ]; then
                     tts_provider_key="GPT_SOVITS_V3"
                     echo -e "\n${GREEN}✅ 已选择 GPT_SOVITS_V3。${RESET}"
-                    echo "  - 服务地址: TTS服务地址 (默认: http://localhost:9880)"
+                    echo "  - 服务地址: http://localhost:9880"
                     echo "  - 文本语言: auto/zh/en/ja/ko/zh-hans/zh-hant/粤 (默认: auto)"
-                    echo "  - 参考音频: 参考音频文件路径 (默认: caixukun.wav)"
+                    echo "  - 参考音频: caixukun.wav"
                     echo "  - 提示语言: zh/en/ja/ko/zh-hans/zh-hant/粤 (默认: zh)"
                     echo "  - 提示文本: 提示文本内容 (可选)"
                     echo -e "${CYAN}💡 启动方法：python api.py${RESET}"
@@ -2105,9 +2217,9 @@ read -r -p "请输入服务地址: " service_url < /dev/tty
                 else
                     tts_provider_key="GPT_SOVITS_V2"
                     echo -e "\n${GREEN}✅ 已选择 GPT_SOVITS_V2。${RESET}"
-                    echo "  - 服务地址: TTS服务地址 (默认: http://localhost:9880/tts)"
+                    echo "  - 服务地址: http://localhost:9880/tts"
                     echo "  - 文本语言: auto/zh/en/ja/ko/zh-hans/zh-hant/粤 (默认: auto)"
-                    echo "  - 参考音频: 参考音频文件路径 (默认: demo.wav)"
+                    echo "  - 参考音频: demo.wav"
                     echo "  - 提示语言: zh/en/ja/ko/zh-hans/zh-hant/粤 (默认: zh)"
                     echo "  - 提示文本: 提示文本内容 (可选)"
                     echo -e "${CYAN}💡 启动方法：python api_v2.py -a 127.0.0.1 -p 9880 -c GPT_SoVITS/configs/demo.yaml${RESET}"
@@ -2140,25 +2252,25 @@ read -r -p "请输入服务地址: " service_url < /dev/tty
                     fi
                 fi
                 ;;
-            13)
+            21)
                 tts_provider_key="AliBLTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了阿里云百炼 AliBL TTS。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
+                safe_read "请输入 API Key: " api_key
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
                 if [ -n "$api_key" ]; then
                     sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
+                echo -e "\n${GREEN}✅ 已选择阿里云百炼AliBL TTS。${RESET}"
                 ;;
-            14)
+            22)
                 tts_provider_key="XunFeiTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了讯飞 XunFei TTS。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://console.xfyun.cn/${RESET}"
-read -r -p "请输入 App ID: " app_id < /dev/tty
-read -r -p "请输入 API Secret: " api_secret < /dev/tty
-read -r -p "请输入 API Key: " api_key < /dev/tty
+                safe_read "请输入 App ID: " app_id
+                safe_read "请输入 API Secret: " api_secret
+                safe_read "请输入 API Key: " api_key
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
                 if [ -n "$app_id" ] && [ -n "$api_secret" ] && [ -n "$api_key" ]; then
@@ -2166,23 +2278,7 @@ read -r -p "请输入 API Key: " api_key < /dev/tty
                     sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$CONFIG_FILE"
                     sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
                 fi
-                ;;
-            15)
-                tts_provider_key="Custom"
-                echo -e "\n${YELLOW}⚠️ 您选择了自定义 TTS。${RESET}"
-                echo -e "${CYAN}🔑 请输入自定义TTS服务配置${RESET}"
-read -r -p "请输入服务名称: " service_name < /dev/tty
-read -r -p "请输入服务地址: " service_url < /dev/tty
-                
-                sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
-                if [ -n "$service_name" ] && [ -n "$service_url" ]; then
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    service_name: .*/    service_name: \"$service_name\"/" "$CONFIG_FILE"
-                    sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    service_url: .*/    service_url: \"$service_url\"/" "$CONFIG_FILE"
-                fi
-                ;;
-            *)
-                echo -e "\n${RED}❌ 输入无效，请重新选择${RESET}"
-                continue
+                echo -e "\n${GREEN}✅ 已选择讯飞XunFei TTS。${RESET}"
                 ;;
         esac
         
