@@ -6,8 +6,17 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.19（内存检测依赖修复版本）
-# 修复内容：修复内存检测逻辑中bc命令依赖问题
+# 版本：1.2.20（Docker服务启动流程修复版本）
+# 修复内容：修复用户选择Docker操作后不执行docker-compose up -d的问题
+# v1.2.19:
+# - 修复内存检测逻辑中bc命令依赖问题
+# - 解决部分系统缺少bc命令导致的内存检测失败
+# - 使用awk替代bc进行除法计算，提高脚本兼容性
+# v1.2.20:
+# - 修复Docker服务启动流程问题
+# - 确保用户选择Docker操作后正确执行docker-compose up -d
+# - 添加服务启动后的连接信息显示
+# - 优化智能内存风险处理逻辑
 # 详细说明：
 # 0) 现在通过脚本配置密钥和服务商（默认）
 # 1) 稍后手动填写所有配置
@@ -27,13 +36,18 @@ trap exit_confirm SIGINT
 # - 将zhipuai类型改为openai类型（ChatGLM实际使用的类型）
 # - 修正LLM和VLLM配置参数，使用正确的base_url和model_name格式
 # v1.2.19:
+# v1.2.20:
+# - 修复Docker服务启动流程问题
+# - 确保用户选择Docker操作后正确执行 docker-compose up -d
+# - 添加专用服务启动函数 start_xiaozhi_service
+# - 优化智能内存风险处理，确保服务能正常启动
 # - 修复内存检测逻辑中bc命令依赖问题
 # - 解决部分系统缺少bc命令导致的内存检测失败
 # - 使用awk替代bc进行除法计算，提高脚本兼容性
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.19"
+Version="1.2.20"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -505,8 +519,12 @@ check_asr_config() {
 
 # 智能内存风险处理函数
 smart_handle_memory_risk() {
+    echo -e "\n${CYAN}🧠 智能内存风险评估${RESET}"
+    
     # 检测当前ASR配置
     local asr_config=$(check_asr_config)
+    
+    echo -e "\033[36m📊 配置检测结果：$asr_config\033[0m"
     
     # 如果检测到在线ASR或者没有找到配置文件，使用温和处理
     if [ "$asr_config" = "online" ] || [ "$asr_config" = "unknown" ] || [ -z "$asr_config" ]; then
@@ -515,13 +533,31 @@ smart_handle_memory_risk() {
         echo -e "${CYAN}ℹ️ 当前配置不会导致内存不足问题${RESET}"
         echo -e "${CYAN}ℹ️ Docker操作将继续正常使用${RESET}"
         
-        # 直接进入Docker选择
+        # 进入Docker管理选择
         docker_container_management
-        return $?
+        local docker_result=$?
+        
+        if [ $docker_result -eq 0 ]; then
+            echo -e "\n${CYAN}🎉 Docker操作和服务启动完成！${RESET}"
+            echo -e "${CYAN}📋 您可以查看上面的连接地址信息使用服务${RESET}"
+            return 0  # 成功完成
+        else
+            echo -e "\n${CYAN}🔄 Docker操作失败或被取消${RESET}"
+            return 1  # 操作失败或被取消
+        fi
     else
         # 本地ASR，使用原有逻辑
         handle_insufficient_memory
-        return $?
+        local handle_result=$?
+        
+        if [ $handle_result -eq 0 ]; then
+            echo -e "\n${CYAN}🎉 Docker操作和服务启动完成！${RESET}"
+            echo -e "${CYAN}📋 您可以查看上面的连接地址信息使用服务${RESET}"
+            return 0  # 成功完成
+        else
+            echo -e "\n${CYAN}🔄 Docker操作失败或被取消${RESET}"
+            return 1  # 操作失败或被取消
+        fi
     fi
 }
 
@@ -559,8 +595,89 @@ docker_container_management() {
         
         read -r -p "按回车键继续..." < /dev/tty
         
-        # 返回0表示用户确认执行docker操作
-        return 0
+        # 执行Docker操作并启动服务
+        echo -e "\n${YELLOW}⚠️ 正在执行Docker操作...${RESET}"
+        
+        # 清理现有容器
+        echo -e "${CYAN}🔍 检查并清理现有容器...${RESET}"
+        if command -v docker &> /dev/null; then
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                echo -e "${YELLOW}⚠️ 正在停止Docker容器...${RESET}"
+                docker stop "$CONTAINER_NAME" 2>/dev/null
+                docker rm "$CONTAINER_NAME" 2>/dev/null
+                echo -e "${GREEN}✅ Docker容器已停止并删除${RESET}"
+            else
+                echo -e "${GREEN}✅ 未发现运行中的Docker容器${RESET}"
+            fi
+        else
+            echo -e "${YELLOW}⚠️ Docker未安装，跳过容器操作${RESET}"
+            return 1
+        fi
+        
+        # 检查并启动服务
+        echo -e "\n${CYAN}🚀 准备启动小智服务器服务...${RESET}"
+        
+        # 检查目录和配置文件
+        if [ ! -d "$MAIN_DIR" ]; then
+            echo -e "${RED}❌ 服务器目录不存在：$MAIN_DIR${RESET}"
+            echo -e "${YELLOW}💡 请先运行脚本进行完整部署${RESET}"
+            return 1
+        fi
+        
+        if [ ! -f "$CONFIG_FILE" ]; then
+            echo -e "${RED}❌ 配置文件不存在：$CONFIG_FILE${RESET}"
+            echo -e "${YELLOW}💡 请先运行脚本进行配置${RESET}"
+            return 1
+        fi
+        
+        # 切换到服务器目录并启动服务
+        cd "$MAIN_DIR" || {
+            echo -e "${RED}❌ 进入目录失败：$MAIN_DIR${RESET}"
+            return 1
+        }
+        
+        if [ -f "docker-compose.yml" ]; then
+            echo -e "${CYAN}🐳 执行 'docker compose up -d' 启动服务...${RESET}"
+            
+            # 启动服务
+            if docker compose up -d; then
+                echo -e "${CYAN}⏳ 等待服务启动...${RESET}"
+                sleep 10
+                
+                # 检查服务状态
+                if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+                    echo -e "${GREEN}🎉 小智服务器启动成功！${RESET}"
+                    echo -e "${GREEN}✅ 容器 $CONTAINER_NAME 正在运行${RESET}"
+                    
+                    # 显示连接信息
+                    INTERNAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
+                    EXTERNAL_IP=$(curl -s --max-time 5 https://api.ip.sb/ip 2>/dev/null || echo "$INTERNAL_IP")
+                    
+                    echo -e "\n${PURPLE}==================================================${RESET}"
+                    echo -e "${GREEN}📡 服务器连接地址信息${RESET}"
+                    echo -e "${PURPLE}==================================================${RESET}"
+                    echo -e "内网地址：$INTERNAL_IP"
+                    echo -e "公网地址：$EXTERNAL_IP"
+                    echo -e "${GREEN}OTA接口（内网）：http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+                    echo -e "${GREEN}WebSocket接口（内网）：ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+                    echo -e "${PURPLE}==================================================${RESET}"
+                    
+                    return 0  # 服务启动成功
+                else
+                    echo -e "${RED}❌ 服务启动失败${RESET}"
+                    echo -e "${YELLOW}💡 请检查容器日志：docker logs $CONTAINER_NAME${RESET}"
+                    return 1
+                fi
+            else
+                echo -e "${RED}❌ Docker服务启动失败${RESET}"
+                return 1
+            fi
+        else
+            echo -e "${RED}❌ 未找到 docker-compose.yml 文件${RESET}"
+            echo -e "${YELLOW}💡 请先下载配置文件：${RESET}"
+            echo -e "${CYAN}curl -O $CONFIG_FILE_URL${RESET}"
+            return 1
+        fi
     fi
     
     # 默认返回1表示不执行docker
@@ -637,10 +754,72 @@ handle_insufficient_memory() {
             echo -e "${YELLOW}⚠️ Docker未安装，跳过容器操作${RESET}"
         fi
         
-        echo -e "\n${GREEN}✅ Docker操作完成${RESET}"
-        echo -e "${YELLOW}💡 建议升级服务器内存后重新部署${RESET}"
+        echo -e "\n${GREEN}✅ Docker容器清理完成${RESET}"
         
-        return 0  # 返回0表示继续执行
+        # 检查并启动服务
+        echo -e "${CYAN}🚀 准备启动小智服务器服务...${RESET}"
+        
+        # 检查目录和配置文件
+        if [ ! -d "$MAIN_DIR" ]; then
+            echo -e "${RED}❌ 服务器目录不存在：$MAIN_DIR${RESET}"
+            echo -e "${YELLOW}💡 请先运行脚本进行完整部署${RESET}"
+            return 1
+        fi
+        
+        if [ ! -f "$CONFIG_FILE" ]; then
+            echo -e "${RED}❌ 配置文件不存在：$CONFIG_FILE${RESET}"
+            echo -e "${YELLOW}💡 请先运行脚本进行配置${RESET}"
+            return 1
+        fi
+        
+        # 切换到服务器目录并启动服务
+        cd "$MAIN_DIR" || {
+            echo -e "${RED}❌ 进入目录失败：$MAIN_DIR${RESET}"
+            return 1
+        }
+        
+        if [ -f "docker-compose.yml" ]; then
+            echo -e "${CYAN}🐳 执行 'docker compose up -d' 启动服务...${RESET}"
+            
+            # 启动服务
+            if docker compose up -d; then
+                echo -e "${CYAN}⏳ 等待服务启动...${RESET}"
+                sleep 10
+                
+                # 检查服务状态
+                if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+                    echo -e "${GREEN}🎉 小智服务器启动成功！${RESET}"
+                    echo -e "${GREEN}✅ 容器 $CONTAINER_NAME 正在运行${RESET}"
+                    
+                    # 显示连接信息
+                    INTERNAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
+                    EXTERNAL_IP=$(curl -s --max-time 5 https://api.ip.sb/ip 2>/dev/null || echo "$INTERNAL_IP")
+                    
+                    echo -e "\n${PURPLE}==================================================${RESET}"
+                    echo -e "${GREEN}📡 服务器连接地址信息${RESET}"
+                    echo -e "${PURPLE}==================================================${RESET}"
+                    echo -e "内网地址：$INTERNAL_IP"
+                    echo -e "公网地址：$EXTERNAL_IP"
+                    echo -e "${GREEN}OTA接口（内网）：http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+                    echo -e "${GREEN}WebSocket接口（内网）：ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+                    echo -e "${PURPLE}==================================================${RESET}"
+                    
+                    return 0  # 服务启动成功
+                else
+                    echo -e "${RED}❌ 服务启动失败${RESET}"
+                    echo -e "${YELLOW}💡 请检查容器日志：docker logs $CONTAINER_NAME${RESET}"
+                    return 1
+                fi
+            else
+                echo -e "${RED}❌ Docker服务启动失败${RESET}"
+                return 1
+            fi
+        else
+            echo -e "${RED}❌ 未找到 docker-compose.yml 文件${RESET}"
+            echo -e "${YELLOW}💡 请先下载配置文件：${RESET}"
+            echo -e "${CYAN}curl -O $CONFIG_FILE_URL${RESET}"
+            return 1
+        fi
     fi
     
     echo -e "\n${RED}⚠️ 无效选择，脚本结束${RESET}"
