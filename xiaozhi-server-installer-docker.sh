@@ -6,12 +6,12 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.1.7-fixed
-# 修复内容：修复 FunASRServer 配置。
+# 版本：1.1.9-fixed（修复版本）
+# 修复内容：修复 FunASRServer 配置，支持独立部署服务
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.1.8-fixed"
+Version="1.1.9-fixed"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -33,6 +33,7 @@ RED="\033[31m" GREEN="\033[32m" YELLOW="\033[33m" BLUE="\033[34m" PURPLE="\033[3
 # 全局变量
 CHATGLM_API_KEY=""
 IS_MEMORY_SUFFICIENT=false
+IS_SHERPA_PARAFORMER_AVAILABLE=false
 CPU_MODEL="" CPU_CORES="" MEM_TOTAL="" DISK_AVAIL=""
 NET_INTERFACE="" NET_SPEED="" INTERNAL_IP="" EXTERNAL_IP="" OS_VERSION=""
 CURRENT_DEPLOY_TYPE="" CONFIG_DOWNLOAD_NEEDED="true" USE_EXISTING_CONFIG=false SKIP_DETAILED_CONFIG=false
@@ -465,13 +466,21 @@ show_server_config() {
     echo
 
     if [ "$MEM_TOTAL" -ge 4 ]; then
-        echo -e "${GREEN}✅ 内存检查通过（${MEM_TOTAL} GB ≥ 4 GB），可以选择本地ASR模型${RESET}"
+        echo -e "${GREEN}✅ 内存检查通过（${MEM_TOTAL} GB ≥ 4 GB），可以选择所有本地ASR模型${RESET}"
         IS_MEMORY_SUFFICIENT=true
-    else
-        echo -e "${RED}❌ 内存检查失败（${MEM_TOTAL} GB < 4 GB）${RESET}"
-        echo -e "${RED}⚠️ 本地ASR模型需要≥4GB内存，当前不足！${RESET}"
-        echo -e "${RED}⚠️ 若强行使用可能导致服务器卡死，请选择在线ASR模型${RESET}"
+        IS_SHERPA_PARAFORMER_AVAILABLE=true
+    elif [ "$MEM_TOTAL" -ge 2 ]; then
+        echo -e "${YELLOW}⚠️ 内存检查：${MEM_TOTAL} GB${RESET}"
+        echo -e "${GREEN}✅ 可以使用轻量级本地ASR模型（如SherpaParaformerASR）${RESET}"
+        echo -e "${YELLOW}💡 其他本地ASR模型需要≥4GB内存${RESET}"
         IS_MEMORY_SUFFICIENT=false
+        IS_SHERPA_PARAFORMER_AVAILABLE=true
+    else
+        echo -e "${RED}❌ 内存检查失败（${MEM_TOTAL} GB < 2 GB）${RESET}"
+        echo -e "${RED}⚠️ 内存不足，建议选择在线ASR模型${RESET}"
+        echo -e "${RED}⚠️ 最低内存要求：SherpaParaformerASR需≥2GB，其他本地模型需≥4GB${RESET}"
+        IS_MEMORY_SUFFICIENT=false
+        IS_SHERPA_PARAFORMER_AVAILABLE=false
     fi
     echo
 }
@@ -984,7 +993,7 @@ config_asr() {
             echo " 3) ${GREEN}SherpaASR (本地，多语言)${RESET}"
             echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
             echo " 4) ${GREEN}SherpaParaformerASR (本地，中文专用)${RESET}"
-            echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
+            echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
             echo " 5) DoubaoASR (火山引擎，按次收费)"
             echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
             echo " 7) TencentASR (腾讯云)"
@@ -995,11 +1004,31 @@ config_asr() {
             echo "12) GroqASR (Groq)"
             echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
             echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
-        else
-            echo -e " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
+        elif [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = true ]; then
+            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
             echo " 2) FunASRServer (独立部署)"
             echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
-            echo -e " 4) ${RED}SherpaParaformerASR (本地，中文专用)${RESET} ${RED}❌ 内存不足${RESET}"
+            echo " 4) ${YELLOW}SherpaParaformerASR (本地，中文专用)${RESET}"
+            echo -e "    ${CYAN}💡 可用 (${MEM_TOTAL}GB ≥ 2GB) - 轻量级模型${RESET}"
+            echo " 5) DoubaoASR (火山引擎，按次收费)"
+            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
+            echo " 7) TencentASR (腾讯云)"
+            echo " 8) AliyunASR (阿里云，批量处理)"
+            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
+            echo "10) BaiduASR (百度智能云)"
+            echo "11) OpenaiASR (OpenAI)"
+            echo "12) GroqASR (Groq)"
+            echo -e "13) ${GREEN}VoskASR (本地，完全离线)${RESET} ${GREEN}✅ 内存占用较小 (建议≥2GB)${RESET}"
+            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
+            echo "10) BaiduASR (百度智能云)"
+            echo "11) OpenaiASR (OpenAI)"
+            echo "12) GroqASR (Groq)"
+            echo -e "13) ${GREEN}VoskASR (本地，完全离线)${RESET} ${GREEN}✅ 内存占用较小 (建议≥2GB)${RESET}"
+        else
+            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
+            echo " 2) FunASRServer (独立部署)"
+            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
+            echo -e " 4) ${RED}SherpaParaformerASR (本地，中文专用)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)${RESET}"
             echo " 5) DoubaoASR (火山引擎，按次收费)"
             echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
             echo " 7) TencentASR (腾讯云)"
@@ -1086,8 +1115,9 @@ read -r -p "请输入模型类型 (默认: sense_voice): " model_type < /dev/tty
                 ;;
             4)
                 asr_provider_key="SherpaParaformerASR"
-                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足，无法选择SherpaParaformerASR本地模型${RESET}"
+                if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)，无法选择SherpaParaformerASR本地模型${RESET}"
+                    echo -e "${RED}⚠️ SherpaParaformerASR需要≥2GB内存${RESET}"
 read -r < /dev/tty
                     continue
                 fi
@@ -1396,8 +1426,9 @@ config_asr_advanced() {
         echo -e "1) FunASR (本地SenseVoiceSmall，推荐 ${RED}⚠️ 内存不足 无法使用${RESET})"
     fi
     
+    # FunASRServer 是独立部署服务，不需要本地内存，始终可选
     echo "2) FunASRServer (独立部署服务)"
-
+    echo -e "    ${GREEN}✅ 独立服务，无需本地内存${RESET}"
     
     if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
         echo "3) SherpaASR (本地多语言)"
@@ -1405,7 +1436,7 @@ config_asr_advanced() {
         echo -e "3) SherpaASR (本地多语言 ${RED}⚠️ 内存不足 无法使用${RESET})"
     fi
     
-    if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+    if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = true ]; then
         echo "4) SherpaParaformerASR (本地中文专用)"
     else
         echo -e "4) SherpaParaformerASR (本地中文专用 ${RED}⚠️ 内存不足 无法使用${RESET})"
@@ -1461,10 +1492,10 @@ config_asr_advanced() {
             fi
             ;;
         4)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+            if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = true ]; then
                 config_sherpa_paraformer_asr
             else
-                echo -e "${RED}💀 内存不足无法选择${RESET}"
+                echo -e "${RED}💀 内存不足 (${MEM_TOTAL}GB < 2GB) 无法选择${RESET}"
                 echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
                 sleep 2
                 config_asr_advanced
