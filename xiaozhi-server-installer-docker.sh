@@ -2166,120 +2166,20 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         echo -e "\n${CYAN}=== 第5步：配置 Memory (记忆) 服务 ===${RESET}"
         config_memory
         if [ $? -eq 1 ]; then
-            # 重新配置TTS
             echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
             config_tts
             if [ $? -eq 1 ]; then
-                # 重新配置VLLM
-                echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
-                config_vllm
-                if [ $? -eq 1 ]; then
-                    # 重新配置LLM
-                    echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
-                    config_llm
-                    if [ $? -eq 1 ]; then
-                        # 重新配置ASR
-                        echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
-                        config_asr
-                        if [ $? -eq 1 ]; then
-                            return 1
-                        fi
-                        
-                        # 重新配置LLM
-                        echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
-                        config_llm
-                        if [ $? -eq 1 ]; then
-                            return 1
-                        fi
-                    fi
-                    
-                    # 重新配置VLLM
-                    echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
-                    config_vllm
-                    if [ $? -eq 1 ]; then
-                        return 1
-                    fi
-                fi
-                
-                # 重新配置TTS
-                echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
-                config_tts
-                if [ $? -eq 1 ]; then
-                    return 1
-                fi
-            fi
-            
-            # 重新配置Memory
-            echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
-            config_memory
-            if [ $? -eq 1 ]; then
-                return 1
+                return 1  # 直接返回，不再继续配置流程
             fi
         fi
         
         echo -e "\n${CYAN}=== 第6步：配置服务器地址 (自动生成) ===${RESET}"
         config_server
         if [ $? -eq 1 ]; then
-            # 重新配置Memory
             echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
             config_memory
             if [ $? -eq 1 ]; then
-                # 重新配置TTS
-                echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
-                config_tts
-                if [ $? -eq 1 ]; then
-                    # 重新配置VLLM
-                    echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
-                    config_vllm
-                    if [ $? -eq 1 ]; then
-                        # 重新配置LLM
-                        echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
-                        config_llm
-                        if [ $? -eq 1 ]; then
-                            # 重新配置ASR
-                            echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
-                            config_asr
-                            if [ $? -eq 1 ]; then
-                                return 1
-                            fi
-                            
-                            # 重新配置LLM
-                            echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
-                            config_llm
-                            if [ $? -eq 1 ]; then
-                                return 1
-                            fi
-                        fi
-                        
-                        # 重新配置VLLM
-                        echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
-                        config_vllm
-                        if [ $? -eq 1 ]; then
-                            return 1
-                        fi
-                    fi
-                    
-                    # 重新配置TTS
-                    echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
-                    config_tts
-                    if [ $? -eq 1 ]; then
-                        return 1
-                    fi
-                fi
-                
-                # 重新配置Memory
-                echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
-                config_memory
-                if [ $? -eq 1 ]; then
-                    return 1
-                fi
-            fi
-            
-            # 重新配置服务器地址
-            echo -e "\n${CYAN}=== 重新配置服务器地址 (自动生成) ===${RESET}"
-            config_server
-            if [ $? -eq 1 ]; then
-                return 1
+                return 1  # 直接返回，不再继续配置流程
             fi
         fi
         
