@@ -6,17 +6,19 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.20（Docker服务启动流程修复版本）
-# 修复内容：修复用户选择Docker操作后不执行docker-compose up -d的问题
-# v1.2.19:
-# - 修复内存检测逻辑中bc命令依赖问题
-# - 解决部分系统缺少bc命令导致的内存检测失败
-# - 使用awk替代bc进行除法计算，提高脚本兼容性
+# 版本：1.2.21（Docker操作工具集成版本）
+# 修复内容：添加完整的Docker操作工具菜单，集成到主菜单
 # v1.2.20:
 # - 修复Docker服务启动流程问题
 # - 确保用户选择Docker操作后正确执行docker-compose up -d
 # - 添加服务启动后的连接信息显示
 # - 优化智能内存风险处理逻辑
+# v1.2.21:
+# - 新增Docker操作工具菜单（选项0）
+# - 集成到主菜单，支持服务管理、镜像清理、系统维护
+# - 包含7个Docker操作子菜单：服务管理、镜像管理、容器管理、系统信息、深度清理、网络端口管理、日志管理
+# - 提供完整的Docker生命周期管理功能
+# - 保持向后兼容，不影响现有功能
 # 详细说明：
 # 0) 现在通过脚本配置密钥和服务商（默认）
 # 1) 稍后手动填写所有配置
@@ -44,10 +46,20 @@ trap exit_confirm SIGINT
 # - 修复内存检测逻辑中bc命令依赖问题
 # - 解决部分系统缺少bc命令导致的内存检测失败
 # - 使用awk替代bc进行除法计算，提高脚本兼容性
+# v1.2.21:
+# - 新增Docker操作工具菜单，集成到主菜单选项0
+# - Docker服务管理：启动/停止/重启/查看状态/资源监控
+# - Docker镜像管理：查看/清理/重新拉取镜像
+# - Docker容器管理：查看/进入/清理/重置容器
+# - Docker系统信息：版本/资源使用/磁盘使用/事件信息
+# - Docker深度清理：选择性清理Docker资源或完全重置
+# - Docker网络端口管理：网络查看/端口检查/连接测试
+# - Docker日志管理：查看/搜索/导出/实时跟踪日志
+# - 保持完全向后兼容，不影响现有部署功能
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.20"
+Version="1.2.21"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -301,6 +313,7 @@ main_menu() {
         fi
         echo
         echo "请选择操作："
+        echo "0) Docker操作工具 (服务管理/镜像清理/系统维护)"
         echo "1) 重新开始部署 (删除现有并重新部署)"
         echo "2) 更新服务器 (保留配置，更新到最新版本)"
         echo "3) 仅修改配置文件 (不下载服务器文件)"
@@ -308,13 +321,14 @@ main_menu() {
         echo "5) 测试服务器端口 (详细端口测试)"
         echo "6) 查看Docker日志"
         echo "7) 删除服务器 (完全删除所有数据)"
-        echo "0) 退出脚本"
+        echo "9) 退出脚本"
     else
         echo -e "${GREEN}欢迎使用小智服务器部署脚本${RESET}"
         echo
         echo "请选择操作："
+        echo "0) Docker操作工具 (服务管理/镜像清理/系统维护)"
         echo "1) 开始部署小智服务器"
-        echo "0) 退出脚本"
+        echo "9) 退出脚本"
     fi
     
     echo -e "${PURPLE}==================================================${RESET}"
@@ -325,7 +339,7 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
         
         if [ -z "$menu_choice" ]; then
             echo -e "${YELLOW}⚠️ 检测到空输入，请输入有效的选项编号${RESET}"
-            echo -e "${CYAN}💡 可用选项：1-7 或 0（退出）${RESET}"
+            echo -e "${CYAN}💡 可用选项：0-7 或 9（退出）${RESET}"
             echo -e "${PURPLE}----------------------------------------${RESET}"
             continue  # 重新开始输入循环
         fi
@@ -335,6 +349,11 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
     done
     
     case $menu_choice in
+        0)
+            # Docker操作工具
+            docker_operation_tool_menu
+            break
+            ;
         1)
             # 根据部署状态决定行为
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
@@ -411,16 +430,16 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
             fi
             break 
             ;;
-        0)
+        9)
             echo -e "${GREEN}👋 感谢使用，脚本退出${RESET}"
             exit 0
             ;;
         *)
             echo -e "${RED}❌ 无效选项，请重新选择${RESET}"
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
-                echo -e "${CYAN}💡 请输入1-7或0退出${RESET}"
+                echo -e "${CYAN}💡 请输入0-7或9退出${RESET}"
             else
-                echo -e "${CYAN}💡 请输入1或0退出${RESET}"
+                echo -e "${CYAN}💡 请输入0或9退出${RESET}"
             fi
             sleep 2
             # 不使用return，而是继续循环让用户重新输入
@@ -5769,6 +5788,581 @@ read -r -p "❓ 是否强制执行？(Y/N，默认N): " choice < /dev/tty
     fi
     
     echo -e "${GREEN}✅ 系统检测通过，继续执行脚本...${RESET}"
+}
+
+# ========================= Docker操作工具菜单 =========================
+
+docker_operation_tool_menu() {
+    while true; do
+        clear
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${CYAN}🐳 Docker操作工具菜单 🐳${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        # 显示Docker状态
+        if command -v docker &> /dev/null; then
+            echo -e "${GREEN}🐳 Docker状态: 已安装${RESET}"
+            docker_version=$(docker --version 2>/dev/null | head -n1 || echo "未知版本")
+            echo -e "${CYAN}📋 版本信息: $docker_version${RESET}"
+            
+            # 检查容器状态
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                echo -e "${GREEN}🟢 小智服务器容器: 运行中${RESET}"
+            else
+                echo -e "${YELLOW}🟡 小智服务器容器: 未运行${RESET}"
+            fi
+        else
+            echo -e "${RED}❌ Docker状态: 未安装${RESET}"
+        fi
+        
+        echo -e "\n${WHITE_RED}可用操作:${RESET}"
+        echo "1) Docker服务管理 (启动/停止/重启/查看状态)"
+        echo "2) Docker镜像管理 (查看/清理/重新拉取镜像)"
+        echo "3) Docker容器管理 (查看/清理/重置容器)"
+        echo "4) Docker系统信息 (版本/资源使用情况)"
+        echo "5) Docker深度清理 (清理所有Docker资源)"
+        echo "6) Docker网络和端口管理"
+        echo "7) Docker日志管理 (查看/实时跟踪)"
+        echo "0) 返回主菜单"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        read -r -p "请选择Docker操作 (0-7): " docker_tool_choice < /dev/tty
+        
+        case $docker_tool_choice in
+            1)
+                docker_service_management
+                ;;
+            2)
+                docker_image_management
+                ;;
+            3)
+                docker_container_management_advanced
+                ;;
+            4)
+                docker_system_info
+                ;;
+            5)
+                docker_deep_cleanup
+                ;;
+            6)
+                docker_network_port_management
+                ;;
+            7)
+                docker_log_management
+                ;;
+            0)
+                echo -e "${CYAN}🔙 返回主菜单${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选项，请输入0-7${RESET}"
+                sleep 2
+                ;;
+        esac
+    done
+}
+
+# Docker服务管理
+docker_service_management() {
+    clear
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}🔧 Docker服务管理 🔧${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    echo "1) 启动小智服务器服务"
+    echo "2) 停止小智服务器服务"
+    echo "3) 重启小智服务器服务"
+    echo "4) 查看服务状态"
+    echo "5) 查看服务资源使用情况"
+    echo "0) 返回上级菜单"
+    
+    read -r -p "请选择操作 (0-5): " service_choice < /dev/tty
+    
+    case $service_choice in
+        1)
+            echo -e "\n${GREEN}🚀 启动小智服务器服务...${RESET}"
+            if [ -d "$MAIN_DIR" ] && [ -f "$MAIN_DIR/docker-compose.yml" ]; then
+                cd "$MAIN_DIR" || return 1
+                if docker compose up -d; then
+                    sleep 5
+                    if docker ps | grep -q "$CONTAINER_NAME"; then
+                        echo -e "${GREEN}✅ 服务启动成功${RESET}"
+                        docker_service_status_display
+                    else
+                        echo -e "${RED}❌ 服务启动失败${RESET}"
+                    fi
+                else
+                    echo -e "${RED}❌ Docker Compose启动失败${RESET}"
+                fi
+            else
+                echo -e "${RED}❌ 服务器目录或配置文件不存在${RESET}"
+            fi
+            ;;
+        2)
+            echo -e "\n${RED}🛑 停止小智服务器服务...${RESET}"
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                docker stop "$CONTAINER_NAME"
+                echo -e "${GREEN}✅ 服务已停止${RESET}"
+            else
+                echo -e "${YELLOW}⚠️ 服务未运行${RESET}"
+            fi
+            ;;
+        3)
+            echo -e "\n${CYAN}🔄 重启小智服务器服务...${RESET}"
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                docker restart "$CONTAINER_NAME"
+                sleep 5
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    echo -e "${GREEN}✅ 服务重启成功${RESET}"
+                    docker_service_status_display
+                else
+                    echo -e "${RED}❌ 服务重启失败${RESET}"
+                fi
+            else
+                echo -e "${YELLOW}⚠️ 服务未运行，无法重启${RESET}"
+            fi
+            ;;
+        4)
+            docker_service_status_display
+            ;;
+        5)
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                echo -e "\n${CYAN}📊 服务资源使用情况:${RESET}"
+                docker stats "$CONTAINER_NAME" --no-stream
+            else
+                echo -e "${YELLOW}⚠️ 服务未运行${RESET}"
+            fi
+            ;;
+        0)
+            return 0
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${RESET}"
+            ;;
+    esac
+    
+    read -r -p "按回车键继续..." < /dev/tty
+}
+
+# Docker镜像管理
+docker_image_management() {
+    clear
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}🖼️ Docker镜像管理 🖼️${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    echo "1) 查看所有镜像"
+    echo "2) 查看小智服务器镜像信息"
+    echo "3) 清理未使用的镜像"
+    echo "4) 强制清理所有镜像"
+    echo "5) 重新拉取小智服务器镜像"
+    echo "0) 返回上级菜单"
+    
+    read -r -p "请选择操作 (0-5): " image_choice < /dev/tty
+    
+    case $image_choice in
+        1)
+            echo -e "\n${CYAN}📋 所有Docker镜像:${RESET}"
+            docker images
+            ;;
+        2)
+            echo -e "\n${CYAN}📋 小智服务器镜像信息:${RESET}"
+            if docker images | grep -q "xiaozhi"; then
+                docker images | grep "xiaozhi"
+            else
+                echo -e "${YELLOW}⚠️ 未找到小智服务器相关镜像${RESET}"
+            fi
+            ;;
+        3)
+            echo -e "\n${YELLOW}🧹 清理未使用的镜像...${RESET}"
+            read -r -p "确认清理未使用的镜像？(y/N): " confirm < /dev/tty
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                docker image prune -f
+                echo -e "${GREEN}✅ 清理完成${RESET}"
+            else
+                echo -e "${CYAN}🔙 已取消清理${RESET}"
+            fi
+            ;;
+        4)
+            echo -e "\n${RED}⚠️ 强制清理所有镜像${RESET}"
+            echo -e "${RED}⚠️ 此操作将删除所有Docker镜像，危险！${RESET}"
+            read -r -p "确认删除所有镜像？(输入YES确认): " confirm < /dev/tty
+            if [ "$confirm" = "YES" ]; then
+                docker rmi $(docker images -q) -f 2>/dev/null || true
+                echo -e "${GREEN}✅ 所有镜像已清理${RESET}"
+            else
+                echo -e "${CYAN}🔙 已取消清理${RESET}"
+            fi
+            ;;
+        5)
+            echo -e "\n${CYAN}📥 重新拉取小智服务器镜像...${RESET}"
+            if [ -f "$MAIN_DIR/docker-compose.yml" ]; then
+                cd "$MAIN_DIR"
+                docker compose pull
+                echo -e "${GREEN}✅ 镜像拉取完成${RESET}"
+            else
+                echo -e "${RED}❌ 未找到docker-compose.yml文件${RESET}"
+            fi
+            ;;
+        0)
+            return 0
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${RESET}"
+            ;;
+    esac
+    
+    read -r -p "按回车键继续..." < /dev/tty
+}
+
+# Docker容器管理(高级)
+docker_container_management_advanced() {
+    clear
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}📦 Docker容器管理 (高级) 📦${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    echo "1) 查看所有容器"
+    echo "2) 查看小智服务器容器详情"
+    echo "3) 进入小智服务器容器"
+    echo "4) 清理已停止的容器"
+    echo "5) 重置小智服务器容器"
+    echo "0) 返回上级菜单"
+    
+    read -r -p "请选择操作 (0-5): " container_choice < /dev/tty
+    
+    case $container_choice in
+        1)
+            echo -e "\n${CYAN}📋 所有Docker容器:${RESET}"
+            docker ps -a
+            ;;
+        2)
+            echo -e "\n${CYAN}📋 小智服务器容器详情:${RESET}"
+            if docker ps -a | grep -q "$CONTAINER_NAME"; then
+                docker inspect "$CONTAINER_NAME"
+            else
+                echo -e "${YELLOW}⚠️ 未找到小智服务器容器${RESET}"
+            fi
+            ;;
+        3)
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                echo -e "\n${CYAN}🔗 进入容器...${RESET}"
+                echo -e "${YELLOW}⚠️ 使用 'exit' 命令退出容器${RESET}"
+                docker exec -it "$CONTAINER_NAME" /bin/bash
+            else
+                echo -e "${RED}❌ 容器未运行${RESET}"
+            fi
+            ;;
+        4)
+            echo -e "\n${YELLOW}🧹 清理已停止的容器...${RESET}"
+            read -r -p "确认清理？(y/N): " confirm < /dev/tty
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                docker container prune -f
+                echo -e "${GREEN}✅ 清理完成${RESET}"
+            else
+                echo -e "${CYAN}🔙 已取消清理${RESET}"
+            fi
+            ;;
+        5)
+            echo -e "\n${RED}⚠️ 重置小智服务器容器${RESET}"
+            read -r -p "确认重置？(y/N): " confirm < /dev/tty
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    docker stop "$CONTAINER_NAME"
+                fi
+                if docker ps -a | grep -q "$CONTAINER_NAME"; then
+                    docker rm "$CONTAINER_NAME"
+                fi
+                echo -e "${GREEN}✅ 容器已重置${RESET}"
+            else
+                echo -e "${CYAN}🔙 已取消重置${RESET}"
+            fi
+            ;;
+        0)
+            return 0
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${RESET}"
+            ;;
+    esac
+    
+    read -r -p "按回车键继续..." < /dev/tty
+}
+
+# Docker系统信息
+docker_system_info() {
+    clear
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}ℹ️ Docker系统信息 ℹ️${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    echo -e "${CYAN}🐳 Docker版本信息:${RESET}"
+    docker version
+    
+    echo -e "\n${CYAN}📊 Docker系统信息:${RESET}"
+    docker system info
+    
+    echo -e "\n${CYAN}💾 Docker磁盘使用情况:${RESET}"
+    docker system df
+    
+    echo -e "\n${CYAN}🔍 Docker事件信息:${RESET}"
+    docker system events --since "1h" --until "0s" 2>/dev/null | head -20 || echo "无法获取事件信息"
+    
+    read -r -p "按回车键继续..." < /dev/tty
+}
+
+# Docker深度清理
+docker_deep_cleanup() {
+    clear
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${RED}⚠️ Docker深度清理 ⚠️${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    echo -e "${RED}⚠️ 警告：此操作将清理所有Docker资源${RESET}"
+    echo -e "${RED}⚠️ 包括：容器、镜像、卷、网络、构建缓存${RESET}"
+    echo -e "${RED}⚠️ 此操作不可恢复！${RESET}"
+    echo ""
+    
+    echo "1) 清理未使用的资源"
+    echo "2) 清理所有未运行的容器"
+    echo "3) 清理所有未使用的镜像"
+    echo "4) 清理所有未使用的卷"
+    echo "5) 清理所有未使用的网络"
+    echo "6) 清理构建缓存"
+    echo "7) 完全重置Docker (所有数据)"
+    echo "0) 返回上级菜单"
+    
+    read -r -p "请选择清理操作 (0-7): " cleanup_choice < /dev/tty
+    
+    case $cleanup_choice in
+        1)
+            echo -e "\n${YELLOW}🧹 清理未使用的资源...${RESET}"
+            docker system prune -f
+            echo -e "${GREEN}✅ 清理完成${RESET}"
+            ;;
+        2)
+            echo -e "\n${YELLOW}🧹 清理未运行的容器...${RESET}"
+            docker container prune -f
+            echo -e "${GREEN}✅ 清理完成${RESET}"
+            ;;
+        3)
+            echo -e "\n${YELLOW}🧹 清理未使用的镜像...${RESET}"
+            docker image prune -a -f
+            echo -e "${GREEN}✅ 清理完成${RESET}"
+            ;;
+        4)
+            echo -e "\n${YELLOW}🧹 清理未使用的卷...${RESET}"
+            docker volume prune -f
+            echo -e "${GREEN}✅ 清理完成${RESET}"
+            ;;
+        5)
+            echo -e "\n${YELLOW}🧹 清理未使用的网络...${RESET}"
+            docker network prune -f
+            echo -e "${GREEN}✅ 清理完成${RESET}"
+            ;;
+        6)
+            echo -e "\n${YELLOW}🧹 清理构建缓存...${RESET}"
+            docker builder prune -f
+            echo -e "${GREEN}✅ 清理完成${RESET}"
+            ;;
+        7)
+            echo -e "\n${RED}☠️ 完全重置Docker${RESET}"
+            echo -e "${RED}⚠️ 此操作将删除所有Docker数据，不可恢复！${RESET}"
+            read -r -p "输入 'DELETE ALL' 确认: " confirm < /dev/tty
+            if [ "$confirm" = "DELETE ALL" ]; then
+                docker system prune -a --volumes -f
+                echo -e "${GREEN}✅ Docker已完全重置${RESET}"
+            else
+                echo -e "${CYAN}🔙 已取消重置${RESET}"
+            fi
+            ;;
+        0)
+            return 0
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${RESET}"
+            ;;
+    esac
+    
+    read -r -p "按回车键继续..." < /dev/tty
+}
+
+# Docker网络和端口管理
+docker_network_port_management() {
+    clear
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}🌐 Docker网络和端口管理 🌐${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    echo "1) 查看Docker网络"
+    echo "2) 查看端口映射"
+    echo "3) 检查端口占用"
+    echo "4) 网络连接测试"
+    echo "5) 查看容器网络详情"
+    echo "0) 返回上级菜单"
+    
+    read -r -p "请选择操作 (0-5): " network_choice < /dev/tty
+    
+    case $network_choice in
+        1)
+            echo -e "\n${CYAN}🌐 Docker网络列表:${RESET}"
+            docker network ls
+            ;;
+        2)
+            echo -e "\n${CYAN}🔗 端口映射列表:${RESET}"
+            docker ps --format "table {{.Names}}\t{{.Ports}}" | head -20
+            ;;
+        3)
+            echo -e "\n${CYAN}🔍 检查端口占用:${RESET}"
+            echo -e "${YELLOW}常用端口: 8000 (API), 8003 (OTA), 8080 (Web)${RESET}"
+            ports=(8000 8003 8080 3000 5000)
+            for port in "${ports[@]}"; do
+                if netstat -tuln 2>/dev/null | grep -q ":$port " || ss -tuln 2>/dev/null | grep -q ":$port "; then
+                    echo -e "${GREEN}✅ 端口 $port: 已被占用${RESET}"
+                else
+                    echo -e "${YELLOW}⚠️ 端口 $port: 可用${RESET}"
+                fi
+            done
+            ;;
+        4)
+            echo -e "\n${CYAN}🌍 网络连接测试:${RESET}"
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                echo "测试容器内部连接..."
+                docker exec "$CONTAINER_NAME" ping -c 3 8.8.8.8 2>/dev/null || echo "容器网络测试失败"
+            else
+                echo -e "${YELLOW}⚠️ 容器未运行${RESET}"
+            fi
+            ;;
+        5)
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                echo -e "\n${CYAN}🔍 容器网络详情:${RESET}"
+                docker inspect "$CONTAINER_NAME" | grep -A 20 "Networks"
+            else
+                echo -e "${YELLOW}⚠️ 容器未运行${RESET}"
+            fi
+            ;;
+        0)
+            return 0
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${RESET}"
+            ;;
+    esac
+    
+    read -r -p "按回车键继续..." < /dev/tty
+}
+
+# Docker日志管理
+docker_log_management() {
+    clear
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}📝 Docker日志管理 📝${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    echo "1) 查看最新50行日志"
+    echo "2) 查看最新100行日志"
+    echo "3) 查看指定时间段日志"
+    echo "4) 实时跟踪日志 (Ctrl+C退出)"
+    echo "5) 搜索日志关键词"
+    echo "6) 导出日志到文件"
+    echo "0) 返回上级菜单"
+    
+    read -r -p "请选择操作 (0-6): " log_choice < /dev/tty
+    
+    case $log_choice in
+        1)
+            echo -e "\n${CYAN}📋 最新50行日志:${RESET}"
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                docker logs --tail 50 "$CONTAINER_NAME"
+            else
+                echo -e "${RED}❌ 容器未运行${RESET}"
+            fi
+            ;;
+        2)
+            echo -e "\n${CYAN}📋 最新100行日志:${RESET}"
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                docker logs --tail 100 "$CONTAINER_NAME"
+            else
+                echo -e "${RED}❌ 容器未运行${RESET}"
+            fi
+            ;;
+        3)
+            echo -e "\n${CYAN}⏰ 指定时间段日志:${RESET}"
+            read -r -p "开始时间 (格式: 2024-01-01 12:00): " start_time < /dev/tty
+            read -r -p "结束时间 (格式: 2024-01-01 13:00): " end_time < /dev/tty
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                docker logs --since "$start_time" --until "$end_time" "$CONTAINER_NAME" 2>/dev/null || echo "无法获取指定时间段日志"
+            else
+                echo -e "${RED}❌ 容器未运行${RESET}"
+            fi
+            ;;
+        4)
+            echo -e "\n${CYAN}📡 实时日志跟踪 (按Ctrl+C退出):${RESET}"
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                docker logs -f "$CONTAINER_NAME"
+            else
+                echo -e "${RED}❌ 容器未运行${RESET}"
+            fi
+            ;;
+        5)
+            echo -e "\n${CYAN}🔍 搜索日志关键词:${RESET}"
+            read -r -p "输入搜索关键词: " keyword < /dev/tty
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                docker logs "$CONTAINER_NAME" 2>/dev/null | grep -i "$keyword" || echo "未找到匹配内容"
+            else
+                echo -e "${RED}❌ 容器未运行${RESET}"
+            fi
+            ;;
+        6)
+            echo -e "\n${CYAN}💾 导出日志到文件:${RESET}"
+            log_file="$HOME/xiaozhi-logs-$(date +%Y%m%d_%H%M%S).txt"
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                docker logs "$CONTAINER_NAME" > "$log_file" 2>/dev/null
+                echo -e "${GREEN}✅ 日志已导出到: $log_file${RESET}"
+            else
+                echo -e "${RED}❌ 容器未运行${RESET}"
+            fi
+            ;;
+        0)
+            return 0
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${RESET}"
+            ;;
+    esac
+    
+    read -r -p "按回车键继续..." < /dev/tty
+}
+
+# 显示服务状态详细信息
+docker_service_status_display() {
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${GREEN}📊 小智服务器状态详情${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    if docker ps | grep -q "$CONTAINER_NAME"; then
+        echo -e "${GREEN}🟢 服务状态: 运行中${RESET}"
+        echo -e "\n${CYAN}📋 容器信息:${RESET}"
+        docker ps --filter "name=$CONTAINER_NAME" --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"
+        
+        echo -e "\n${CYAN}🔗 访问地址:${RESET}"
+        INTERNAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
+        EXTERNAL_IP=$(curl -s --max-time 5 https://api.ip.sb/ip 2>/dev/null || echo "$INTERNAL_IP")
+        
+        echo -e "内网地址: $INTERNAL_IP"
+        echo -e "公网地址: $EXTERNAL_IP"
+        echo -e "${GREEN}API接口: http://$INTERNAL_IP:8000${RESET}"
+        echo -e "${GREEN}OTA接口: http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
+        echo -e "${GREEN}WebSocket: ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+        
+        echo -e "\n${CYAN}💻 资源使用:${RESET}"
+        docker stats "$CONTAINER_NAME" --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}"
+        
+    else
+        echo -e "${RED}🔴 服务状态: 未运行${RESET}"
+    fi
+    
+    echo -e "${PURPLE}==================================================${RESET}"
 }
 
 # ========================= 主执行函数 =========================
