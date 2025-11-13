@@ -6,8 +6,8 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.17（智能检测版本）
-# 修复内容：添加ASR配置智能检测，避免对在线ASR用户显示不必要的内存警告
+# 版本：1.2.19（内存检测依赖修复版本）
+# 修复内容：修复内存检测逻辑中bc命令依赖问题
 # 详细说明：
 # 0) 现在通过脚本配置密钥和服务商（默认）
 # 1) 稍后手动填写所有配置
@@ -15,16 +15,25 @@ trap exit_confirm SIGINT
 # 3) 不配置所有配置，直接返回菜单（智能ASR检测，无在线ASR无警告）
 # 4) 返回上一个菜单
 # 修正内容：
+# v1.2.17:
 # - 添加check_asr_config函数，智能检测配置文件中的ASR设置
 # - 添加smart_handle_memory_risk函数，根据ASR类型选择警告策略
 # - 在线ASR配置（阿里云、讯飞、百度等）跳过内存警告，直接Docker操作
 # - 本地ASR配置显示完整内存不足警告和风险提示
 # - 优化Docker管理流程，确保正常返回处理结果
 # - 清理测试代码残留，提升用户体验
+# v1.2.18:
+# - 修复create_default_config_file函数中LLM type设置错误
+# - 将zhipuai类型改为openai类型（ChatGLM实际使用的类型）
+# - 修正LLM和VLLM配置参数，使用正确的base_url和model_name格式
+# v1.2.19:
+# - 修复内存检测逻辑中bc命令依赖问题
+# - 解决部分系统缺少bc命令导致的内存检测失败
+# - 使用awk替代bc进行除法计算，提高脚本兼容性
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.17"
+Version="1.2.19"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -415,10 +424,8 @@ check_server_config() {
     EXTERNAL_IP=$(curl -s --max-time 5 https://api.ip.sb/ip || curl -s --max-time 5 https://ifconfig.me || curl -s --max-time 5 https://ipinfo.io/ip || echo "$INTERNAL_IP")
 
     # 获取硬件信息（四舍五入处理内存，避免系统预留内存导致误判）
-    MEM_TOTAL=$(free -g | awk '/Mem:/ {print $2}')
-    [ -z "$MEM_TOTAL" ] || [ "$MEM_TOTAL" = "0" ] && MEM_TOTAL=$(echo "$(free -m | awk '/Mem:/ {print $2}') / 1024" | bc -l)
-    # 四舍五入到整数，避免4GB系统因预留内存显示3.9GB导致误判
-    MEM_TOTAL=$(echo "$MEM_TOTAL" | awk '{printf("%.0f", $1+0.5)}')
+    # 修复v1.2.19: 消除bc命令依赖，使用awk直接计算
+    MEM_TOTAL=$(free -m | awk 'BEGIN{sum=0} /Mem:/ {sum+=$2} END{print int((sum/1024)+0.5)}')
     CPU_MODEL=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ *//')
     CPU_CORES=$(grep -c '^processor' /proc/cpuinfo)
     DISK_AVAIL=$(df -h / | awk '/\// {print $4}')
@@ -1129,18 +1136,23 @@ ASR:
 # LLM配置 (智谱清言)
 LLM:
   ChatGLMLLM:
-    type: zhipuai
+    type: openai
+    model_name: glm-4-flash
+    base_url: https://open.bigmodel.cn/api/paas/v4/
     api_key: ""     # 需要用户填入
-    api_url: "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-    model: "glm-4"
+    temperature: 0.7
+    max_tokens: 500
+    top_p: 1
+    top_k: 50
+    frequency_penalty: 0
 
 # VLLM配置 (智谱清言)
 VLLM:
   ChatGLMVLLM:
-    type: zhipuai
+    type: openai
+    model_name: glm-4v-flash
+    base_url: https://open.bigmodel.cn/api/paas/v4/
     api_key: ""     # 需要用户填入
-    api_url: "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-    model: "glm-4"
 
 # TTS配置 (微软Edge)
 TTS:
