@@ -27,7 +27,7 @@ RETRY_MAX=3
 RETRY_DELAY=3
 
 # 颜色定义
-RED="\033[31m" GREEN="\033[32m" YELLOW="\033[33m" BLUE="\033[34m" PURPLE="\033[35m" CYAN="\033[36m" RESET="\033[0m" BOLD="\033[1m"
+RED="\033[31m" GREEN="\033[32m" YELLOW="\033[33m" BLUE="\033[34m" PURPLE="\033[35m" CYAN="\033[36m" WHITE_RED="\033[31;47;1m" RESET="\033[0m" BOLD="\033[1m"
 
 # 全局变量
 CHATGLM_API_KEY=""
@@ -211,6 +211,34 @@ check_server_status() {
     echo "  - 服务器目录存在：$([ "$SERVER_DIR_EXISTS" = true ] && echo "✅ 是" || echo "❌ 否")"
     echo "  - 配置文件存在：$([ "$CONFIG_EXISTS" = true ] && echo "✅ 是" || echo "❌ 否")"
     echo
+}
+
+# 检查系统内存大小
+check_memory_size() {
+    local mem_total_kb
+    local mem_total_gb
+    
+    # 获取总内存大小（KB）
+    if [ -f /proc/meminfo ]; then
+        mem_total_kb=$(grep -i MemTotal /proc/meminfo | awk '{print $2}')
+    else
+        mem_total_kb=$(vm_stat | grep "Pages free:" | awk '{print $3}' | sed 's/\.//')  # 估算值
+    fi
+    
+    if [ -z "$mem_total_kb" ] || [ "$mem_total_kb" -eq 0 ]; then
+        echo -e "${YELLOW}⚠️ 无法获取内存信息，默认使用4GB作为基准${RESET}"
+        return 1
+    fi
+    
+    # 转换为GB（1GB = 1048576 KB）
+    mem_total_gb=$(echo "scale=1; $mem_total_kb / 1048576" | bc 2>/dev/null || echo "$((mem_total_kb / 1048576))")
+    
+    # 检查是否小于4GB
+    if [ "$mem_total_kb" -lt 4194304 ]; then  # 4GB = 4*1024*1024 = 4194304 KB
+        return 1  # 内存不足
+    else
+        return 0  # 内存充足
+    fi
 }
 
 # ========================= 主菜单函数 =========================
@@ -1190,42 +1218,7 @@ read -r -p "请输入 Access Key Secret (留空跳过): " access_key_secret < /d
                 echo -e "\n${GREEN}✅ 已选择阿里云ASR并配置完成。${RESET}"
                 ;;
             9)
-                asr_provider_key="AliyunStreamASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunStreamASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
-                echo -e "${CYAN}🔑 Appkey地址：https://nls-portal.console.aliyun.com/applist${RESET}"
-                
-                echo -e "${CYAN}📝 阿里云流式ASR需要以下参数：${RESET}"
-                echo "  - Appkey: 语音交互服务项目Appkey（必填）"
-                echo "  - Token: 临时AccessToken，24小时有效（必填）"
-                echo -e "${YELLOW}💡 长期使用建议设置下方Access Key（可选）：${RESET}"
-                echo "  - Access Key ID: 阿里云账号访问密钥ID（可选，长期使用推荐）"
-                echo "  - Access Key Secret: 阿里云账号访问密钥（可选，长期使用推荐）"
-                
-                safe_read "请输入 Appkey: " appkey
-                safe_read "请输入 Token: " token
-                
-                echo -e "\n${YELLOW}💡 是否要配置长期使用的Access Key？${RESET}"
-                echo "如需长期使用（避免Token过期），建议配置Access Key:"
-read -r -p "请输入 Access Key ID (留空跳过): " access_key_id < /dev/tty
-read -r -p "请输入 Access Key Secret (留空跳过): " access_key_secret < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                
-                if [ -n "$appkey" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: \"$appkey\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$token" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    token: .*/    token: \"$token\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$access_key_id" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$access_key_secret" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: \"$access_key_secret\"/" "$CONFIG_FILE"
-                fi
-                
-                echo -e "\n${GREEN}✅ 已选择阿里云流式ASR并配置完成。${RESET}"
+                config_aliyun_asr
                 ;;
             10)
                 asr_provider_key="BaiduASR"
@@ -1349,6 +1342,46 @@ read -r -p "按回车键重新选择..." < /dev/tty
         # 配置完成，返回0表示成功
         return 0
     done
+}
+
+# 阿里云ASR配置
+config_aliyun_asr() {
+    echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunStreamASR。${RESET}"
+    echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
+    echo -e "${CYAN}🔑 Appkey地址：https://nls-portal.console.aliyun.com/applist${RESET}"
+    
+    echo -e "${CYAN}📝 阿里云流式ASR需要以下参数：${RESET}"
+    echo "  - Appkey: 语音交互服务项目Appkey（必填）"
+    echo "  - Token: 临时AccessToken，24小时有效（必填）"
+    echo -e "${YELLOW}💡 长期使用建议设置下方Access Key（可选）：${RESET}"
+    echo "  - Access Key ID: 阿里云账号访问密钥ID（可选，长期使用推荐）"
+    echo "  - Access Key Secret: 阿里云账号访问密钥（可选，长期使用推荐）"
+    
+    safe_read "请输入 Appkey: " appkey
+    safe_read "请输入 Token: " token
+    
+    echo -e "\n${YELLOW}💡 是否要配置长期使用的Access Key？${RESET}"
+    echo "如需长期使用（避免Token过期），建议配置Access Key:"
+    read -r -p "请输入 Access Key ID (留空跳过): " access_key_id < /dev/tty
+    read -r -p "请输入 Access Key Secret (留空跳过): " access_key_secret < /dev/tty
+    
+    local asr_provider_key="AliyunStreamASR"
+    sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+    
+    if [ -n "$appkey" ]; then
+        sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: \"$appkey\"/" "$CONFIG_FILE"
+    fi
+    if [ -n "$token" ]; then
+        sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    token: .*/    token: \"$token\"/" "$CONFIG_FILE"
+    fi
+    if [ -n "$access_key_id" ]; then
+        sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
+    fi
+    if [ -n "$access_key_secret" ]; then
+        sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: \"$access_key_secret\"/" "$CONFIG_FILE"
+    fi
+    
+    echo -e "\n${GREEN}✅ 阿里云流式ASR配置完成${RESET}"
 }
 
 # ========================= 高级ASR配置 =========================
@@ -2526,6 +2559,52 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         echo -e "${CYAN}  - Memory: nomem (无记忆)${RESET}"
         echo -e "${CYAN}ℹ️ 默认配置路径：$CONFIG_FILE${RESET}"
         
+        # 检查内存大小
+        echo -e "\n${BLUE}🔍 检查系统内存...${RESET}"
+        local memory_sufficient=true
+        if ! check_memory_size; then
+            memory_sufficient=false
+            echo -e "${WHITE_RED}⚠️ 内存小于4G 不推荐${RESET}"
+        else
+            echo -e "${GREEN}✅ 内存检查通过${RESET}"
+        fi
+        
+        # Docker退出选择菜单
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${CYAN}🐳 Docker容器管理选择  🐳${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        echo "1) 执行docker退出"
+        echo "2) 不执行docker退出"
+        
+        # 如果内存不足，默认选择1
+        if [ "$memory_sufficient" = false ]; then
+            echo -e "${YELLOW}💡 由于内存不足，默认选择: 1${RESET}"
+            local docker_choice=1
+        else
+            read -r -p "请选择（默认2）：" docker_choice < /dev/tty
+            docker_choice=${docker_choice:-2}
+        fi
+        
+        # 处理Docker退出选择
+        if [ "$docker_choice" = "1" ]; then
+            echo -e "\n${BLUE}🔍 检查容器状态...${RESET}"
+            if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+                echo -e "${YELLOW}⚠️ 正在停止并删除容器 $CONTAINER_NAME...${RESET}"
+                if docker stop "$CONTAINER_NAME" >/dev/null 2>&1 && docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
+                    echo -e "${GREEN}✅ 容器 $CONTAINER_NAME 已成功停止并删除${RESET}"
+                else
+                    echo -e "${RED}❌ 容器 $CONTAINER_NAME 操作失败${RESET}"
+                fi
+            else
+                echo -e "${GREEN}✅ 容器 $CONTAINER_NAME 不存在或未运行${RESET}"
+            fi
+        elif [ "$docker_choice" = "2" ]; then
+            echo -e "\n${GREEN}✅ 跳过Docker容器操作${RESET}"
+        else
+            echo -e "${YELLOW}⚠️ 无效选择，跳过Docker容器操作${RESET}"
+        fi
+        
         # 设置默认配置
         sed -i "s/selected_module:.*/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
         
@@ -2957,6 +3036,119 @@ EOF
     
     echo -e "${GREEN}✅ GPT-SoVITS V3配置完成${RESET}"
     echo -e "${YELLOW}💡 请确保服务已启动在 $sovits_v3_url${RESET}"
+}
+
+# 高级LLM配置
+config_llm_advanced() {
+    echo -e "${YELLOW}🤖 大语言模型(LLM)服务详细配置${RESET}"
+    echo -e "${CYAN}请选择LLM服务类型：${RESET}"
+    
+    while true; do
+        echo "1) ChatGLMLLM (智谱清言，推荐)"
+        echo "2) QwenLLM (通义千问)"
+        echo "3) KimiLLM (月之暗面)"
+        echo "4) SparkLLM (讯飞星火)"
+        echo "5) WenxinLLM (百度文心一言)"
+        echo "6) DoubaoLLM (火山引擎豆包)"
+        echo "7) OpenaiLLM (OpenAI)"
+        echo "8) GroqLLM (Groq)"
+        echo "9) AliLLM (阿里云)"
+        echo "10) DeepSeekLLM (DeepSeek)"
+        echo "11) GeminiLLM (谷歌Gemini)"
+        echo "12) DifyLLM (Dify)"
+        echo "13) OllamaLLM (Ollama本地)"
+        echo "14) XinferenceLLM (Xinference)"
+        echo "15) FastgptLLM (FastGPT)"
+        echo "0) 返回上级菜单"
+        
+        read -r -p "请选择LLM服务类型 (0-15，默认1): " llm_choice < /dev/tty
+        llm_choice=${llm_choice:-1}
+        
+        if [ "$llm_choice" = "0" ]; then
+            return 1
+        fi
+        
+        local llm_provider_key
+        case $llm_choice in
+            1)
+                llm_provider_key="ChatGLMLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了智谱清言 ChatGLM。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://open.bigmodel.cn/usercenter/apikeys${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ ChatGLM配置完成${RESET}"
+                return 0
+                ;;
+            2)
+                llm_provider_key="QwenLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen。${RESET}"
+                echo -e "${CYAN}🔑 密钥获取地址：https://dashscope.console.aliyun.com/apiKey${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Qwen配置完成${RESET}"
+                return 0
+                ;;
+            3)
+                llm_provider_key="KimiLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了月之暗面 Kimi。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://platform.moonshot.cn/${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Kimi配置完成${RESET}"
+                return 0
+                ;;
+            4)
+                llm_provider_key="SparkLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞星火 Spark。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.xfyun.cn/${RESET}"
+                read -r -p "请输入 App ID: " app_id < /dev/tty
+                read -r -p "请输入 API Secret: " api_secret < /dev/tty
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$app_id" ] && [ -n "$api_secret" ] && [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Spark配置完成${RESET}"
+                return 0
+                ;;
+            5)
+                llm_provider_key="WenxinLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度文心一言 Wenxin。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/#/ai/wenxinworkshop/app/index${RESET}"
+                read -r -p "请输入 Access Key: " access_key < /dev/tty
+                read -r -p "请输入 Secret Key: " secret_key < /dev/tty
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$access_key" ] && [ -n "$secret_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    access_key: .*/    access_key: \"$access_key\"/" "$CONFIG_FILE"
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "${GREEN}✅ Wenxin配置完成${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选择，请重新选择${RESET}"
+                ;;
+        esac
+    done
 }
 
 # 其他TTS服务配置（简化版本）
