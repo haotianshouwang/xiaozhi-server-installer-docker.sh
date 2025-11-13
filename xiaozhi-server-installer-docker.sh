@@ -7,11 +7,11 @@ trap exit_confirm SIGINT
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
 # 版本：1.2.7-fixed（修复版本）
-# 修复内容：修复ASR配置返回主菜单功能 - 用户输入0时真正返回主菜单而非重新配置
+# 修复内容：修复Docker容器管理选择逻辑 - 用户选择1时执行docker退出，选择2时直接结束脚本
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.7-fixed"
+Version="1.2.8-fixed"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -464,48 +464,69 @@ handle_insufficient_memory() {
     echo "2) 不执行docker退出"
     echo ""
     
-    # 显示安全建议
-    echo -e "${PURPLE}🔒 脚本将自动选择：1) 执行docker退出${RESET}"
-    echo -e "${YELLOW}💡 这将停止并删除Docker容器，避免系统卡死${RESET}"
+    echo -e "${YELLOW}💡 由于内存不足，默认选择: 1${RESET}"
     
-    echo -e "\n${PURPLE}⚖️ 免责声明：${RESET}"
-    echo -e "${CYAN}脚本已尽最大努力保护您的服务器安全${RESET}"
-    echo -e "${YELLOW}如果您坚持选择选项2，您将承担服务器卡死的全部风险${RESET}"
-    echo -e "${YELLOW}作者不承担因您的选择导致的任何损失${RESET}"
+    read -r -p "请选择Docker操作 (1-2，默认1): " docker_choice < /dev/tty
+    docker_choice=${docker_choice:-1}
     
-    echo -e "\n${PURPLE}⏰ 3秒后自动执行docker退出...${RESET}"
-    echo ""
-    
-    # 倒数计时
-    for i in 3 2 1; do
-        echo -ne "\r${YELLOW}倒计时：${i} 秒${RESET}"
-        sleep 1
-    done
-    
-    echo -e "\n\n${YELLOW}⚠️ 警告：即将执行Docker操作${RESET}"
-    echo -e "${YELLOW}如果您的服务器出现卡死情况，请尝试以下自救方式：${RESET}"
-    echo "1. 如果您使用的是云服务器，请尝试VNC登录，执行：sudo systemctl stop docker"
-    echo "2. 如果您使用的是云服务器，请检查控制台是否有远程指令"
-    echo "3. 如果您使用的是云服务器，请配置远程指令：sudo systemctl stop docker"
-    echo "4. 如果上述方法都无效，请自行百度解决方案"
-    echo "5. 作为最后手段，可能需要重装系统"
-    
-    echo -e "\n${YELLOW}⚠️ 继续执行Docker操作...${RESET}"
-    echo ""
-    
-    # 自动执行docker退出
-    echo -e "${CYAN}🔍 检查容器状态...${RESET}"
-    if command -v docker &> /dev/null; then
-        if docker ps | grep -q "$CONTAINER_NAME"; then
-            echo -e "${YELLOW}⚠️ 正在停止Docker容器...${RESET}"
-            docker stop "$CONTAINER_NAME" 2>/dev/null
-            docker rm "$CONTAINER_NAME" 2>/dev/null
-            echo -e "${GREEN}✅ Docker容器已停止并删除${RESET}"
+    if [ "$docker_choice" = "2" ]; then
+        echo -e "\n${YELLOW}⚠️ 您选择不执行docker退出${RESET}"
+        echo -e "${RED}💀 警告：选择此选项将直接结束脚本${RESET}"
+        echo -e "${RED}⚠️ 由于您的服务器内存不足(${MEM_TOTAL}GB < 2GB)${RESET}"
+        echo -e "${RED}⚠️ 配置文件将默认使用本地ASR模型${RESET}"
+        echo -e "${RED}⚠️ Docker容器默认设置自动启动${RESET}"
+        echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
+        
+        echo -e "\n${RED}==================================================${RESET}"
+        echo -e "${RED}⚖️ 免责声明：${RESET}"
+        echo -e "${RED}脚本已尽最大努力保护您的服务器安全${RESET}"
+        echo -e "${RED}如果您坚持继续，您将承担服务器卡死的全部风险${RESET}"
+        echo -e "${RED}作者不承担因您的选择导致的任何损失${RESET}"
+        echo -e "${RED}==================================================${RESET}"
+        
+        read -r -p "您确定要继续吗？(输入'y'确认，其他任意键取消): " confirm_exit < /dev/tty
+        if [[ "$confirm_exit" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}脚本结束，祝您好运...${RESET}"
+            exit 0
         else
-            echo -e "${GREEN}✅ 未发现运行中的Docker容器${RESET}"
+            echo -e "${CYAN}重新选择Docker操作...${RESET}"
+            docker_choice=1  # 强制选择1
         fi
-    else
-        echo -e "${YELLOW}⚠️ Docker未安装，跳过容器操作${RESET}"
+    fi
+    
+    # 如果选择1执行docker退出
+    if [ "$docker_choice" = "1" ]; then
+        echo -e "\n${YELLOW}⚠️ 警告：即将执行Docker操作${RESET}"
+        echo -e "${YELLOW}如果您的服务器出现卡死情况，请尝试以下自救方式：${RESET}"
+        echo "1. 如果您使用的是云服务器，请尝试VNC登录，执行：sudo systemctl stop docker"
+        echo "2. 如果您使用的是云服务器，请检查控制台是否有远程指令"
+        echo "3. 如果您使用的是云服务器，请配置远程指令：sudo systemctl stop docker"
+        echo "4. 如果上述方法都无效，请自行百度解决方案"
+        echo "5. 作为最后手段，可能需要重装系统"
+        
+        echo -e "\n${YELLOW}⚠️ 继续执行Docker操作...${RESET}"
+        echo ""
+        
+        # 执行docker退出
+        echo -e "${CYAN}🔍 检查容器状态...${RESET}"
+        if command -v docker &> /dev/null; then
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+                echo -e "${YELLOW}⚠️ 正在停止Docker容器...${RESET}"
+                docker stop "$CONTAINER_NAME" 2>/dev/null
+                docker rm "$CONTAINER_NAME" 2>/dev/null
+                echo -e "${GREEN}✅ Docker容器已停止并删除${RESET}"
+            else
+                echo -e "${GREEN}✅ 未发现运行中的Docker容器${RESET}"
+            fi
+        else
+            echo -e "${YELLOW}⚠️ Docker未安装，跳过容器操作${RESET}"
+        fi
+        
+        echo -e "\n${GREEN}✅ 内存不足风险处理完成${RESET}"
+        echo -e "${YELLOW}💡 建议升级服务器内存后重新部署${RESET}"
+        
+        read -r -p "按回车键返回主菜单..." < /dev/tty
+        return 1
     fi
     
     echo -e "\n${GREEN}✅ 内存不足风险处理完成${RESET}"
