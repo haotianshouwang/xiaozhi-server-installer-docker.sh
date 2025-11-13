@@ -6,12 +6,12 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.1.4-fixed（修复版本）
-# 修复内容：修复讯飞ASR配置函数缺失和VLLM返回逻辑问题
+# 版本：1.1.7-fixed（修复版本）
+# 修复内容：修复 FunASRServer 配置，支持独立部署服务
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.1.4-fixed"
+Version="1.1.8-fixed"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -1396,11 +1396,9 @@ config_asr_advanced() {
         echo -e "1) FunASR (本地SenseVoiceSmall，推荐 ${RED}⚠️ 内存不足 无法使用${RESET})"
     fi
     
-    if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-        echo "2) FunASRServer (独立部署服务)"
-    else
-        echo -e "2) FunASRServer (独立部署服务 ${RED}⚠️ 内存不足 无法使用${RESET})"
-    fi
+    # FunASRServer 是独立部署服务，不需要本地内存，始终可选
+    echo "2) FunASRServer (独立部署服务)"
+    echo -e "    ${GREEN}✅ 独立服务，无需本地内存${RESET}"
     
     if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
         echo "3) SherpaASR (本地多语言)"
@@ -1450,14 +1448,8 @@ config_asr_advanced() {
             fi
             ;;
         2)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_funasr_server
-            else
-                echo -e "${RED}💀 内存不足无法选择${RESET}"
-                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
-                sleep 2
-                config_asr_advanced
-            fi
+            config_funasr_server
+            return 0
             ;;
         3)
             if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
@@ -1565,8 +1557,8 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " llm_cho
         llm_choice=${llm_choice:-1}
         
         if [ "$llm_choice" = "0" ]; then
-            echo -e "${CYAN}🔄 返回上一步，重新配置 ASR 服务${RESET}"
-            return 1
+            echo -e "${CYAN}🔄 返回上一步${RESET}"
+            return 1  # 返回上一步
         fi
 
         local llm_provider_key
@@ -2364,6 +2356,7 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
                     if [ -n "$prompt_text" ]; then
                         sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    prompt_text: .*|    prompt_text: \"$prompt_text\"|" "$CONFIG_FILE"
                     fi
+                    echo -e "\n${GREEN}🎉 GPT-SoVITS V3 配置完成！${RESET}"
                 else
                     tts_provider_key="GPT_SOVITS_V2"
                     echo -e "\n${GREEN}✅ 已选择 GPT_SOVITS_V2。${RESET}"
@@ -2400,6 +2393,7 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
                     if [ -n "$prompt_text" ]; then
                         sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s|^    prompt_text: .*|    prompt_text: \"$prompt_text\"|" "$CONFIG_FILE"
                     fi
+                    echo -e "\n${GREEN}🎉 GPT-SoVITS V2 配置完成！${RESET}"
                 fi
                 ;;
             21)
@@ -2433,6 +2427,7 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
         esac
         
         # 配置完成，返回0表示成功
+        echo -e "\n${GREEN}✅ TTS服务配置完成！${RESET}"
         return 0
     done
 }
@@ -2683,111 +2678,81 @@ read -r -p "请选择（默认1）：" key_choice < /dev/tty
         echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
         
         # 简化的线性配置流程，支持返回上一步
-        echo -e "\n${CYAN}=== 第1步：配置 ASR (语音识别) 服务 ===${RESET}"
-        config_asr_advanced
-        if [ $? -eq 1 ]; then
-            return 1
-        fi
+        local config_step=1
+        local max_steps=5
         
-        echo -e "\n${CYAN}=== 第2步：配置 LLM (大语言模型) 服务 ===${RESET}"
-        config_llm_advanced
-        if [ $? -eq 1 ]; then
-            # 重新配置ASR
-            echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
-            config_asr
-            if [ $? -eq 1 ]; then
-                return 1
-            fi
-            
-            # 重新配置LLM
-            echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
-            config_llm
-            if [ $? -eq 1 ]; then
-                return 1
-            fi
-        fi
-        
-        echo -e "\n${CYAN}=== 第3步：配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
-        config_vllm
-        if [ $? -eq 1 ]; then
-            # 重新配置LLM
-            echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
-            config_llm
-            if [ $? -eq 1 ]; then
-                # 重新配置ASR
-                echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
-                config_asr
-                if [ $? -eq 1 ]; then
-                    return 1
-                fi
-                
-                # 重新配置LLM
-                echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
-                config_llm
-                if [ $? -eq 1 ]; then
-                    return 1
-                fi
-            fi
-            
-            # 重新配置VLLM
-            echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
-            config_vllm
-            if [ $? -eq 1 ]; then
-                return 1
-            fi
-        fi
-        
-        echo -e "\n${CYAN}=== 第4步：配置 TTS (语音合成) 服务 ===${RESET}"
-        config_tts_advanced
-        if [ $? -eq 1 ]; then
-            # 重新配置VLLM
-            echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
-            config_vllm
-            if [ $? -eq 1 ]; then
-                # 重新配置LLM
-                echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
-                config_llm
-                if [ $? -eq 1 ]; then
-                    # 重新配置ASR
-                    echo -e "\n${CYAN}=== 重新配置 ASR (语音识别) 服务 ===${RESET}"
-                    config_asr
-                    if [ $? -eq 1 ]; then
+        while [ $config_step -le $max_steps ]; do
+            case $config_step in
+                1)
+                    echo -e "\n${CYAN}=== 第1步：配置 ASR (语音识别) 服务 ===${RESET}"
+                    config_asr_advanced
+                    local asr_result=$?
+                    if [ $asr_result -eq 2 ]; then
+                        echo -e "\n${YELLOW}⚠️ 用户取消配置${RESET}"
                         return 1
+                    elif [ $asr_result -eq 1 ]; then
+                        echo -e "\n${CYAN}🔄 重新开始配置流程${RESET}"
+                        config_step=1
+                        continue
                     fi
-                    
-                    # 重新配置LLM
-                    echo -e "\n${CYAN}=== 重新配置 LLM (大语言模型) 服务 ===${RESET}"
-                    config_llm
-                    if [ $? -eq 1 ]; then
+                    ;;
+                2)
+                    echo -e "\n${CYAN}=== 第2步：配置 LLM (大语言模型) 服务 ===${RESET}"
+                    config_llm_advanced
+                    local llm_result=$?
+                    if [ $llm_result -eq 2 ]; then
+                        echo -e "\n${YELLOW}⚠️ 用户取消配置${RESET}"
                         return 1
+                    elif [ $llm_result -eq 1 ]; then
+                        config_step=1  # 返回上一步
+                        echo -e "\n${CYAN}🔄 返回上一步${RESET}"
+                        continue
                     fi
-                fi
-                
-                # 重新配置VLLM
-                echo -e "\n${CYAN}=== 重新配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
-                config_vllm
-                if [ $? -eq 1 ]; then
-                    return 1
-                fi
-            fi
-            
-            # 重新配置TTS
-            echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
-            config_tts
-            if [ $? -eq 1 ]; then
-                return 1
-            fi
-        fi
+                    ;;
+                3)
+                    echo -e "\n${CYAN}=== 第3步：配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+                    config_vllm
+                    local vllm_result=$?
+                    if [ $vllm_result -eq 2 ]; then
+                        echo -e "\n${YELLOW}⚠️ 用户取消配置${RESET}"
+                        return 1
+                    elif [ $vllm_result -eq 1 ]; then
+                        config_step=2  # 返回上一步
+                        echo -e "\n${CYAN}🔄 返回上一步${RESET}"
+                        continue
+                    fi
+                    ;;
+                4)
+                    echo -e "\n${CYAN}=== 第4步：配置 TTS (语音合成) 服务 ===${RESET}"
+                    config_tts_advanced
+                    local tts_result=$?
+                    if [ $tts_result -eq 2 ]; then
+                        echo -e "\n${YELLOW}⚠️ 用户取消配置${RESET}"
+                        return 1
+                    elif [ $tts_result -eq 1 ]; then
+                        config_step=3  # 返回上一步
+                        echo -e "\n${CYAN}🔄 返回上一步${RESET}"
+                        continue
+                    fi
+                    ;;
+                5)
+                    echo -e "\n${CYAN}=== 第5步：配置 Memory (记忆) 服务 ===${RESET}"
+                    config_memory
+                    local memory_result=$?
+                    if [ $memory_result -eq 2 ]; then
+                        echo -e "\n${YELLOW}⚠️ 用户取消配置${RESET}"
+                        return 1
+                    elif [ $memory_result -eq 1 ]; then
+                        config_step=4  # 返回上一步
+                        echo -e "\n${CYAN}🔄 返回上一步${RESET}"
+                        continue
+                    fi
+                    ;;
+            esac
+            config_step=$((config_step + 1))
+        done
         
-        echo -e "\n${CYAN}=== 第5步：配置 Memory (记忆) 服务 ===${RESET}"
-        config_memory
-        if [ $? -eq 1 ]; then
-            echo -e "\n${CYAN}=== 重新配置 TTS (语音合成) 服务 ===${RESET}"
-            config_tts
-            if [ $? -eq 1 ]; then
-                return 1  # 直接返回，不再继续配置流程
-            fi
-        fi
+        echo -e "\n${GREEN}🎉 所有服务配置完成！${RESET}"
         
         echo -e "\n${CYAN}=== 第6步：配置服务器地址 (自动生成) ===${RESET}"
         config_server
@@ -3598,6 +3563,56 @@ EOF
 }
 
 # 讯飞ASR配置
+config_funasr_server() {
+    echo -e "\n${CYAN}🎤 配置 FunASR Server${RESET}"
+    echo -e "${YELLOW}⚠️ 您选择了 FunASRServer（独立部署服务）${RESET}"
+    echo -e "${CYAN}🔗 需要自行部署 FunASR Server 服务${RESET}"
+    echo ""
+    echo -e "${CYAN}📋 配置说明：${RESET}"
+    echo "  - FunASRServer 是独立的 ASR 服务，需要您自行部署"
+    echo "  - 默认端口：10095"
+    echo "  - 服务地址格式：http://localhost:10095 或 http://your-server:10095"
+    echo ""
+    
+    # 读取现有配置作为默认值
+    local default_host=$(grep -A3 -B1 "FunASRServer:" "$CONFIG_FILE" 2>/dev/null | grep "host:" | awk '{print $2}' || echo "http://localhost:10095")
+    
+    read -r -p "请输入 FunASR Server 地址 (默认: $default_host): " server_url < /dev/tty
+    server_url=${server_url:-$default_host}
+    
+    # 验证地址格式
+    if [[ ! "$server_url" =~ ^https?:// ]]; then
+        echo -e "${RED}❌ 地址格式错误，请使用 http:// 或 https:// 开头${RESET}"
+        echo -e "${YELLOW}💡 示例：http://localhost:10095${RESET}"
+        read -r -p "请重新输入: " server_url < /dev/tty
+    fi
+    
+    # 提取主机部分用于校验
+    local host_part=$(echo "$server_url" | sed 's|^https\?://||' | sed 's|/.*||' | sed 's|:.*||')
+    
+    echo -e "\n${GREEN}✅ 配置信息：${RESET}"
+    echo "  - 服务地址: $server_url"
+    echo "  - 主机: $host_part"
+    echo ""
+    
+    # 确认配置
+    read -r -p "确认配置此地址？(y/N): " confirm < /dev/tty
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}⚠️ 取消配置${RESET}"
+        return 1
+    fi
+    
+    # 更新配置文件
+    sed -i "/^  ASR: /c\  ASR: FunASRServer" "$CONFIG_FILE"
+    sed -i "/^  FunASRServer:/,/^  [A-Za-z]/ s/^    host: .*/    host: $server_url/" "$CONFIG_FILE"
+    
+    echo -e "\n${GREEN}✅ FunASR Server 配置完成${RESET}"
+    echo -e "${CYAN}💡 提示：${RESET}"
+    echo "  - 确保您的 FunASR Server 正在运行"
+    echo "  - 如果是远程服务器，请确保防火墙允许访问"
+    echo "  - 可以使用 curl -s '$server_url/ping' 测试连通性"
+}
+
 config_xunfei_stream_asr() {
     echo -e "\n${CYAN}🎤 配置讯飞流式ASR${RESET}"
     
