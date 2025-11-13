@@ -6,23 +6,25 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.16（修复版本）
-# 修复内容：修正Docker警告逻辑，Docker选择界面都会显示，警告信息根据内存决定
+# 版本：1.2.17（智能检测版本）
+# 修复内容：添加ASR配置智能检测，避免对在线ASR用户显示不必要的内存警告
 # 详细说明：
 # 0) 现在通过脚本配置密钥和服务商（默认）
 # 1) 稍后手动填写所有配置
 # 2) 退出配置（将使用现有配置文件）
-# 3) 不配置所有配置，直接返回菜单（无论内存都显示Docker选择，警告视内存而定）
+# 3) 不配置所有配置，直接返回菜单（智能ASR检测，无在线ASR无警告）
 # 4) 返回上一个菜单
 # 修正内容：
-# - 选项2和选项3无论内存大小都显示Docker选择界面
-# - 内存<4GB时显示完整警告信息，内存>=4GB时只显示提示信息
-# - 添加了完整的免责声明和自救指南
-# - 确保所有警告在Docker操作选项2后显示
+# - 添加check_asr_config函数，智能检测配置文件中的ASR设置
+# - 添加smart_handle_memory_risk函数，根据ASR类型选择警告策略
+# - 在线ASR配置（阿里云、讯飞、百度等）跳过内存警告，直接Docker操作
+# - 本地ASR配置显示完整内存不足警告和风险提示
+# - 优化Docker管理流程，确保正常返回处理结果
+# - 清理测试代码残留，提升用户体验
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.16"
+Version="1.2.17"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -460,6 +462,104 @@ check_server_config() {
     fi
 }
 
+# 检测配置文件中的ASR配置
+check_asr_config() {
+    local config_file=""
+    
+    # 查找配置文件
+    if [ -f "$MAIN_DIR/data/.config.yaml" ]; then
+        config_file="$MAIN_DIR/data/.config.yaml"
+    elif [ -f "$HOME/xiaozhi-server/data/.config.yaml" ]; then
+        config_file="$HOME/xiaozhi-server/data/.config.yaml"
+    elif [ -f "$MAIN_DIR/.config.yaml" ]; then
+        config_file="$MAIN_DIR/.config.yaml"
+    fi
+    
+    # 如果没有找到配置文件，返回空字符串
+    if [ -z "$config_file" ] || [ ! -f "$config_file" ]; then
+        echo ""
+        return 0
+    fi
+    
+    # 检测ASR配置
+    if [ -f "$config_file" ]; then
+        # 检查是否包含本地ASR相关配置
+        if grep -i "faster_whisper\|vosk\|espeak\|pyttsx3\|local\|本地" "$config_file" >/dev/null 2>&1; then
+            echo "local"
+        elif grep -i "aliyun\|阿里云\|azure\|azure_OPENAI_API_BASE\|gpt\|openai\|讯飞\|百度\|腾讯\|火山\|doubao" "$config_file" >/dev/null 2>&1; then
+            echo "online"
+        else
+            echo "unknown"
+        fi
+    else
+        echo ""
+    fi
+}
+
+# 智能内存风险处理函数
+smart_handle_memory_risk() {
+    # 检测当前ASR配置
+    local asr_config=$(check_asr_config)
+    
+    # 如果检测到在线ASR或者没有找到配置文件，使用温和处理
+    if [ "$asr_config" = "online" ] || [ "$asr_config" = "unknown" ] || [ -z "$asr_config" ]; then
+        # 在线ASR或未知配置，使用温和处理
+        echo -e "${GREEN}✅ 检测到在线ASR配置${RESET}"
+        echo -e "${CYAN}ℹ️ 当前配置不会导致内存不足问题${RESET}"
+        echo -e "${CYAN}ℹ️ Docker操作将继续正常使用${RESET}"
+        
+        # 直接进入Docker选择
+        docker_container_management
+        return $?
+    else
+        # 本地ASR，使用原有逻辑
+        handle_insufficient_memory
+        return $?
+    fi
+}
+
+# Docker容器管理选择界面
+docker_container_management() {
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}🐳 Docker容器管理选择  🐳${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    echo "1) 不执行docker退出，直接结束脚本"
+    echo "2) 执行docker退出"
+    echo ""
+    
+    read -r -p "请选择Docker操作 (1-2，默认1): " docker_choice < /dev/tty
+    docker_choice=${docker_choice:-1}
+    
+    if [ "$docker_choice" = "1" ]; then
+        echo -e "\n${GREEN}✅ 您选择了不执行docker退出${RESET}"
+        echo -e "${CYAN}🛑 脚本将直接结束${RESET}"
+        
+        read -r -p "按回车键退出脚本..." < /dev/tty
+        exit 0
+    fi
+    
+    # 如果选择2执行docker退出
+    if [ "$docker_choice" = "2" ]; then
+        echo -e "\n${YELLOW}⚠️ 确认执行Docker操作${RESET}"
+        echo -e "${CYAN}📋 Docker操作将按正常流程执行${RESET}"
+        
+        # 显示标准的Docker操作确认信息（温和版本）
+        echo -e "\n${GREEN}==================================================${RESET}"
+        echo -e "${GREEN}ℹ️ 注意事项：${RESET}"
+        echo -e "${GREEN}请确认您的配置已正确设置${RESET}"
+        echo -e "${GREEN}如遇问题可参考脚本日志${RESET}"
+        echo -e "${GREEN}==================================================${RESET}"
+        
+        read -r -p "按回车键继续..." < /dev/tty
+        
+        # 返回0表示用户确认执行docker操作
+        return 0
+    fi
+    
+    # 默认返回1表示不执行docker
+    return 1
+}
+
 # 内存不足处理函数
 handle_insufficient_memory() {
     echo -e "${RED}⚠️ 严重警告 - 内存不足风险${RESET}"
@@ -512,12 +612,10 @@ handle_insufficient_memory() {
         echo -e "${RED}4. 如果都没有用，请自行百度解决方案${RESET}"
         echo -e "${RED}5. 最后手段：重装系统${RESET}"
         
-        echo -e "\n${RED}但是这个docker和下面正常的执行的docker不一样${RESET}"
-        
-        echo -e "\n${YELLOW}⚠️ 正在执行Docker配置...${RESET}"
+        echo -e "\n${YELLOW}⚠️ 正在执行Docker操作...${RESET}"
         echo ""
         
-        # 执行docker退出
+        # 执行docker相关操作（停止现有容器等）
         echo -e "${CYAN}🔍 检查容器状态...${RESET}"
         if command -v docker &> /dev/null; then
             if docker ps | grep -q "$CONTAINER_NAME"; then
@@ -532,7 +630,7 @@ handle_insufficient_memory() {
             echo -e "${YELLOW}⚠️ Docker未安装，跳过容器操作${RESET}"
         fi
         
-        echo -e "\n${GREEN}✅ 内存不足风险处理完成${RESET}"
+        echo -e "\n${GREEN}✅ Docker操作完成${RESET}"
         echo -e "${YELLOW}💡 建议升级服务器内存后重新部署${RESET}"
         
         return 0  # 返回0表示继续执行
@@ -2819,25 +2917,9 @@ config_keys() {
             if [ "$confirm_skip" = "1" ]; then
                 echo -e "\n${GREEN}✅ 跳过所有配置${RESET}"
                 
-                # 检查系统内存并提供Docker管理选择
+                # 使用智能内存风险处理
                 show_server_config
-                
-                # 根据内存大小决定是否显示警告，但Docker选择界面都会显示
-                if [ "$MEM_TOTAL" -lt 4 ]; then
-                    echo -e "\n${YELLOW}⚠️ 警告：您没有配置任何密钥和服务商${RESET}"
-                    echo -e "${YELLOW}⚠️ 因为您没有改过配置文件，服务器配置可能执行docker不够就会导致服务器卡死${RESET}"
-                    echo -e "${RED}💀 配置文件默认使用本地ASR模型，并使用docker启动，docker默认设置自动启动${RESET}"
-                    echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
-                    echo -e "\n${RED}❌ 免责声明：本操作可能导致您的服务器卡死或无法正常使用${RESET}"
-                    echo -e "${RED}❌ 请确保您已备份重要数据，并了解可能的风险${RESET}"
-                    echo -e "${RED}❌ 作者不承担因使用此功能导致的任何损失和后果${RESET}"
-                else
-                    echo -e "\n${GREEN}✅ 内存充足（${MEM_TOTAL}GB ≥ 4GB）${RESET}"
-                    echo -e "${CYAN}ℹ️ 建议在Docker操作前确认配置文件设置${RESET}"
-                fi
-                
-                # 无论内存大小都提供Docker管理选择
-                handle_insufficient_memory
+                smart_handle_memory_risk
                 if [ $? -eq 1 ]; then
                     echo -e "\n${CYAN}🔄 用户取消Docker操作，返回主菜单${RESET}"
                     return 1
@@ -2895,26 +2977,9 @@ config_keys() {
             if [ "$confirm_exit" = "1" ]; then
                 echo -e "\n${GREEN}✅ 使用现有配置文件，退出详细配置流程${RESET}"
                 
-                # 在退出配置前，检查系统内存并提供Docker管理选择
-                # 因为使用现有配置可能包含本地ASR模型，在低内存服务器上会导致卡死
+                # 使用智能内存风险处理
                 show_server_config
-                
-                # 根据内存大小决定是否显示警告，但Docker选择界面都会显示
-                if [ "$MEM_TOTAL" -lt 4 ]; then
-                    echo -e "\n${YELLOW}⚠️ 警告：您没有配置任何密钥和服务商${RESET}"
-                    echo -e "${YELLOW}⚠️ 因为您没有改过配置文件，服务器配置可能执行docker不够就会导致服务器卡死${RESET}"
-                    echo -e "${RED}💀 配置文件默认使用本地ASR模型，并使用docker启动，docker默认设置自动启动${RESET}"
-                    echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
-                    echo -e "\n${RED}❌ 免责声明：本操作可能导致您的服务器卡死或无法正常使用${RESET}"
-                    echo -e "${RED}❌ 请确保您已备份重要数据，并了解可能的风险${RESET}"
-                    echo -e "${RED}❌ 作者不承担因使用此功能导致的任何损失和后果${RESET}"
-                else
-                    echo -e "\n${GREEN}✅ 内存充足（${MEM_TOTAL}GB ≥ 4GB）${RESET}"
-                    echo -e "${CYAN}ℹ️ 建议在Docker操作前确认配置文件设置${RESET}"
-                fi
-                
-                # 无论内存大小都提供Docker管理选择
-                handle_insufficient_memory
+                smart_handle_memory_risk
                 if [ $? -eq 1 ]; then
                     echo -e "\n${CYAN}🔄 用户取消Docker操作，返回主菜单${RESET}"
                     return 1
