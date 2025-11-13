@@ -6,8 +6,8 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.1.7-fixed（修复版本）
-# 修复内容：修复 FunASRServer 配置，支持独立部署服务
+# 版本：1.1.7-fixed
+# 修复内容：修复 FunASRServer 配置。
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
@@ -1396,9 +1396,8 @@ config_asr_advanced() {
         echo -e "1) FunASR (本地SenseVoiceSmall，推荐 ${RED}⚠️ 内存不足 无法使用${RESET})"
     fi
     
-    # FunASRServer 是独立部署服务，不需要本地内存，始终可选
     echo "2) FunASRServer (独立部署服务)"
-    echo -e "    ${GREEN}✅ 独立服务，无需本地内存${RESET}"
+
     
     if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
         echo "3) SherpaASR (本地多语言)"
