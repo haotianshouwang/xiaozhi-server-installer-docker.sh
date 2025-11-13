@@ -6,12 +6,16 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.10-fixed（修复版本）
-# 修复内容：修复选择退出配置后继续执行服务启动的问题 - 确保用户选择退出配置时正确返回主菜单
+# 版本：1.2.11-fixed（修复版本）
+# 修复内容：修改Docker容器管理选择逻辑 - 在用户选择退出配置时添加内存检查和Docker管理选择
+# 详细说明：
+# 1. 选择"1"：不执行docker退出，直接结束脚本
+# 2. 选择"2"：执行docker退出，显示严重警告和免责声明
+# 3. 添加服务器卡死自救指南
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.10-fixed"
+Version="1.2.11-fixed"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -460,51 +464,50 @@ handle_insufficient_memory() {
     echo -e "\n${PURPLE}==================================================${RESET}"
     echo -e "${CYAN}🐳 Docker容器管理选择  🐳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
-    echo "1) 执行docker退出"
-    echo "2) 不执行docker退出"
+    echo "1) 不执行docker退出，直接结束脚本"
+    echo "2) 执行docker退出"
     echo ""
-    
-    echo -e "${YELLOW}💡 由于内存不足，默认选择: 1${RESET}"
     
     read -r -p "请选择Docker操作 (1-2，默认1): " docker_choice < /dev/tty
     docker_choice=${docker_choice:-1}
     
-    if [ "$docker_choice" = "2" ]; then
-        echo -e "\n${YELLOW}⚠️ 您选择不执行docker退出${RESET}"
-        echo -e "${RED}💀 警告：选择此选项将直接结束脚本${RESET}"
-        echo -e "${RED}⚠️ 由于您的服务器内存不足(${MEM_TOTAL}GB < 2GB)${RESET}"
-        echo -e "${RED}⚠️ 配置文件将默认使用本地ASR模型${RESET}"
-        echo -e "${RED}⚠️ Docker容器默认设置自动启动${RESET}"
-        echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
+    if [ "$docker_choice" = "1" ]; then
+        echo -e "\n${GREEN}✅ 您选择了不执行docker退出${RESET}"
+        echo -e "${CYAN}🛑 脚本将直接结束，避免服务器卡死风险${RESET}"
+        echo -e "\n${YELLOW}💡 建议：${RESET}"
+        echo -e "  - 升级服务器内存至2GB以上"
+        echo -e "  - 修改配置文件，使用在线ASR服务"
+        echo -e "  - 重新运行脚本进行配置"
         
-        echo -e "\n${RED}==================================================${RESET}"
-        echo -e "${RED}⚖️ 免责声明：${RESET}"
-        echo -e "${RED}脚本已尽最大努力保护您的服务器安全${RESET}"
-        echo -e "${RED}如果您坚持继续，您将承担服务器卡死的全部风险${RESET}"
-        echo -e "${RED}作者不承担因您的选择导致的任何损失${RESET}"
-        echo -e "${RED}==================================================${RESET}"
-        
-        read -r -p "您确定要继续吗？(输入'y'确认，其他任意键取消): " confirm_exit < /dev/tty
-        if [[ "$confirm_exit" =~ ^[Yy]$ ]]; then
-            echo -e "${RED}脚本结束，祝您好运...${RESET}"
-            exit 0
-        else
-            echo -e "${CYAN}重新选择Docker操作...${RESET}"
-            docker_choice=1  # 强制选择1
-        fi
+        read -r -p "按回车键退出脚本..." < /dev/tty
+        exit 0
     fi
     
-    # 如果选择1执行docker退出
-    if [ "$docker_choice" = "1" ]; then
-        echo -e "\n${YELLOW}⚠️ 警告：即将执行Docker操作${RESET}"
-        echo -e "${YELLOW}如果您的服务器出现卡死情况，请尝试以下自救方式：${RESET}"
-        echo "1. 如果您使用的是云服务器，请尝试VNC登录，执行：sudo systemctl stop docker"
-        echo "2. 如果您使用的是云服务器，请检查控制台是否有远程指令"
-        echo "3. 如果您使用的是云服务器，请配置远程指令：sudo systemctl stop docker"
-        echo "4. 如果上述方法都无效，请自行百度解决方案"
-        echo "5. 作为最后手段，可能需要重装系统"
+    # 如果选择2执行docker退出，显示严重警告
+    if [ "$docker_choice" = "2" ]; then
+        echo -e "\n${RED}⚠️ 你知道你在干什么吗？这不是在开玩笑！${RESET}"
+        echo -e "${RED}❌ 因为你服务器内存不足${RESET}"
+        echo -e "${RED}❌ 配置文件默认使用本地ASR模型${RESET}"
+        echo -e "${RED}❌ Docker容器默认设置自动启动${RESET}"
+        echo -e "${RED}💀 这将导致你服务器无限卡死...${RESET}"
         
-        echo -e "\n${YELLOW}⚠️ 继续执行Docker操作...${RESET}"
+        echo -e "\n${RED}==================================================${RESET}"
+        echo -e "${RED}🛑 免责声明：${RESET}"
+        echo -e "${RED}脚本已尽最大努力保护你的服务器${RESET}"
+        echo -e "${RED}如果坚持继续，你将承担服务器卡死的全部风险${RESET}"
+        echo -e "${RED}作者不承担任何责任${RESET}"
+        echo -e "${RED}==================================================${RESET}"
+        
+        echo -e "\n${RED}🆘 如果你的服务器卡死，请尝试以下方式自救：${RESET}"
+        echo -e "${RED}1. 如果你是云服务器，请尝试VNC登录，执行sudo systemctl stop docker${RESET}"
+        echo -e "${RED}2. 如果你是云服务器，请检查控制台是否有远程指令${RESET}"
+        echo -e "${RED}3. 如果是云服务器，请配置远程指令：sudo systemctl stop docker${RESET}"
+        echo -e "${RED}4. 如果都没有用，请自行百度解决方案${RESET}"
+        echo -e "${RED}5. 最后手段：重装系统${RESET}"
+        
+        echo -e "\n${RED}但是这个docker和下面正常的执行的docker不一样${RESET}"
+        
+        echo -e "\n${YELLOW}⚠️ 正在执行Docker配置...${RESET}"
         echo ""
         
         # 执行docker退出
@@ -525,15 +528,11 @@ handle_insufficient_memory() {
         echo -e "\n${GREEN}✅ 内存不足风险处理完成${RESET}"
         echo -e "${YELLOW}💡 建议升级服务器内存后重新部署${RESET}"
         
-        read -r -p "按回车键返回主菜单..." < /dev/tty
-        return 1
+        return 0  # 返回0表示继续执行
     fi
     
-    echo -e "\n${GREEN}✅ 内存不足风险处理完成${RESET}"
-    echo -e "${YELLOW}💡 建议升级服务器内存后重新部署${RESET}"
-    
-    read -r -p "按回车键返回主菜单..." < /dev/tty
-    return 1
+    echo -e "\n${RED}⚠️ 无效选择，脚本结束${RESET}"
+    exit 0
 }
 
 show_server_config() {
@@ -2804,6 +2803,27 @@ config_keys() {
             
             if [ "$confirm_exit" = "1" ]; then
                 echo -e "\n${GREEN}✅ 使用现有配置文件，退出详细配置流程${RESET}"
+                
+                # 在退出配置前，检查系统内存并提供Docker管理选择
+                # 因为使用现有配置可能包含本地ASR模型，在低内存服务器上会导致卡死
+                show_server_config
+                
+                # 如果内存不足 (<2GB)，提供Docker管理选择
+                if [ "$MEM_TOTAL" -lt 2 ]; then
+                    echo -e "\n${YELLOW}⚠️ 警告：您的服务器内存${MEM_TOTAL}GB不足2GB${RESET}"
+                    echo -e "${YELLOW}⚠️ 使用现有配置文件可能包含本地ASR模型${RESET}"
+                    echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
+                    
+                    handle_insufficient_memory
+                    if [ $? -eq 1 ]; then
+                        echo -e "\n${CYAN}🔄 用户取消Docker操作，返回主菜单${RESET}"
+                        return 1
+                    else
+                        echo -e "\n${CYAN}📋 配置文件将使用：$CONFIG_FILE${RESET}"
+                        echo -e "${CYAN}🔄 正在返回主菜单...${RESET}"
+                        return 1
+                    fi
+                fi
                 
                 # 设置标志，告知setup_config_file使用现有配置
                 export USE_EXISTING_CONFIG=true
