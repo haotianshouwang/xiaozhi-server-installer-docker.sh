@@ -6,11 +6,96 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.28（菜单映射修复版本）
+# 版本：1.2.30（系统监控修复版本）
+# 修复内容：修复未部署状态菜单映射问题，确保选项3和7正确对应系统监控工具
+# v1.2.20:
+# - 修复Docker服务启动流程问题
+# - 确保用户选择Docker操作后正确执行docker-compose up -d
+# - 添加服务启动后的连接信息显示
+# - 优化智能内存风险处理逻辑
+# v1.2.21:
+# - 新增Docker操作工具菜单（选项0）
+# - 集成到主菜单，支持服务管理、镜像清理、系统维护
+# - 包含7个Docker操作子菜单：服务管理、镜像管理、容器管理、系统信息、深度清理、网络端口管理、日志管理
+# - 提供完整的Docker生命周期管理功能
+# - 保持向后兼容，不影响现有功能
+# 详细说明：
+# 0) 现在通过脚本配置密钥和服务商（默认）
+# 1) 稍后手动填写所有配置
+# 2) 退出配置（将使用现有配置文件）
+# 3) 不配置所有配置，直接返回菜单（智能ASR检测，无在线ASR无警告）
+# 4) 返回上一个菜单
+# 修正内容：
+# v1.2.17:
+# - 添加check_asr_config函数，智能检测配置文件中的ASR设置
+# - 添加smart_handle_memory_risk函数，根据ASR类型选择警告策略
+# - 在线ASR配置（阿里云、讯飞、百度等）跳过内存警告，直接Docker操作
+# - 本地ASR配置显示完整内存不足警告和风险提示
+# - 优化Docker管理流程，确保正常返回处理结果
+# - 清理测试代码残留，提升用户体验
+# v1.2.18:
+# - 修复create_default_config_file函数中LLM type设置错误
+# - 将zhipuai类型改为openai类型（ChatGLM实际使用的类型）
+# - 修正LLM和VLLM配置参数，使用正确的base_url和model_name格式
+# v1.2.19:
+# v1.2.20:
+# - 修复Docker服务启动流程问题
+# - 确保用户选择Docker操作后正确执行 docker-compose up -d
+# - 添加专用服务启动函数 start_xiaozhi_service
+# - 优化智能内存风险处理，确保服务能正常启动
+# - 修复内存检测逻辑中bc命令依赖问题
+# - 解决部分系统缺少bc命令导致的内存检测失败
+# - 使用awk替代bc进行除法计算，提高脚本兼容性
+# v1.2.21:
+# - 新增Docker操作工具菜单，集成到主菜单选项0
+# v1.2.23:
+# - 解决GitHub脚本被替换为报告文件导致的语法错误
+# - 提供完整的bash脚本，确保从GitHub下载时正常执行
+# v1.2.26:
+# - 增强网络监控功能：添加实时网络流量监控，每秒流量统计
+# - 网络连接详细信息：显示谁连接我的IP和端口，我连接谁的IP和端口
+# - 活跃连接监控：实时显示活跃连接数量和连接详情
+# - 监听端口显示：显示当前系统监听的端口列表
+# - 网络接口优化：自动检测网络接口，支持多种网络配置
+# - 连接状态跟踪：实时跟踪TCP连接状态和详细信息
+# - 菜单选项优化：退出脚本选项从10改为0，用户体验更友好
+# - 网络数据缓存：实现网络流量实时计算，避免数据丢失
+# - 网络兼容性增强：支持不同Linux发行版的网络统计方式
+
+# v1.2.25:
+# - 新增系统监控工具：高科技风格黑客大屏界面，实时系统状态监控
+# - 详细系统信息：CPU核心使用率、内存使用情况、磁盘使用率、网络状态
+# - 实时进程监控：显示TOP 5 CPU使用进程
+# - 系统健康检查：CPU温度监控、内存风险评估、磁盘空间预警
+# - 网络信息显示：内网IP、公网IP、收发数据流量统计
+# - Docker状态监控：容器运行状态、资源使用情况
+# - 彩色进度条显示：内存和磁盘使用率直观展示
+# - 智能刷新机制：每2秒自动更新，支持键盘快捷键操作
+# - 终端尺寸自适应：自动检测并提示最小窗口尺寸要求
+# - 菜单结构调整：系统监控工具置于选项7，退出选项改为10
+# - 完整向后兼容：不影响现有部署和Docker工具功能
+
+# v1.2.24:
+# - 调整菜单结构：Docker工具从选项0移至选项6
+# - 完善Docker工具功能：所有子函数都支持循环菜单
+# - 优化用户体验：每次操作完成后返回Docker工具主页
+# - 新增Docker系统信息子菜单功能
+# - Docker服务管理：启动/停止/重启/查看状态/资源监控
+# - Docker镜像管理：查看/清理/重新拉取镜像
+# - Docker容器管理：查看/进入/清理/重置容器
+# - Docker系统信息：版本/资源使用/磁盘使用/事件信息
+# - Docker深度清理：选择性清理Docker资源或完全重置
+# - Docker网络端口管理：网络查看/端口检查/连接测试
+# - Docker日志管理：查看/搜索/导出/实时跟踪日志
+# - 保持完全向后兼容，不影响现有部署功能
+# v1.2.22:
+# - 修复case语句语法错误，删除多余分号
+# - 解决Docker操作工具菜单启动时的bash语法问题
+# - 确保脚本可以在所有bash环境中正常运行
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.22"
+Version="1.2.30"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -314,32 +399,24 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
             break
             ;;
         2)
-            # 更新服务器
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
+                # 已部署 -> 更新服务器
                 update_server
-                break
             else
-                echo -e "${RED}❌ 未检测到现有服务器，无法更新${RESET}"
-                if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
-                    echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
-                fi
-read -r -p "按回车键继续..." < /dev/tty < /dev/tty
-                break
+                # 未部署 -> Docker操作工具
+                docker_operation_tool_menu
             fi
+            break
             ;;
         3)
-            # 仅修改配置文件
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
+                # 已部署 -> 仅修改配置文件
                 config_only
-                break  
             else
-                echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
-                if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
-                    echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
-                fi
-read -r -p "按回车键继续..." < /dev/tty < /dev/tty
-                break  
+                # 未部署 -> 系统监控工具
+                system_monitor_tool
             fi
+            break
             ;;
         4)
             # 测试服务器连接
@@ -348,9 +425,7 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break  
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
-                if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
-                    echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
-                fi
+                echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
 read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break 
             fi
@@ -362,9 +437,7 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break 
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
-                if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
-                    echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
-                fi
+                echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
 read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break
             fi
@@ -375,9 +448,16 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
             break
             ;;
         7)
-            # 系统监控工具
-            system_monitor_tool
-            break
+            # 系统监控工具（仅已部署状态可用）
+            if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
+                system_monitor_tool
+                break
+            else
+                echo -e "${RED}❌ 该功能需要先部署服务器${RESET}"
+                echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
+read -r -p "按回车键继续..." < /dev/tty < /dev/tty
+                break
+            fi
             ;;
         8)
             # 查看Docker日志
@@ -6224,7 +6304,8 @@ system_monitor_tool() {
         # 内存使用率进度条
         MEM_PERCENT_NUM=$(echo $MEM_PERCENT | sed 's/%//' 2>/dev/null || echo "0")
         BAR_LENGTH=50
-        FILLED=$((MEM_PERCENT_NUM * BAR_LENGTH / 100))
+        # 使用bc进行精确计算，支持小数
+        FILLED=$(echo "$MEM_PERCENT_NUM * $BAR_LENGTH / 100" | bc | cut -d. -f1 2>/dev/null || echo "0")
         
         echo -e "\033[1;35m│\033[1;36m  ████ 使用情况: [\033[1;32m"
         for i in $(seq 1 $FILLED); do echo -n "█"; done
