@@ -6,8 +6,8 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.41（监控系统自动退出提示修复版本）
-# 修复内容：解决监控系统在没有用户输入时自动显示退出提示的问题
+# 版本：1.2.44（监控系统退出键恢复版本）
+# 修复内容：将监控系统退出键从0恢复为Q，保持标准键盘习惯
 # v1.2.40: 修复监控系统界面显示混乱问题
 # 修复内容：完全重写系统监控工具，实现真正的固定窗口实时更新，类似top/htop仪表板
 # v1.2.20:
@@ -6108,11 +6108,12 @@ system_monitor_tool() {
     
     # 终端大小检测
     if [ "$(tput cols)" -lt 80 ] || [ "$(tput lines)" -lt 25 ]; then
-        echo -e "${RED}⚠️ 检测到终端窗口太小，建议调整为至少80x25${RESET}"
+        echo -e "${YELLOW}⚠️ 检测到终端窗口太小，可能影响显示效果${RESET}"
         echo -e "${CYAN}当前尺寸: $(tput cols) x $(tput lines)${RESET}"
-        echo -e "${YELLOW}按任意键继续...${RESET}"
-        read -r
-        return 0
+        echo -e "${CYAN}💡 建议调整为至少80x25以获得最佳体验${RESET}"
+        echo -e "${GREEN}🔄 继续启动监控系统...${RESET}"
+        sleep 3
+        # 不再提前退出，允许在较小窗口中运行
     fi
     
     sleep 2
