@@ -876,10 +876,24 @@ show_server_config() {
 
 choose_docker_mirror() {
     echo -e "${GREEN}📦 选择Docker镜像源（加速下载）：${RESET}"
-    echo "1) 阿里云 2) 腾讯云 3) 华为云 4) DaoCloud 5) 网易云"
-    echo "6) 清华源 7) 中科大 8) 中科院 9) 百度云 10) 京东云"
-    echo "11) 淘宝源 12) 官方源 13) 腾讯云国际 14) Azure中国 15) 360镜像源"
-    echo "16) 阿里云GAE 17) 自定义 18) 官方源(不推荐)"
+    echo " 1) 阿里云"
+    echo " 2) 腾讯云"
+    echo " 3) 华为云"
+    echo " 4) DaoCloud"
+    echo " 5) 网易云"
+    echo " 6) 清华源"
+    echo " 7) 中科大"
+    echo " 8) 中科院"
+    echo " 9) 百度云"
+    echo "10) 京东云"
+    echo "11) 淘宝源"
+    echo "12) 官方源"
+    echo "13) 腾讯云国际"
+    echo "14) Azure中国"
+    echo "15) 360镜像源"
+    echo "16) 阿里云GAE"
+    echo "17) 自定义"
+    echo "18) 官方源(不推荐)"
 read -r -p "请输入序号（默认1）：" mirror_choice < /dev/tty
     mirror_choice=${mirror_choice:-1}
 
