@@ -6,7 +6,7 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.64（管道执行支持修复版本）
+# 版本：1.2.65（增强网络监控功能版本）
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法
 # v1.2.54 集成：完整集成监控系统v1.2.54，修复所有监控功能，确保语法正确，支持Q键退出
 # v1.2.51（详细监控面板版本）
@@ -6612,6 +6612,80 @@ update_enhanced_network_info() {
     echo -e "\033[1;37m  🔗 活动连接: \033[1;32m$connections\033[0m"
     echo -e "\033[1;37m  📡 DNS服务器: \033[1;32m$dns_servers\033[0m"
     echo -e "\033[1;37m  🌐 网络状态: \033[1;32m$dns_status\033[0m"
+    
+    # 获取详细的网络连接信息
+    echo -e "\033[1;33m【连接详情】\033[0m"
+    
+    # 1. 显示监听端口（服务器对外提供的服务）
+    echo -e "\033[1;35m🔍 监听端口（服务器对外提供服务）:\033[0m"
+    local listening_ports
+    if command -v ss >/dev/null 2>&1; then
+        # 使用ss命令获取监听端口
+        listening_ports=$(ss -tuln 2>/dev/null | grep -E "LISTEN|State" | grep -v "Local Address" | head -10)
+        if [ -n "$listening_ports" ]; then
+            echo "$listening_ports" | while read -r line; do
+                echo -e "\033[1;37m    $line\033[0m"
+            done
+        else
+            echo -e "\033[1;37m    暂无监听端口信息\033[0m"
+        fi
+    else
+        echo -e "\033[1;37m    ss命令不可用，使用netstat\033[0m"
+        netstat -tuln 2>/dev/null | grep -E "LISTEN|State" | head -10 | while read -r line; do
+            echo -e "\033[1;37m    $line\033[0m"
+        done
+    fi
+    
+    # 2. 显示建立的连接（外部连接到服务器）
+    echo -e "\033[1;35m🌍 外部连接（连接到本服务器）:\033[0m"
+    local established_connections
+    if command -v ss >/dev/null 2>&1; then
+        established_connections=$(ss -tn 2>/dev/null | grep -E "ESTAB" | head -10)
+        if [ -n "$established_connections" ]; then
+            echo "$established_connections" | while read -r line; do
+                echo -e "\033[1;37m    $line\033[0m"
+            done
+        else
+            echo -e "\033[1;37m    当前无外部连接\033[0m"
+        fi
+    else
+        echo -e "\033[1;37m    暂无ESTAB连接信息\033[0m"
+    fi
+    
+    # 3. 显示服务器主动连接的外部端口（连接外部服务）
+    echo -e "\033[1;35m🚀 主动连接（服务器连接外部服务）:\033[0m"
+    local outgoing_connections
+    if command -v ss >/dev/null 2>&1; then
+        outgoing_connections=$(ss -tn 2>/dev/null | grep -E "ESTAB" | grep -v ":$internal_ip\.|:$external_ip\." | head -10)
+        if [ -n "$outgoing_connections" ]; then
+            echo "$outgoing_connections" | while read -r line; do
+                echo -e "\033[1;37m    $line\033[0m"
+            done
+        else
+            echo -e "\033[1;37m    暂无主动连接外部服务\033[0m"
+        fi
+    else
+        echo -e "\033[1;37m    暂无主动连接信息\033[0m"
+    fi
+    
+    # 4. 显示重要端口的连接统计
+    echo -e "\033[1;35m📊 关键端口连接统计:\033[0m"
+    local docker_connections web_connections ssh_connections other_connections
+    
+    # Docker服务端口 (8000, 8003)
+    if command -v ss >/dev/null 2>&1; then
+        docker_connections=$(ss -tn 2>/dev/null | grep -E "8000|8003" | wc -l)
+        web_connections=$(ss -tn 2>/dev/null | grep -E "80|443" | wc -l)
+        ssh_connections=$(ss -tn 2>/dev/null | grep -E ":22" | wc -l)
+        other_connections=$(ss -tn 2>/dev/null | grep -E "ESTAB" | wc -l)
+        
+        echo -e "\033[1;37m    🐳 Docker服务(8000,8003): $docker_connections 个连接\033[0m"
+        echo -e "\033[1;37m    🌐 Web服务(80,443): $web_connections 个连接\033[0m"
+        echo -e "\033[1;37m    🔐 SSH服务(22): $ssh_connections 个连接\033[0m"
+        echo -e "\033[1;37m    📡 其他连接: $other_connections 个\033[0m"
+    else
+        echo -e "\033[1;37m    ss命令不可用，无法获取端口统计\033[0m"
+    fi
 }
 
 # 更新GPU信息
