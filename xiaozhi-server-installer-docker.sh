@@ -6635,6 +6635,7 @@ update_enhanced_gpu_info() {
             gpu_memory="N/A"
             gpu_power="N/A"
             gpu_fan="N/A"
+            gpu_memory_percent="N/A"
         fi
     elif command -v rocm-smi >/dev/null 2>&1; then
         # AMD GPU (ROCm)
@@ -6643,6 +6644,7 @@ update_enhanced_gpu_info() {
         gpu_temp=$(rocm-smi --showtemp 2>/dev/null | grep "Temperature" | head -1 | awk '{print $3}' | sed 's/C//')
         gpu_memory="ROCm GPU"
         gpu_power="N/A"
+        gpu_memory_percent="N/A"
         gpu_fan="N/A"
     elif command -v glxinfo >/dev/null 2>&1; then
         # 使用glxinfo检测GPU
@@ -6652,6 +6654,7 @@ update_enhanced_gpu_info() {
         gpu_memory="N/A"
         gpu_power="N/A"
         gpu_fan="N/A"
+        gpu_memory_percent="N/A"
     elif [ -f "/sys/class/drm/card0/device/vendor" ]; then
         # 通用GPU检测
         gpu_name="集成GPU"
@@ -6660,12 +6663,14 @@ update_enhanced_gpu_info() {
         gpu_memory="N/A"
         gpu_power="N/A"
         gpu_fan="N/A"
+        gpu_memory_percent="N/A"
     else
         gpu_name="未检测到GPU"
         gpu_usage="N/A"
         gpu_temp="N/A"
         gpu_memory="N/A"
         gpu_power="N/A"
+        gpu_memory_percent="N/A"
         gpu_fan="N/A"
     fi
     
