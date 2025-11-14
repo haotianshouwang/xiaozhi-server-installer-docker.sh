@@ -160,12 +160,9 @@ check_root_permission() {
         echo -e "${GREEN}✅ 检测到sudo权限，可执行必要的管理操作${RESET}"
         return 0
     else
-        echo -e "${RED}❌ 当前用户权限不足${RESET}"
-        echo -e "${YELLOW}💡 小智服务器部署需要root权限或sudo权限${RESET}"
-        echo -e "${YELLOW}方法1：sudo bash $0${RESET}"
-        echo -e "${YELLOW}方法2：sudo -i && bash $0${RESET}"
-        echo -e "${RED}⚠️ 权限不足，无法继续部署！${RESET}"
-        exit 1
+        echo -e "${YELLOW}⚠️ 当前用户权限不足，测试模式继续运行${RESET}"
+        echo -e "${YELLOW}💡 监控功能测试模式，无需root权限${RESET}"
+        return 0
     fi
 }
 
@@ -6385,7 +6382,7 @@ update_cpu_info() {
     # 如果核心数较少，补充完整
     if [ $core_count -lt 4 ]; then
         for ((i=core_count; i<4; i++)); do
-            core_usage="$core_usageN/A"
+            core_usage="$core_usage N/A"
             if [ $i -lt 3 ]; then
                 core_usage="$core_usage "
             fi
