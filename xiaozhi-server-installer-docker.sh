@@ -3,98 +3,11 @@ set -uo pipefail
 trap exit_confirm SIGINT
 
 # ========================= 基础配置 =========================
-# 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
+# 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
 # 版本：1.2.68（Docker安装函数优化版本 - 修复调用问题）
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
-# v1.2.54 集成：完整集成监控系统v1.2.54，修复所有监控功能，确保语法正确，支持Q键退出
-# v1.2.51（详细监控面板版本）
-# 修复内容：1) 提示信息完全固定在屏幕底部，不随数据刷新消失 2) 添加CPU多核心监控 3) 添加运行进程监控 4) 添加GPU详细信息 5) 添加温度监控
-# v1.2.20:
-# - 修复Docker服务启动流程问题
-# - 确保用户选择Docker操作后正确执行docker-compose up -d
-# - 添加服务启动后的连接信息显示
-# - 优化智能内存风险处理逻辑
-# v1.2.21:
-# - 新增Docker操作工具菜单（选项0）
-# - 集成到主菜单，支持服务管理、镜像清理、系统维护
-# - 包含7个Docker操作子菜单：服务管理、镜像管理、容器管理、系统信息、深度清理、网络端口管理、日志管理
-# - 提供完整的Docker生命周期管理功能
-# - 保持向后兼容，不影响现有功能
-# 详细说明：
-# 0) 现在通过脚本配置密钥和服务商（默认）
-# 1) 稍后手动填写所有配置
-# 2) 退出配置（将使用现有配置文件）
-# 3) 不配置所有配置，直接返回菜单（智能ASR检测，无在线ASR无警告）
-# 4) 返回上一个菜单
-# 修正内容：
-# v1.2.17:
-# - 添加check_asr_config函数，智能检测配置文件中的ASR设置
-# - 添加smart_handle_memory_risk函数，根据ASR类型选择警告策略
-# - 在线ASR配置（阿里云、讯飞、百度等）跳过内存警告，直接Docker操作
-# - 本地ASR配置显示完整内存不足警告和风险提示
-# - 优化Docker管理流程，确保正常返回处理结果
-# - 清理测试代码残留，提升用户体验
-# v1.2.18:
-# - 修复create_default_config_file函数中LLM type设置错误
-# - 将zhipuai类型改为openai类型（ChatGLM实际使用的类型）
-# - 修正LLM和VLLM配置参数，使用正确的base_url和model_name格式
-# v1.2.19:
-# v1.2.20:
-# - 修复Docker服务启动流程问题
-# - 确保用户选择Docker操作后正确执行 docker-compose up -d
-# - 添加专用服务启动函数 start_xiaozhi_service
-# - 优化智能内存风险处理，确保服务能正常启动
-# - 修复内存检测逻辑中bc命令依赖问题
-# - 解决部分系统缺少bc命令导致的内存检测失败
-# - 使用awk替代bc进行除法计算，提高脚本兼容性
-# v1.2.21:
-# - 新增Docker操作工具菜单，集成到主菜单选项0
-# v1.2.23:
-# - 解决GitHub脚本被替换为报告文件导致的语法错误
-# - 提供完整的bash脚本，确保从GitHub下载时正常执行
-# v1.2.26:
-# - 增强网络监控功能：添加实时网络流量监控，每秒流量统计
-# - 网络连接详细信息：显示谁连接我的IP和端口，我连接谁的IP和端口
-# - 活跃连接监控：实时显示活跃连接数量和连接详情
-# - 监听端口显示：显示当前系统监听的端口列表
-# - 网络接口优化：自动检测网络接口，支持多种网络配置
-# - 连接状态跟踪：实时跟踪TCP连接状态和详细信息
-# - 菜单选项优化：退出脚本选项从10改为0，用户体验更友好
-# - 网络数据缓存：实现网络流量实时计算，避免数据丢失
-# - 网络兼容性增强：支持不同Linux发行版的网络统计方式
-
-# v1.2.25:
-# - 新增系统监控工具：高科技风格黑客大屏界面，实时系统状态监控
-# - 详细系统信息：CPU核心使用率、内存使用情况、磁盘使用率、网络状态
-# - 实时进程监控：显示TOP 5 CPU使用进程
-# - 系统健康检查：CPU温度监控、内存风险评估、磁盘空间预警
-# - 网络信息显示：内网IP、公网IP、收发数据流量统计
-# - Docker状态监控：容器运行状态、资源使用情况
-# - 彩色进度条显示：内存和磁盘使用率直观展示
-# - 智能刷新机制：每2秒自动更新，支持键盘快捷键操作
-# - 终端尺寸自适应：自动检测并提示最小窗口尺寸要求
-# - 菜单结构调整：系统监控工具置于选项7，退出选项改为10
-# - 完整向后兼容：不影响现有部署和Docker工具功能
-
-# v1.2.24:
-# - 调整菜单结构：Docker工具从选项0移至选项6
-# - 完善Docker工具功能：所有子函数都支持循环菜单
-# - 优化用户体验：每次操作完成后返回Docker工具主页
-# - 新增Docker系统信息子菜单功能
-# - Docker服务管理：启动/停止/重启/查看状态/资源监控
-# - Docker镜像管理：查看/清理/重新拉取镜像
-# - Docker容器管理：查看/进入/清理/重置容器
-# - Docker系统信息：版本/资源使用/磁盘使用/事件信息
-# - Docker深度清理：选择性清理Docker资源或完全重置
-# - Docker网络端口管理：网络查看/端口检查/连接测试
-# - Docker日志管理：查看/搜索/导出/实时跟踪日志
-# - 保持完全向后兼容，不影响现有部署功能
-# v1.2.22:
-# - 修复case语句语法错误，删除多余分号
-# - 解决Docker操作工具菜单启动时的bash语法问题
-# - 确保脚本可以在所有bash环境中正常运行
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
@@ -530,7 +443,6 @@ check_server_config() {
     [ -z "$EXTERNAL_IP" ] && EXTERNAL_IP="无法获取公网IP"
 
     # 获取硬件信息（四舍五入处理内存，避免系统预留内存导致误判）
-    # 修复v1.2.19: 消除bc命令依赖，使用awk直接计算
     MEM_TOTAL=$(free -m | awk 'BEGIN{sum=0} /Mem:/ {sum+=$2} END{print int((sum/1024)+0.5)}')
     CPU_MODEL=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ *//')
     CPU_CORES=$(grep -c '^processor' /proc/cpuinfo)
@@ -611,7 +523,7 @@ check_asr_config() {
 
 # 智能内存风险处理函数
 smart_handle_memory_risk() {
-    echo -e "\n${CYAN}🧠 智能内存风险评估${RESET}"
+    echo -e "\n${CYAN}🧠 内存风险评估${RESET}"
     
     # 检测当前ASR配置
     local asr_config=$(check_asr_config)
@@ -653,10 +565,10 @@ smart_handle_memory_risk() {
     fi
 }
 
-# Docker容器管理选择界面
+# 退出配置界面
 docker_container_management() {
     echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🐳 Docker容器管理选择  🐳${RESET}"
+    echo -e "${CYAN}🐳 退出配置脚本选择  🐳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     echo "1) 不执行docker退出，直接结束脚本"
     echo "2) 执行docker退出"
@@ -1509,30 +1421,28 @@ download_files() {
                 
                 # 创建默认的docker-compose.yml
                 cat > "$MAIN_DIR/docker-compose.yml" << 'EOF'
-version: '3.8'
+# Docker安装Server
+
+version: '3'
 services:
   xiaozhi-esp32-server:
-    image: xiaozhi-esp32-server:latest
+    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_latest
     container_name: xiaozhi-esp32-server
-    ports:
-      - "3000:3000"
-      - "3001:3001"
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
-      - ./models:/app/models
-      - ./music:/app/music
+    restart: always
+    security_opt:
+      - seccomp:unconfined
     environment:
       - TZ=Asia/Shanghai
-    restart: unless-stopped
-    # 如果需要GPU支持，取消注释下面两行
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    ports:
+      # ws服务端
+      - "8000:8000"
+      # http服务的端口，用于简单OTA接口(单服务部署)，以及视觉分析接口
+      - "8003:8003"
+    volumes:
+      # 配置文件目录
+      - ./data:/opt/xiaozhi-esp32-server/data
+      # 模型文件挂接，很重要
+      - ./models/SenseVoiceSmall/model.pt:/opt/xiaozhi-esp32-server/models/SenseVoiceSmall/model.pt
 EOF
                 echo -e "${GREEN}✅ 已创建默认docker-compose.yml模板${RESET}"
             fi
@@ -1745,7 +1655,7 @@ read -p "请输入选择 (1-3，默认1): " detailed_choice </dev/tty
     echo "- TTS配置 (EdgeTTS等语音合成服务)"
 }
 
-# ========================= ASR 配置（15个服务商） =========================
+# ========================= ASR 配置 =========================
 
 # 阿里云ASR配置
 config_aliyun_asr() {
@@ -1787,7 +1697,7 @@ config_aliyun_asr() {
     echo -e "\n${GREEN}✅ 阿里云流式ASR配置完成${RESET}"
 }
 
-# ========================= 高级ASR配置 =========================
+# ========================= ASR配置 =========================
 config_asr_advanced() {
     echo -e "${YELLOW}🎤 语音识别(ASR)服务详细配置${RESET}"
     echo -e "${CYAN}请选择ASR服务类型：${RESET}"
@@ -1922,9 +1832,243 @@ config_asr_advanced() {
     esac
 }
 
-# ========================= LLM 配置（8个服务商） =========================
+# ========================= ASR 配置 =========================
+config_asr() {
+    while true; do
+        echo -e "\n${GREEN}【1/6】配置 ASR (语音识别) 服务${RESET}"
+        echo "请选择ASR服务商（共15个）："
+        
+        if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+            echo " 1) ${GREEN}FunASR (本地)${RESET}"
+            echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
+            echo " 2) FunASRServer (独立部署)"
+            echo " 3) ${GREEN}SherpaASR (本地，多语言)${RESET}"
+            echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
+            echo " 4) ${GREEN}SherpaParaformerASR (本地，中文专用)${RESET}"
+            echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
+            echo " 5) DoubaoASR (火山引擎，按次收费)"
+            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
+            echo " 7) TencentASR (腾讯云)"
+            echo " 8) AliyunASR (阿里云，批量处理)"
+            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
+            echo "10) BaiduASR (百度智能云)"
+            echo "11) OpenaiASR (OpenAI)"
+            echo "12) GroqASR (Groq)"
+            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
+            echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
+            echo "14) Qwen3ASRFlash (通义千问)"
+            echo "15) XunfeiStreamASR (讯飞，流式)"
+            echo " 0) ${YELLOW} 返回上一步 ${RESET}"
+        elif [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = true ]; then
+            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
+            echo " 2) FunASRServer (独立部署)"
+            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
+            echo " 4) ${YELLOW}SherpaParaformerASR (本地，中文专用)${RESET}"
+            echo -e "    ${CYAN}💡 可用 (${MEM_TOTAL}GB ≥ 2GB) - 轻量级模型${RESET}"
+            echo " 5) DoubaoASR (火山引擎，按次收费)"
+            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
+            echo " 7) TencentASR (腾讯云)"
+            echo " 8) AliyunASR (阿里云，批量处理)"
+            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
+            echo "10) BaiduASR (百度智能云)"
+            echo "11) OpenaiASR (OpenAI)"
+            echo "12) GroqASR (Groq)"
+            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
+            echo -e "    ${CYAN}✅ 内存占用较小 (建议≥2GB)${RESET}"
+            echo "14) Qwen3ASRFlash (通义千问)"
+            echo "15) XunfeiStreamASR (讯飞，流式)"
+            echo " 0) ${YELLOW} 返回上一步 ${RESET}"
+        else
+            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
+            echo " 2) FunASRServer (独立部署)"
+            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
+            echo -e " 4) ${RED}SherpaParaformerASR (本地，中文专用)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)${RESET}"
+            echo " 5) DoubaoASR (火山引擎，按次收费)"
+            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
+            echo " 7) TencentASR (腾讯云)"
+            echo " 8) AliyunASR (阿里云，批量处理)"
+            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
+            echo "10) BaiduASR (百度智能云)"
+            echo "11) OpenaiASR (OpenAI)"
+            echo "12) GroqASR (Groq)"
+            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
+            echo -e "    ${CYAN}✅ 内存占用较小 (建议≥2GB)${RESET}"
+            echo "14) Qwen3ASRFlash (通义千问)"
+            echo "15) XunfeiStreamASR (讯飞，流式)"
+            echo " 0) ${YELLOW} 返回上一步 ${RESET}"
+        fi
+        
+        read -r -p "请输入序号 (默认推荐 9，输入0返回上一步): " asr_choice < /dev/tty
+        asr_choice=${asr_choice:-9}
+        
+        # ASR是第一步，输入0返回配置选择菜单
+        if [ "$asr_choice" = "0" ]; then
+            echo -e "${CYAN}🔄 返回配置选择菜单${RESET}"
+            return 2  # 返回码2表示返回配置选择菜单
+        fi
+        
+        local asr_provider_key
+        case $asr_choice in
+            1)
+                asr_provider_key="FunASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择FunASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            2)
+                asr_provider_key="FunASRServer"
+                echo -e "\n${YELLOW}⚠️ 您选择了 FunASRServer。${RESET}"
+                echo -e "${CYAN}🔗 需要自行部署 FunASR Server 服务${RESET}"
+                read -r -p "请输入 FunASR Server 地址 (默认 http://localhost:10095): " server_url < /dev/tty
+                server_url=${server_url:-"http://localhost:10095"}
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    host: .*/    host: $server_url/" "$CONFIG_FILE"
+                ;;
+            3)
+                asr_provider_key="SherpaASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择SherpaASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            4)
+                asr_provider_key="SherpaParaformerASR"
+                if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)，无法选择SherpaParaformerASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaParaformerASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            5)
+                asr_provider_key="DoubaoASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
+                read -r -p "请输入 AppID: " appid < /dev/tty
+                read -r -p "请输入 Access Token: " access_token < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            6)
+                asr_provider_key="DoubaoStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoStreamASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
+                read -r -p "请输入 AppID: " appid < /dev/tty
+                read -r -p "请输入 Access Token: " access_token < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            7)
+                asr_provider_key="TencentASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了腾讯云 TencentASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/asr${RESET}"
+                read -r -p "请输入 APPID: " appid < /dev/tty
+                read -r -p "请输入 SecretID: " secret_id < /dev/tty
+                read -r -p "请输入 SecretKey: " secret_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            8)
+                asr_provider_key="AliyunASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                read -r -p "请输入 Appkey: " appkey < /dev/tty
+                read -r -p "请输入 Token: " token < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            9)
+                asr_provider_key="AliyunStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunStreamASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
+                read -r -p "请输入 Appkey: " appkey < /dev/tty
+                read -r -p "请输入 Token: " token < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            10)
+                asr_provider_key="BaiduASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度智能云 BaiduASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/${RESET}"
+                read -r -p "请输入 APP ID: " app_id < /dev/tty
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                read -r -p "请输入 Secret Key: " secret_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            11)
+                asr_provider_key="OpenaiASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI ASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://platform.openai.com/${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            12)
+                asr_provider_key="GroqASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Groq ASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.groq.com/${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            13)
+                asr_provider_key="VoskASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足，无法选择VoskASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            14)
+                asr_provider_key="Qwen3ASRFlash"
+                echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen3ASRFlash。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            15)
+                asr_provider_key="XunfeiStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞 XunfeiStreamASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn${RESET}"
+                read -r -p "请输入 APP ID: " app_id < /dev/tty
+                read -r -p "请输入 API Secret: " api_secret < /dev/tty
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            *)
+                echo -e "\n${RED}❌ 输入无效，请选择1-15范围内的数字，或输入0返回上一步${RESET}"
+                echo -e "${YELLOW}💡 提示：默认推荐选项9（阿里云流式ASR）${RESET}"
+                read -r -p "按回车键重新选择..." < /dev/tty
+                continue
+                ;;
+        esac
+        
+        # 如果配置成功，退出循环
+        if [ -n "$asr_provider_key" ]; then
+            break
+        fi
+    done
+}
 
-# ========================= LLM 配置（8个服务商） =========================
+# ========================= LLM 配置 =========================
 # 确保当前目录安全
 check_working_directory() {
     if ! pwd >/dev/null 2>&1; then
@@ -1938,7 +2082,7 @@ config_llm() {
     check_working_directory
     
     while true; do
-        echo -e "\n\n${GREEN}【2/5】配置 LLM (大语言模型) 服务${RESET}"
+        echo -e "\n\n${GREEN}【2/6】配置 LLM (大语言模型) 服务${RESET}"
         echo "请选择LLM服务商（共15个）："
         echo " 1) ChatGLMLLM (智谱清言) [推荐]"
         echo " 2) QwenLLM (通义千问)"
@@ -2279,10 +2423,10 @@ read -r -p "请输入自定义变量 (可选，格式: k1=v1,k2=v2): " variables
     done
 }
 
-# ========================= VLLM 配置（4个服务商） =========================
+# ========================= VLLM 配置 =========================
 config_vllm() {
     while true; do
-        echo -e "\n\n${GREEN}【3/5】配置 VLLM (视觉大语言模型) 服务${RESET}"
+        echo -e "\n\n${GREEN}【3/6】配置 VLLM (视觉大语言模型) 服务${RESET}"
         echo "请选择VLLM服务商（共3个）："
         echo " 1) ChatGLMVLLM (智谱清言) [推荐]"
         echo " 2) QwenVLVLLM (通义千问)"
@@ -2370,7 +2514,7 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " vllm_ch
 # ========================= TTS 配置（16个服务商） =========================
 config_tts() {
     while true; do
-        echo -e "\n\n${GREEN}【4/5】配置 TTS (语音合成) 服务${RESET}"
+        echo -e "\n\n${GREEN}【4/6】配置 TTS (语音合成) 服务${RESET}"
         echo "请选择TTS服务商（共22个）："
         echo " 1) EdgeTTS (微软) [推荐]"
         echo " 2) DoubaoTTS (火山引擎)"
@@ -2836,10 +2980,10 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
     done
 }
 
-# ========================= Memory 配置（3个服务商） =========================
+# ========================= Memory 配置 =========================
 config_memory() {
     while true; do
-        echo -e "\n\n${GREEN}【5/5】配置 Memory (记忆) 服务${RESET}"
+        echo -e "\n\n${GREEN}【5/6】配置 Memory (记忆) 服务${RESET}"
         echo "请选择Memory模式（共3个）："
         echo " 1) 不开启记忆 (nomem) [推荐]"
         echo " 2) 本地短记忆 (mem_local_short) - 隐私优先"
@@ -3072,7 +3216,7 @@ config_keys() {
                 CURRENT_DEPLOY_TYPE="internal"
                 export KEY_CONFIG_MODE="manual"
                 
-                # 关键修复：直接返回到deploy_server，并返回取消状态
+                #直接返回到deploy_server，并返回取消状态
                 echo -e "\n${CYAN}📋 配置文件将使用：$CONFIG_FILE${RESET}"
                 echo -e "${CYAN}🔄 正在返回主菜单...${RESET}"
                 return 1  # 返回1表示用户取消配置，返回主菜单
@@ -7253,8 +7397,7 @@ update_control_hints() {
                 fi
             done
         fi
-# ========================= 主执行函数 =========================
-
+        
 # ========================= 主执行函数 =========================
 main() {
     check_working_directory
@@ -7273,239 +7416,3 @@ main() {
 
 # 启动脚本执行
 main "$@"
-
-# ========================= ASR 配置（15个服务商） =========================
-config_asr() {
-    while true; do
-        echo -e "\n${GREEN}【1/5】配置 ASR (语音识别) 服务${RESET}"
-        echo "请选择ASR服务商（共15个）："
-        
-        if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-            echo " 1) ${GREEN}FunASR (本地)${RESET}"
-            echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
-            echo " 2) FunASRServer (独立部署)"
-            echo " 3) ${GREEN}SherpaASR (本地，多语言)${RESET}"
-            echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
-            echo " 4) ${GREEN}SherpaParaformerASR (本地，中文专用)${RESET}"
-            echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
-            echo " 5) DoubaoASR (火山引擎，按次收费)"
-            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
-            echo " 7) TencentASR (腾讯云)"
-            echo " 8) AliyunASR (阿里云，批量处理)"
-            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
-            echo "10) BaiduASR (百度智能云)"
-            echo "11) OpenaiASR (OpenAI)"
-            echo "12) GroqASR (Groq)"
-            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
-            echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
-            echo "14) Qwen3ASRFlash (通义千问)"
-            echo "15) XunfeiStreamASR (讯飞，流式)"
-            echo " 0) ${YELLOW} 返回上一步 ${RESET}"
-        elif [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = true ]; then
-            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
-            echo " 2) FunASRServer (独立部署)"
-            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
-            echo " 4) ${YELLOW}SherpaParaformerASR (本地，中文专用)${RESET}"
-            echo -e "    ${CYAN}💡 可用 (${MEM_TOTAL}GB ≥ 2GB) - 轻量级模型${RESET}"
-            echo " 5) DoubaoASR (火山引擎，按次收费)"
-            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
-            echo " 7) TencentASR (腾讯云)"
-            echo " 8) AliyunASR (阿里云，批量处理)"
-            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
-            echo "10) BaiduASR (百度智能云)"
-            echo "11) OpenaiASR (OpenAI)"
-            echo "12) GroqASR (Groq)"
-            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
-            echo -e "    ${CYAN}✅ 内存占用较小 (建议≥2GB)${RESET}"
-            echo "14) Qwen3ASRFlash (通义千问)"
-            echo "15) XunfeiStreamASR (讯飞，流式)"
-            echo " 0) ${YELLOW} 返回上一步 ${RESET}"
-        else
-            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
-            echo " 2) FunASRServer (独立部署)"
-            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
-            echo -e " 4) ${RED}SherpaParaformerASR (本地，中文专用)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)${RESET}"
-            echo " 5) DoubaoASR (火山引擎，按次收费)"
-            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
-            echo " 7) TencentASR (腾讯云)"
-            echo " 8) AliyunASR (阿里云，批量处理)"
-            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
-            echo "10) BaiduASR (百度智能云)"
-            echo "11) OpenaiASR (OpenAI)"
-            echo "12) GroqASR (Groq)"
-            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
-            echo -e "    ${CYAN}✅ 内存占用较小 (建议≥2GB)${RESET}"
-            echo "14) Qwen3ASRFlash (通义千问)"
-            echo "15) XunfeiStreamASR (讯飞，流式)"
-            echo " 0) ${YELLOW} 返回上一步 ${RESET}"
-        fi
-        
-        read -r -p "请输入序号 (默认推荐 9，输入0返回上一步): " asr_choice < /dev/tty
-        asr_choice=${asr_choice:-9}
-        
-        # ASR是第一步，输入0返回配置选择菜单
-        if [ "$asr_choice" = "0" ]; then
-            echo -e "${CYAN}🔄 返回配置选择菜单${RESET}"
-            return 2  # 返回码2表示返回配置选择菜单
-        fi
-        
-        local asr_provider_key
-        case $asr_choice in
-            1)
-                asr_provider_key="FunASR"
-                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择FunASR本地模型${RESET}"
-                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
-                    sleep 1
-                    continue
-                fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            2)
-                asr_provider_key="FunASRServer"
-                echo -e "\n${YELLOW}⚠️ 您选择了 FunASRServer。${RESET}"
-                echo -e "${CYAN}🔗 需要自行部署 FunASR Server 服务${RESET}"
-                read -r -p "请输入 FunASR Server 地址 (默认 http://localhost:10095): " server_url < /dev/tty
-                server_url=${server_url:-"http://localhost:10095"}
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    host: .*/    host: $server_url/" "$CONFIG_FILE"
-                ;;
-            3)
-                asr_provider_key="SherpaASR"
-                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择SherpaASR本地模型${RESET}"
-                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
-                    sleep 1
-                    continue
-                fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaASR。${RESET}"
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            4)
-                asr_provider_key="SherpaParaformerASR"
-                if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)，无法选择SherpaParaformerASR本地模型${RESET}"
-                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
-                    sleep 1
-                    continue
-                fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaParaformerASR。${RESET}"
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            5)
-                asr_provider_key="DoubaoASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
-                read -r -p "请输入 AppID: " appid < /dev/tty
-                read -r -p "请输入 Access Token: " access_token < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            6)
-                asr_provider_key="DoubaoStreamASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoStreamASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
-                read -r -p "请输入 AppID: " appid < /dev/tty
-                read -r -p "请输入 Access Token: " access_token < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            7)
-                asr_provider_key="TencentASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了腾讯云 TencentASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/asr${RESET}"
-                read -r -p "请输入 APPID: " appid < /dev/tty
-                read -r -p "请输入 SecretID: " secret_id < /dev/tty
-                read -r -p "请输入 SecretKey: " secret_key < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            8)
-                asr_provider_key="AliyunASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
-                read -r -p "请输入 Appkey: " appkey < /dev/tty
-                read -r -p "请输入 Token: " token < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            9)
-                asr_provider_key="AliyunStreamASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunStreamASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
-                read -r -p "请输入 Appkey: " appkey < /dev/tty
-                read -r -p "请输入 Token: " token < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            10)
-                asr_provider_key="BaiduASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了百度智能云 BaiduASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/${RESET}"
-                read -r -p "请输入 APP ID: " app_id < /dev/tty
-                read -r -p "请输入 API Key: " api_key < /dev/tty
-                read -r -p "请输入 Secret Key: " secret_key < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            11)
-                asr_provider_key="OpenaiASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI ASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://platform.openai.com/${RESET}"
-                read -r -p "请输入 API Key: " api_key < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            12)
-                asr_provider_key="GroqASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了 Groq ASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://console.groq.com/${RESET}"
-                read -r -p "请输入 API Key: " api_key < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            13)
-                asr_provider_key="VoskASR"
-                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足，无法选择VoskASR本地模型${RESET}"
-                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
-                    sleep 1
-                    continue
-                fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            14)
-                asr_provider_key="Qwen3ASRFlash"
-                echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen3ASRFlash。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
-                read -r -p "请输入 API Key: " api_key < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            15)
-                asr_provider_key="XunfeiStreamASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了讯飞 XunfeiStreamASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn${RESET}"
-                read -r -p "请输入 APP ID: " app_id < /dev/tty
-                read -r -p "请输入 API Secret: " api_secret < /dev/tty
-                read -r -p "请输入 API Key: " api_key < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                ;;
-            *)
-                echo -e "\n${RED}❌ 输入无效，请选择1-15范围内的数字，或输入0返回上一步${RESET}"
-                echo -e "${YELLOW}💡 提示：默认推荐选项9（阿里云流式ASR）${RESET}"
-                read -r -p "按回车键重新选择..." < /dev/tty
-                continue
-                ;;
-        esac
-        
-        # 如果配置成功，退出循环
-        if [ -n "$asr_provider_key" ]; then
-            break
-        fi
-    done
-}
