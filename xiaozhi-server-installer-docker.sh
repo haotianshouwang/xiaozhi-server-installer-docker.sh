@@ -6,7 +6,7 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.54（完整功能监控系统集成版本）
+# 版本：1.2.64（管道执行支持修复版本）
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法
 # v1.2.54 集成：完整集成监控系统v1.2.54，修复所有监控功能，确保语法正确，支持Q键退出
 # v1.2.51（详细监控面板版本）
@@ -426,7 +426,7 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
                 echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
-read -r -p "按回车键继续..." < /dev/tty < /dev/tty
+read -r -p "按回车键继续..." </dev/tty
                 break 
             fi
             ;;
@@ -438,7 +438,7 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
                 echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
-read -r -p "按回车键继续..." < /dev/tty < /dev/tty
+read -r -p "按回车键继续..." </dev/tty
                 break
             fi
             ;;
@@ -455,7 +455,7 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
             else
                 echo -e "${RED}❌ 该功能需要先部署服务器${RESET}"
                 echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
-read -r -p "按回车键继续..." < /dev/tty < /dev/tty
+read -r -p "按回车键继续..." </dev/tty
                 break
             fi
             ;;
@@ -470,7 +470,7 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 delete_server
             else
                 echo -e "${YELLOW}⚠️ 未检测到服务器数据${RESET}"
-read -r -p "按回车键继续..." < /dev/tty < /dev/tty
+read -r -p "按回车键继续..." </dev/tty
             fi
             break 
             ;;
@@ -1483,7 +1483,7 @@ setup_config_file() {
         echo "配置文件: $CONFIG_FILE"
         echo "请选择处理方式："
         echo "1) 使用现有配置文件 2) 重新下载新配置文件"
-read -p "请输入选择 (1-2，默认1): " config_choice
+read -p "请输入选择 (1-2，默认1): " config_choice </dev/tty
         config_choice=${config_choice:-1}
         
         case $config_choice in
@@ -1495,7 +1495,7 @@ read -p "请输入选择 (1-2，默认1): " config_choice
                     echo "1) 保留现有配置直接使用"
                     echo "2) 重新进行详细配置"
                     echo "3) 保留配置文件但重新配置"
-read -p "请输入选择 (1-3，默认1): " detailed_choice
+read -p "请输入选择 (1-3，默认1): " detailed_choice </dev/tty
                     detailed_choice=${detailed_choice:-1}
                     
                     case $detailed_choice in
@@ -5306,7 +5306,7 @@ docker_logs() {
         if [ "$SERVER_DIR_EXISTS" != true ] || [ "$CONFIG_EXISTS" != true ]; then
             echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
         fi
-read -r -p "按回车键继续..." < /dev/tty < /dev/tty
+read -r -p "按回车键继续..." </dev/tty
         return
     fi
     
@@ -6140,7 +6140,7 @@ system_monitor_tool() {
         echo -e "${RED}⚠️ 检测到终端窗口太小，建议调整为至少80x25${RESET}"
         echo -e "${CYAN}当前尺寸: $(tput cols) x $(tput lines)${RESET}"
         echo -e "${YELLOW}按任意键继续...${RESET}"
-        read -r
+        read -r </dev/tty
         return 0
     fi
     
@@ -6164,7 +6164,7 @@ system_monitor_tool() {
         
         # 等待用户输入
         local input=""
-        read -r -p "请输入操作 [R-刷新, Q-退出]: " input
+        read -r -p "请输入操作 [R-刷新, Q-退出]: " input </dev/tty
         
         # 处理输入 - 忽略空输入，直接跳过
         if [ -z "$input" ]; then
