@@ -6,63 +6,8 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.23（GitHub版本修复版本）
-# 修复内容：解决GitHub脚本被替换为报告文件导致的语法错误
-# v1.2.20:
-# - 修复Docker服务启动流程问题
-# - 确保用户选择Docker操作后正确执行docker-compose up -d
-# - 添加服务启动后的连接信息显示
-# - 优化智能内存风险处理逻辑
-# v1.2.21:
-# - 新增Docker操作工具菜单（选项0）
-# - 集成到主菜单，支持服务管理、镜像清理、系统维护
-# - 包含7个Docker操作子菜单：服务管理、镜像管理、容器管理、系统信息、深度清理、网络端口管理、日志管理
-# - 提供完整的Docker生命周期管理功能
-# - 保持向后兼容，不影响现有功能
-# 详细说明：
-# 0) 现在通过脚本配置密钥和服务商（默认）
-# 1) 稍后手动填写所有配置
-# 2) 退出配置（将使用现有配置文件）
-# 3) 不配置所有配置，直接返回菜单（智能ASR检测，无在线ASR无警告）
-# 4) 返回上一个菜单
-# 修正内容：
-# v1.2.17:
-# - 添加check_asr_config函数，智能检测配置文件中的ASR设置
-# - 添加smart_handle_memory_risk函数，根据ASR类型选择警告策略
-# - 在线ASR配置（阿里云、讯飞、百度等）跳过内存警告，直接Docker操作
-# - 本地ASR配置显示完整内存不足警告和风险提示
-# - 优化Docker管理流程，确保正常返回处理结果
-# - 清理测试代码残留，提升用户体验
-# v1.2.18:
-# - 修复create_default_config_file函数中LLM type设置错误
-# - 将zhipuai类型改为openai类型（ChatGLM实际使用的类型）
-# - 修正LLM和VLLM配置参数，使用正确的base_url和model_name格式
-# v1.2.19:
-# v1.2.20:
-# - 修复Docker服务启动流程问题
-# - 确保用户选择Docker操作后正确执行 docker-compose up -d
-# - 添加专用服务启动函数 start_xiaozhi_service
-# - 优化智能内存风险处理，确保服务能正常启动
-# - 修复内存检测逻辑中bc命令依赖问题
-# - 解决部分系统缺少bc命令导致的内存检测失败
-# - 使用awk替代bc进行除法计算，提高脚本兼容性
-# v1.2.21:
-# - 新增Docker操作工具菜单，集成到主菜单选项0
-# v1.2.23:
-# - 解决GitHub脚本被替换为报告文件导致的语法错误
-# - 提供完整的bash脚本，确保从GitHub下载时正常执行
-# - Docker服务管理：启动/停止/重启/查看状态/资源监控
-# - Docker镜像管理：查看/清理/重新拉取镜像
-# - Docker容器管理：查看/进入/清理/重置容器
-# - Docker系统信息：版本/资源使用/磁盘使用/事件信息
-# - Docker深度清理：选择性清理Docker资源或完全重置
-# - Docker网络端口管理：网络查看/端口检查/连接测试
-# - Docker日志管理：查看/搜索/导出/实时跟踪日志
-# - 保持完全向后兼容，不影响现有部署功能
-# v1.2.22:
-# - 修复case语句语法错误，删除多余分号
-# - 解决Docker操作工具菜单启动时的bash语法问题
-# - 确保脚本可以在所有bash环境中正常运行
+# 版本：1.2.27
+# 更新内容：统一调整所有菜单结构，将退出脚本和返回上一步选项移至菜单末尾
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
@@ -320,22 +265,24 @@ main_menu() {
         fi
         echo
         echo "请选择操作："
-        echo "0) Docker操作工具 (服务管理/镜像清理/系统维护)"
         echo "1) 重新开始部署 (删除现有并重新部署)"
         echo "2) 更新服务器 (保留配置，更新到最新版本)"
         echo "3) 仅修改配置文件 (不下载服务器文件)"
         echo "4) 测试服务器连接"
         echo "5) 测试服务器端口 (详细端口测试)"
-        echo "6) 查看Docker日志"
-        echo "7) 删除服务器 (完全删除所有数据)"
-        echo "9) 退出脚本"
+        echo "6) Docker操作工具 (服务管理/镜像清理/系统维护)"
+        echo "7) 系统监控工具 (实时系统状态监控)"
+        echo "8) 查看Docker日志"
+        echo "9) 删除服务器 (完全删除所有数据)"
+        echo "0) 退出脚本"
     else
         echo -e "${GREEN}欢迎使用小智服务器部署脚本${RESET}"
         echo
         echo "请选择操作："
-        echo "0) Docker操作工具 (服务管理/镜像清理/系统维护)"
         echo "1) 开始部署小智服务器"
-        echo "9) 退出脚本"
+        echo "2) Docker操作工具 (服务管理/镜像清理/系统维护)"
+        echo "3) 系统监控工具 (实时系统状态监控)"
+        echo "0) 退出脚本"
     fi
     
     echo -e "${PURPLE}==================================================${RESET}"
@@ -346,7 +293,7 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
         
         if [ -z "$menu_choice" ]; then
             echo -e "${YELLOW}⚠️ 检测到空输入，请输入有效的选项编号${RESET}"
-            echo -e "${CYAN}💡 可用选项：0-7 或 9（退出）${RESET}"
+            echo -e "${CYAN}💡 已部署：1-9,0 | 未部署：1-3,0${RESET}"
             echo -e "${PURPLE}----------------------------------------${RESET}"
             continue  # 重新开始输入循环
         fi
@@ -356,11 +303,6 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
     done
     
     case $menu_choice in
-        0)
-            # Docker操作工具
-            docker_operation_tool_menu
-            break
-            ;;
         1)
             # 根据部署状态决定行为
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
@@ -373,6 +315,16 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
             break
             ;;
         2)
+            # Docker操作工具
+            docker_operation_tool_menu
+            break
+            ;;
+        3)
+            # 系统监控工具
+            system_monitor_tool
+            break
+            ;;
+        4)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 update_server
                 break
@@ -385,7 +337,7 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break
             fi
             ;;
-        3)
+        5)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 config_only
                 break  
@@ -398,7 +350,7 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break  
             fi
             ;;
-        4)
+        6)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 test_server
                 break  
@@ -411,7 +363,7 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break 
             fi
             ;;
-        5)
+        7)
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 test_ports
                 break 
@@ -424,11 +376,11 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break
             fi
             ;;
-        6)
+        8)
             docker_logs
             break  
             ;;
-        7)
+        9)
             if [ "$SERVER_DIR_EXISTS" = true ] || [ "$CONTAINER_EXISTS" = true ]; then
                 delete_server
             else
@@ -437,20 +389,24 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
             fi
             break 
             ;;
-        9)
+        0)
             echo -e "${GREEN}👋 感谢使用，脚本退出${RESET}"
             exit 0
             ;;
         *)
             echo -e "${RED}❌ 无效选项，请重新选择${RESET}"
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
-                echo -e "${CYAN}💡 请输入0-7或9退出${RESET}"
+                echo -e "${CYAN}💡 已部署：1-9,0 | 未部署：1-3,0${RESET}"
             else
-                echo -e "${CYAN}💡 请输入0或9退出${RESET}"
+                echo -e "${CYAN}💡 未部署：1-3,0${RESET}"
             fi
             sleep 2
             # 不使用return，而是继续循环让用户重新输入
             continue
+            ;;
+        0)
+            echo -e "${GREEN}👋 感谢使用，脚本退出${RESET}"
+            exit 0
             ;;
     esac
     done
@@ -1494,400 +1450,6 @@ read -p "请输入选择 (1-3，默认1): " detailed_choice
 }
 
 # ========================= ASR 配置（15个服务商） =========================
-config_asr() {
-    while true; do
-        echo -e "\n${GREEN}【1/5】配置 ASR (语音识别) 服务${RESET}"
-        echo "请选择ASR服务商（共15个）："
-        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
-        
-        if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-            echo " 1) ${GREEN}FunASR (本地)${RESET}"
-            echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
-            echo " 2) FunASRServer (独立部署)"
-            echo " 3) ${GREEN}SherpaASR (本地，多语言)${RESET}"
-            echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
-            echo " 4) ${GREEN}SherpaParaformerASR (本地，中文专用)${RESET}"
-            echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
-            echo " 5) DoubaoASR (火山引擎，按次收费)"
-            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
-            echo " 7) TencentASR (腾讯云)"
-            echo " 8) AliyunASR (阿里云，批量处理)"
-            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
-            echo "10) BaiduASR (百度智能云)"
-            echo "11) OpenaiASR (OpenAI)"
-            echo "12) GroqASR (Groq)"
-            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
-            echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
-        elif [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = true ]; then
-            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
-            echo " 2) FunASRServer (独立部署)"
-            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
-            echo " 4) ${YELLOW}SherpaParaformerASR (本地，中文专用)${RESET}"
-            echo -e "    ${CYAN}💡 可用 (${MEM_TOTAL}GB ≥ 2GB) - 轻量级模型${RESET}"
-            echo " 5) DoubaoASR (火山引擎，按次收费)"
-            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
-            echo " 7) TencentASR (腾讯云)"
-            echo " 8) AliyunASR (阿里云，批量处理)"
-            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
-            echo "10) BaiduASR (百度智能云)"
-            echo "11) OpenaiASR (OpenAI)"
-            echo "12) GroqASR (Groq)"
-            echo -e "13) ${GREEN}VoskASR (本地，完全离线)${RESET} ${GREEN}✅ 内存占用较小 (建议≥2GB)${RESET}"
-            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
-            echo "10) BaiduASR (百度智能云)"
-            echo "11) OpenaiASR (OpenAI)"
-            echo "12) GroqASR (Groq)"
-            echo -e "13) ${GREEN}VoskASR (本地，完全离线)${RESET} ${GREEN}✅ 内存占用较小 (建议≥2GB)${RESET}"
-        else
-            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
-            echo " 2) FunASRServer (独立部署)"
-            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
-            echo -e " 4) ${RED}SherpaParaformerASR (本地，中文专用)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)${RESET}"
-            echo " 5) DoubaoASR (火山引擎，按次收费)"
-            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
-            echo " 7) TencentASR (腾讯云)"
-            echo " 8) AliyunASR (阿里云，批量处理)"
-            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
-            echo "10) BaiduASR (百度智能云)"
-            echo "11) OpenaiASR (OpenAI)"
-            echo "12) GroqASR (Groq)"
-            echo -e "13) ${GREEN}VoskASR (本地，完全离线)${RESET} ${GREEN}✅ 内存占用较小 (建议≥2GB)${RESET}"
-        fi
-        echo " 14) Qwen3ASRFlash (通义千问)"
-        echo " 15) XunfeiStreamASR (讯飞，流式)"
-        
-read -r -p "请输入序号 (默认推荐 9，输入0返回上一步): " asr_choice < /dev/tty
-        asr_choice=${asr_choice:-9}
-        
-        # ASR是第一步，输入0直接返回主菜单
-        if [ "$asr_choice" = "0" ]; then
-            echo -e "${CYAN}🔄 取消配置，返回主菜单${RESET}"
-            return 1
-        fi
-
-        local asr_provider_key
-        case $asr_choice in
-            1)
-                asr_provider_key="FunASR"
-                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择FunASR本地模型${RESET}"
-                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
-                    sleep 1
-                    continue
-                fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
-                echo -e "${CYAN}ℹ️ 系统将自动配置 model_dir 为 models/SenseVoiceSmall。${RESET}"
-                echo -e "\n${CYAN}📥 正在下载 SenseVoiceSmall ASR 模型... 这可能需要几分钟。${RESET}"
-                retry_exec "curl -fSL $LOCAL_ASR_MODEL_URL -o $MAIN_DIR/models/SenseVoiceSmall/model.pt" "下载 ASR 模型"
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_dir: .*|    model_dir: \"models/SenseVoiceSmall\"|" "$CONFIG_FILE"
-                ;;
-            2)
-                asr_provider_key="FunASRServer"
-                echo -e "\n${YELLOW}⚠️ 您选择了 FunASRServer。${RESET}"
-                echo -e "${CYAN}🔗 需要自行部署 FunASR Server 服务${RESET}"
-read -r -p "请输入 FunASR Server 地址 (默认 http://localhost:10095): " server_url < /dev/tty
-                server_url=${server_url:-"http://localhost:10095"}
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    host: .*/    host: $server_url/" "$CONFIG_FILE"
-                ;;
-            3)
-                asr_provider_key="SherpaASR"
-                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择SherpaASR本地模型${RESET}"
-                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
-                    sleep 1
-                    continue
-                fi
-                echo -e "\n${YELLOW}⚠️ 您选择了 SherpaASR。${RESET}"
-                echo -e "${CYAN}🔑 SherpaASR配置需要以下参数：${RESET}"
-                echo "  - API类型: sherpa_onnx_local (固定值)"
-                echo "  - 模型目录: 模型存放路径 (默认: models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17)"
-                echo "  - 输出目录: 临时文件输出路径 (默认: tmp/)"
-                echo "  - 模型类型: sense_voice (多语言) 或 paraformer (中文专用) (默认: sense_voice)"
-                echo -e "${CYAN}💡 需要手动下载模型文件到指定目录${RESET}"
-                
-read -r -p "请输入模型目录 (默认: models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17): " model_dir < /dev/tty
-                model_dir="${model_dir:-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17}"
-read -r -p "请输入输出目录 (默认: tmp/): " output_dir < /dev/tty
-                output_dir="${output_dir:-tmp/}"
-read -r -p "请输入模型类型 (默认: sense_voice): " model_type < /dev/tty
-                model_type="${model_type:-sense_voice}"
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$model_dir" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_dir: .*|    model_dir: \"$model_dir\"|" "$CONFIG_FILE"
-                fi
-                if [ -n "$output_dir" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    output_dir: .*|    output_dir: \"$output_dir\"|" "$CONFIG_FILE"
-                fi
-                if [ -n "$model_type" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    model_type: .*/    model_type: $model_type/" "$CONFIG_FILE"
-                fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaASR。${RESET}"
-                ;;
-            4)
-                asr_provider_key="SherpaParaformerASR"
-                if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = false ]; then
-                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)，无法选择SherpaParaformerASR本地模型${RESET}"
-                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
-                    sleep 1
-                    continue
-                fi
-                echo -e "\n${YELLOW}⚠️ 您选择了 SherpaParaformerASR。${RESET}"
-                echo -e "${CYAN}🔑 SherpaParaformerASR配置需要以下参数：${RESET}"
-                echo "  - API类型: sherpa_onnx_local (固定值)"
-                echo "  - 模型目录: 模型存放路径 (默认: models/sherpa-onnx-paraformer-zh-small-2024-03-09)"
-                echo "  - 输出目录: 临时文件输出路径 (默认: tmp/)"
-                echo "  - 模型类型: paraformer (中文专用)"
-                echo -e "${CYAN}💡 中文专用模型，适合低性能设备${RESET}"
-                echo -e "${CYAN}💡 需要手动下载模型文件到指定目录${RESET}"
-                
-read -r -p "请输入模型目录 (默认: models/sherpa-onnx-paraformer-zh-small-2024-03-09): " model_dir < /dev/tty
-                model_dir="${model_dir:-models/sherpa-onnx-paraformer-zh-small-2024-03-09}"
-read -r -p "请输入输出目录 (默认: tmp/): " output_dir < /dev/tty
-                output_dir="${output_dir:-tmp/}"
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$model_dir" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_dir: .*|    model_dir: \"$model_dir\"|" "$CONFIG_FILE"
-                fi
-                if [ -n "$output_dir" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    output_dir: .*|    output_dir: \"$output_dir\"|" "$CONFIG_FILE"
-                fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaParaformerASR。${RESET}"
-                ;;
-            5)
-                asr_provider_key="DoubaoASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
-                echo -e "${CYAN}📝 火山引擎ASR需要以下参数：${RESET}"
-                echo "  - AppID: 火山引擎语音合成服务AppID"
-                echo "  - Access Token: 火山引擎语音合成服务Access Token"
-                
-                safe_read "请输入 AppID: " appid
-                safe_read "请输入 Access Token: " access_token
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$appid" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appid: .*/    appid: \"$appid\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$access_token" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: \"$access_token\"/" "$CONFIG_FILE"
-                fi
-                echo -e "\n${GREEN}✅ 已选择火山引擎DoubaoASR。${RESET}"
-                ;;
-            6)
-                asr_provider_key="DoubaoStreamASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoStreamASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
-                echo -e "${CYAN}📝 火山引擎流式ASR需要以下参数：${RESET}"
-                echo "  - AppID: 火山引擎语音合成服务AppID"
-                echo "  - Access Token: 火山引擎语音合成服务Access Token"
-                
-                safe_read "请输入 AppID: " appid
-                safe_read "请输入 Access Token: " access_token
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$appid" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appid: .*/    appid: \"$appid\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$access_token" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_token: .*/    access_token: \"$access_token\"/" "$CONFIG_FILE"
-                fi
-                echo -e "\n${GREEN}✅ 已选择火山引擎流式ASR。${RESET}"
-                ;;
-            7)
-                asr_provider_key="TencentASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了腾讯云 TencentASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/asr${RESET}"
-                echo -e "${CYAN}📝 腾讯云ASR需要以下参数：${RESET}"
-                echo "  - APPID: 腾讯语音合成服务APPID"
-                echo "  - SecretID: 腾讯语音合成服务SecretID"
-                echo "  - SecretKey: 腾讯语音合成服务SecretKey"
-                
-                safe_read "请输入 APPID: " appid
-                safe_read "请输入 SecretID: " secret_id
-                safe_read "请输入 SecretKey: " secret_key
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$appid" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appid: .*/    appid: \"$appid\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$secret_id" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_id: .*/    secret_id: \"$secret_id\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$secret_key" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
-                fi
-                echo -e "\n${GREEN}✅ 已选择腾讯云ASR。${RESET}"
-                ;;
-            8)
-                asr_provider_key="AliyunASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
-                echo -e "${CYAN}🔑 Appkey地址：https://nls-portal.console.aliyun.com/applist${RESET}"
-                
-                echo -e "${CYAN}📝 阿里云ASR需要以下参数：${RESET}"
-                echo "  - Appkey: 语音交互服务项目Appkey（必填）"
-                echo "  - Token: 临时AccessToken，24小时有效（必填）"
-                echo -e "${YELLOW}💡 长期使用建议设置下方Access Key（可选）：${RESET}"
-                echo "  - Access Key ID: 阿里云账号访问密钥ID（可选，长期使用推荐）"
-                echo "  - Access Key Secret: 阿里云账号访问密钥（可选，长期使用推荐）"
-                
-                safe_read "请输入 Appkey: " appkey
-                safe_read "请输入 Token: " token
-                
-                echo -e "\n${YELLOW}💡 是否要配置长期使用的Access Key？${RESET}"
-                echo "如需长期使用（避免Token过期），建议配置Access Key:"
-read -r -p "请输入 Access Key ID (留空跳过): " access_key_id < /dev/tty
-read -r -p "请输入 Access Key Secret (留空跳过): " access_key_secret < /dev/tty
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                
-                if [ -n "$appkey" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    appkey: .*/    appkey: \"$appkey\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$token" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    token: .*/    token: \"$token\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$access_key_id" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$access_key_secret" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: \"$access_key_secret\"/" "$CONFIG_FILE"
-                fi
-                
-                echo -e "\n${GREEN}✅ 已选择阿里云ASR并配置完成。${RESET}"
-                ;;
-            9)
-                config_aliyun_asr
-                ;;
-            10)
-                asr_provider_key="BaiduASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了百度智能云 BaiduASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai${RESET}"
-read -r -p "请输入 APP ID: " app_id < /dev/tty
-                app_id="${app_id:-}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
-read -r -p "请输入 Secret Key: " secret_key < /dev/tty
-                secret_key="${secret_key:-}"
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$app_id" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$api_key" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$secret_key" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    secret_key: .*/    secret_key: \"$secret_key\"/" "$CONFIG_FILE"
-                fi
-                ;;
-            11)
-                asr_provider_key="OpenaiASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了OpenAI OpenaiASR。${RESET}"
-                echo -e "${CYAN}🔑 API地址：https://platform.openai.com${RESET}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$api_key" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
-                fi
-                ;;
-            12)
-                asr_provider_key="GroqASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了Groq GroqASR。${RESET}"
-                echo -e "${CYAN}🔑 API地址：https://console.groq.com${RESET}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$api_key" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
-                fi
-                ;;
-            13)
-                asr_provider_key="VoskASR"
-                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
-                    echo -e "\n${YELLOW}⚠️ 内存不足提醒：推荐≥2GB内存${RESET}"
-read -r -p "按回车继续或输入0重新选择: " confirm_memory < /dev/tty
-                    if [ "$confirm_memory" = "0" ]; then
-                        continue
-                    fi
-                fi
-                echo -e "\n${YELLOW}⚠️ 您选择了 VoskASR。${RESET}"
-                echo -e "${CYAN}🔑 VoskASR配置需要以下参数：${RESET}"
-                echo "  - API类型: vosk (固定值)"
-                echo "  - 模型路径: 语音识别模型路径 (必需，如: models/vosk/vosk-model-small-cn-0.22)"
-                echo "  - 输出目录: 临时文件输出路径 (默认: tmp/)"
-                echo -e "${CYAN}💡 完全离线运行，无需网络连接${RESET}"
-                echo -e "${CYAN}💡 下载地址：https://alphacephei.com/vosk/models${RESET}"
-                
-read -r -p "请输入模型路径 (如: models/vosk/vosk-model-small-cn-0.22): " model_path < /dev/tty
-                model_path="${model_path:-}"
-read -r -p "请输入输出目录 (默认: tmp/): " output_dir < /dev/tty
-                output_dir="${output_dir:-tmp/}"
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$model_path" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    model_path: .*|    model_path: \"$model_path\"|" "$CONFIG_FILE"
-                fi
-                if [ -n "$output_dir" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s|^    output_dir: .*|    output_dir: \"$output_dir\"|" "$CONFIG_FILE"
-                fi
-                echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
-                ;;
-            14)
-                asr_provider_key="Qwen3ASRFlash"
-                echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen3ASRFlash。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$api_key" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
-                fi
-                ;;
-            15)
-                asr_provider_key="XunfeiStreamASR"
-                echo -e "\n${YELLOW}⚠️ 您选择了讯飞 XunfeiStreamASR。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn${RESET}"
-read -r -p "请输入 APP ID: " app_id < /dev/tty
-                app_id="${app_id:-}"
-read -r -p "请输入 API Secret: " api_secret < /dev/tty
-                api_secret="${api_secret:-}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
-                
-                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
-                if [ -n "$app_id" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$api_secret" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_secret: .*/    api_secret: \"$api_secret\"/" "$CONFIG_FILE"
-                fi
-                if [ -n "$api_key" ]; then
-                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
-                fi
-                ;;
-            *)
-                echo -e "\n${RED}❌ 输入无效，请选择1-15范围内的数字，或输入0返回上一步${RESET}"
-                echo -e "${YELLOW}💡 提示：默认推荐选项9（阿里云流式ASR）${RESET}"
-read -r -p "按回车键重新选择..." < /dev/tty
-                continue
-                ;;
-        esac
-        
-        # 配置完成，返回0表示成功
-        return 0
-    done
-}
 
 # 阿里云ASR配置
 config_aliyun_asr() {
@@ -1929,7 +1491,7 @@ config_aliyun_asr() {
     echo -e "\n${GREEN}✅ 阿里云流式ASR配置完成${RESET}"
 }
 
-# ========================= 高级ASR配置 =========================
+# ========================= ASR配置 =========================
 config_asr_advanced() {
     echo -e "${YELLOW}🎤 语音识别(ASR)服务详细配置${RESET}"
     echo -e "${CYAN}请选择ASR服务类型：${RESET}"
@@ -2082,7 +1644,6 @@ config_llm() {
     while true; do
         echo -e "\n\n${GREEN}【2/5】配置 LLM (大语言模型) 服务${RESET}"
         echo "请选择LLM服务商（共15个）："
-        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         echo " 1) ChatGLMLLM (智谱清言) [推荐]"
         echo " 2) QwenLLM (通义千问)"
         echo " 3) KimiLLM (月之暗面)"
@@ -2098,6 +1659,7 @@ config_llm() {
         echo "13) OllamaLLM (Ollama本地)"
         echo "14) XinferenceLLM (Xinference)"
         echo "15) FastgptLLM (FastGPT)"
+        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " llm_choice < /dev/tty
         llm_choice=${llm_choice:-1}
@@ -2426,10 +1988,10 @@ config_vllm() {
     while true; do
         echo -e "\n\n${GREEN}【3/5】配置 VLLM (视觉大语言模型) 服务${RESET}"
         echo "请选择VLLM服务商（共3个）："
-        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         echo " 1) ChatGLMVLLM (智谱清言) [推荐]"
         echo " 2) QwenVLVLLM (通义千问)"
         echo " 3) XunfeiSparkLLM (讯飞星火)"
+        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " vllm_choice < /dev/tty
         vllm_choice=${vllm_choice:-1}
@@ -2514,7 +2076,6 @@ config_tts() {
     while true; do
         echo -e "\n\n${GREEN}【4/5】配置 TTS (语音合成) 服务${RESET}"
         echo "请选择TTS服务商（共22个）："
-        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         echo " 1) EdgeTTS (微软) [推荐]"
         echo " 2) DoubaoTTS (火山引擎)"
         echo " 3) HuoshanDoubleStreamTTS (火山双流)"
@@ -2537,6 +2098,7 @@ config_tts() {
         echo "20) GPT-Sovits (自部署)"
         echo "21) AliBLTTS (阿里云百炼)"
         echo "22) XunFeiTTS (讯飞)"
+        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_choice < /dev/tty
         tts_choice=${tts_choice:-1}
@@ -2983,10 +2545,10 @@ config_memory() {
     while true; do
         echo -e "\n\n${GREEN}【5/5】配置 Memory (记忆) 服务${RESET}"
         echo "请选择Memory模式（共3个）："
-        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         echo " 1) 不开启记忆 (nomem) [推荐]"
         echo " 2) 本地短记忆 (mem_local_short) - 隐私优先"
         echo " 3) Mem0AI (mem0ai) - 支持超长记忆 (每月免费1000次)"
+        echo " 0) ${YELLOW} 返回上一步 ${RESET}"
         
 read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " memory_choice < /dev/tty
         memory_choice=${memory_choice:-1}
@@ -3323,7 +2885,7 @@ config_keys() {
         return 0  # 配置成功完成
 }
 
-# ========================= 高级TTS配置 =========================
+# ========================= TTS配置 =========================
 config_tts_advanced() {
     echo -e "${YELLOW}🎤 语音合成(TTS)服务详细配置${RESET}"
     echo -e "${CYAN}请选择TTS服务类型：${RESET}"
@@ -3655,7 +3217,7 @@ EOF
     echo -e "${YELLOW}💡 请确保服务已启动在 $sovits_v3_url${RESET}"
 }
 
-# 高级LLM配置
+# LLM配置
 config_llm_advanced() {
     echo -e "${YELLOW}🤖 大语言模型(LLM)服务详细配置${RESET}"
     echo -e "${CYAN}请选择LLM服务类型：${RESET}"
@@ -5008,8 +4570,8 @@ show_connection_info() {
     
     echo -e "${GREEN}OTA接口（内网）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
     echo -e "${GREEN}OTA接口（公网）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-    echo -e "${GREEN}Websocket接口：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
-    echo -e "${GREEN}Websocket接口：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+    echo -e "${GREEN}Websocket接口（内网）：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+    echo -e "${GREEN}Websocket接口（公网）：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
 }
 
@@ -5871,474 +5433,546 @@ docker_operation_tool_menu() {
 
 # Docker服务管理
 docker_service_management() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🔧 Docker服务管理 🔧${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "1) 启动小智服务器服务"
-    echo "2) 停止小智服务器服务"
-    echo "3) 重启小智服务器服务"
-    echo "4) 查看服务状态"
-    echo "5) 查看服务资源使用情况"
-    echo "0) 返回上级菜单"
-    
-    read -r -p "请选择操作 (0-5): " service_choice < /dev/tty
-    
-    case $service_choice in
-        1)
-            echo -e "\n${GREEN}🚀 启动小智服务器服务...${RESET}"
-            if [ -d "$MAIN_DIR" ] && [ -f "$MAIN_DIR/docker-compose.yml" ]; then
-                cd "$MAIN_DIR" || return 1
-                if docker compose up -d; then
-                    sleep 5
-                    if docker ps | grep -q "$CONTAINER_NAME"; then
-                        echo -e "${GREEN}✅ 服务启动成功${RESET}"
-                        docker_service_status_display
+    while true; do
+        clear
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${CYAN}🔧 Docker服务管理 🔧${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        echo "1) 启动小智服务器服务"
+        echo "2) 停止小智服务器服务"
+        echo "3) 重启小智服务器服务"
+        echo "4) 查看服务状态"
+        echo "5) 查看服务资源使用情况"
+        echo "0) 返回Docker工具主页"
+        
+        read -r -p "请选择操作 (0-5): " service_choice < /dev/tty
+        
+        case $service_choice in
+            1)
+                echo -e "\n${GREEN}🚀 启动小智服务器服务...${RESET}"
+                if [ -d "$MAIN_DIR" ] && [ -f "$MAIN_DIR/docker-compose.yml" ]; then
+                    cd "$MAIN_DIR" || return 1
+                    if docker compose up -d; then
+                        sleep 5
+                        if docker ps | grep -q "$CONTAINER_NAME"; then
+                            echo -e "${GREEN}✅ 服务启动成功${RESET}"
+                            docker_service_status_display
+                        else
+                            echo -e "${RED}❌ 服务启动失败${RESET}"
+                        fi
                     else
-                        echo -e "${RED}❌ 服务启动失败${RESET}"
+                        echo -e "${RED}❌ Docker Compose启动失败${RESET}"
                     fi
                 else
-                    echo -e "${RED}❌ Docker Compose启动失败${RESET}"
+                    echo -e "${RED}❌ 服务器目录或配置文件不存在${RESET}"
                 fi
-            else
-                echo -e "${RED}❌ 服务器目录或配置文件不存在${RESET}"
-            fi
-            ;;
-        2)
-            echo -e "\n${RED}🛑 停止小智服务器服务...${RESET}"
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                docker stop "$CONTAINER_NAME"
-                echo -e "${GREEN}✅ 服务已停止${RESET}"
-            else
-                echo -e "${YELLOW}⚠️ 服务未运行${RESET}"
-            fi
-            ;;
-        3)
-            echo -e "\n${CYAN}🔄 重启小智服务器服务...${RESET}"
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                docker restart "$CONTAINER_NAME"
-                sleep 5
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            2)
+                echo -e "\n${RED}🛑 停止小智服务器服务...${RESET}"
                 if docker ps | grep -q "$CONTAINER_NAME"; then
-                    echo -e "${GREEN}✅ 服务重启成功${RESET}"
-                    docker_service_status_display
+                    docker stop "$CONTAINER_NAME"
+                    echo -e "${GREEN}✅ 服务已停止${RESET}"
                 else
-                    echo -e "${RED}❌ 服务重启失败${RESET}"
+                    echo -e "${YELLOW}⚠️ 服务未运行${RESET}"
                 fi
-            else
-                echo -e "${YELLOW}⚠️ 服务未运行，无法重启${RESET}"
-            fi
-            ;;
-        4)
-            docker_service_status_display
-            ;;
-        5)
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                echo -e "\n${CYAN}📊 服务资源使用情况:${RESET}"
-                docker stats "$CONTAINER_NAME" --no-stream
-            else
-                echo -e "${YELLOW}⚠️ 服务未运行${RESET}"
-            fi
-            ;;
-        0)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选项${RESET}"
-            ;;
-    esac
-    
-    read -r -p "按回车键继续..." < /dev/tty
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            3)
+                echo -e "\n${CYAN}🔄 重启小智服务器服务...${RESET}"
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    docker restart "$CONTAINER_NAME"
+                    sleep 5
+                    if docker ps | grep -q "$CONTAINER_NAME"; then
+                        echo -e "${GREEN}✅ 服务重启成功${RESET}"
+                        docker_service_status_display
+                    else
+                        echo -e "${RED}❌ 服务重启失败${RESET}"
+                    fi
+                else
+                    echo -e "${YELLOW}⚠️ 服务未运行，无法重启${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            4)
+                docker_service_status_display
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            5)
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    echo -e "\n${CYAN}📊 服务资源使用情况:${RESET}"
+                    docker stats "$CONTAINER_NAME" --no-stream
+                else
+                    echo -e "${YELLOW}⚠️ 服务未运行${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            0)
+                echo -e "${CYAN}🔙 返回Docker工具主页${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选项${RESET}"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # Docker镜像管理
 docker_image_management() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🖼️ Docker镜像管理 🖼️${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "1) 查看所有镜像"
-    echo "2) 查看小智服务器镜像信息"
-    echo "3) 清理未使用的镜像"
-    echo "4) 强制清理所有镜像"
-    echo "5) 重新拉取小智服务器镜像"
-    echo "0) 返回上级菜单"
-    
-    read -r -p "请选择操作 (0-5): " image_choice < /dev/tty
-    
-    case $image_choice in
-        1)
-            echo -e "\n${CYAN}📋 所有Docker镜像:${RESET}"
-            docker images
-            ;;
-        2)
-            echo -e "\n${CYAN}📋 小智服务器镜像信息:${RESET}"
-            if docker images | grep -q "xiaozhi"; then
-                docker images | grep "xiaozhi"
-            else
-                echo -e "${YELLOW}⚠️ 未找到小智服务器相关镜像${RESET}"
-            fi
-            ;;
-        3)
-            echo -e "\n${YELLOW}🧹 清理未使用的镜像...${RESET}"
-            read -r -p "确认清理未使用的镜像？(y/N): " confirm < /dev/tty
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                docker image prune -f
-                echo -e "${GREEN}✅ 清理完成${RESET}"
-            else
-                echo -e "${CYAN}🔙 已取消清理${RESET}"
-            fi
-            ;;
-        4)
-            echo -e "\n${RED}⚠️ 强制清理所有镜像${RESET}"
-            echo -e "${RED}⚠️ 此操作将删除所有Docker镜像，危险！${RESET}"
-            read -r -p "确认删除所有镜像？(输入YES确认): " confirm < /dev/tty
-            if [ "$confirm" = "YES" ]; then
-                docker rmi $(docker images -q) -f 2>/dev/null || true
-                echo -e "${GREEN}✅ 所有镜像已清理${RESET}"
-            else
-                echo -e "${CYAN}🔙 已取消清理${RESET}"
-            fi
-            ;;
-        5)
-            echo -e "\n${CYAN}📥 重新拉取小智服务器镜像...${RESET}"
-            if [ -f "$MAIN_DIR/docker-compose.yml" ]; then
-                cd "$MAIN_DIR"
-                docker compose pull
-                echo -e "${GREEN}✅ 镜像拉取完成${RESET}"
-            else
-                echo -e "${RED}❌ 未找到docker-compose.yml文件${RESET}"
-            fi
-            ;;
-        0)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选项${RESET}"
-            ;;
-    esac
-    
-    read -r -p "按回车键继续..." < /dev/tty
+    while true; do
+        clear
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${CYAN}🖼️ Docker镜像管理 🖼️${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        echo "1) 查看所有镜像"
+        echo "2) 查看小智服务器镜像信息"
+        echo "3) 清理未使用的镜像"
+        echo "4) 强制清理所有镜像"
+        echo "5) 重新拉取小智服务器镜像"
+        echo "0) 返回Docker工具主页"
+        
+        read -r -p "请选择操作 (0-5): " image_choice < /dev/tty
+        
+        case $image_choice in
+            1)
+                echo -e "\n${CYAN}📋 所有Docker镜像:${RESET}"
+                docker images
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            2)
+                echo -e "\n${CYAN}📋 小智服务器镜像信息:${RESET}"
+                if docker images | grep -q "xiaozhi"; then
+                    docker images | grep "xiaozhi"
+                else
+                    echo -e "${YELLOW}⚠️ 未找到小智服务器相关镜像${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            3)
+                echo -e "\n${YELLOW}🧹 清理未使用的镜像...${RESET}"
+                read -r -p "确认清理未使用的镜像？(y/N): " confirm < /dev/tty
+                if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                    docker image prune -f
+                    echo -e "${GREEN}✅ 清理完成${RESET}"
+                else
+                    echo -e "${CYAN}🔙 已取消清理${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            4)
+                echo -e "\n${RED}⚠️ 强制清理所有镜像${RESET}"
+                echo -e "${RED}⚠️ 此操作将删除所有Docker镜像，危险！${RESET}"
+                read -r -p "确认删除所有镜像？(输入YES确认): " confirm < /dev/tty
+                if [ "$confirm" = "YES" ]; then
+                    docker rmi $(docker images -q) -f 2>/dev/null || true
+                    echo -e "${GREEN}✅ 所有镜像已清理${RESET}"
+                else
+                    echo -e "${CYAN}🔙 已取消清理${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            5)
+                echo -e "\n${CYAN}📥 重新拉取小智服务器镜像...${RESET}"
+                if [ -f "$MAIN_DIR/docker-compose.yml" ]; then
+                    cd "$MAIN_DIR"
+                    docker compose pull
+                    echo -e "${GREEN}✅ 镜像拉取完成${RESET}"
+                else
+                    echo -e "${RED}❌ 未找到docker-compose.yml文件${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            0)
+                echo -e "${CYAN}🔙 返回Docker工具主页${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选项${RESET}"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # Docker容器管理(高级)
 docker_container_management_advanced() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}📦 Docker容器管理 (高级) 📦${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "1) 查看所有容器"
-    echo "2) 查看小智服务器容器详情"
-    echo "3) 进入小智服务器容器"
-    echo "4) 清理已停止的容器"
-    echo "5) 重置小智服务器容器"
-    echo "0) 返回上级菜单"
-    
-    read -r -p "请选择操作 (0-5): " container_choice < /dev/tty
-    
-    case $container_choice in
-        1)
-            echo -e "\n${CYAN}📋 所有Docker容器:${RESET}"
-            docker ps -a
-            ;;
-        2)
-            echo -e "\n${CYAN}📋 小智服务器容器详情:${RESET}"
-            if docker ps -a | grep -q "$CONTAINER_NAME"; then
-                docker inspect "$CONTAINER_NAME"
-            else
-                echo -e "${YELLOW}⚠️ 未找到小智服务器容器${RESET}"
-            fi
-            ;;
-        3)
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                echo -e "\n${CYAN}🔗 进入容器...${RESET}"
-                echo -e "${YELLOW}⚠️ 使用 'exit' 命令退出容器${RESET}"
-                docker exec -it "$CONTAINER_NAME" /bin/bash
-            else
-                echo -e "${RED}❌ 容器未运行${RESET}"
-            fi
-            ;;
-        4)
-            echo -e "\n${YELLOW}🧹 清理已停止的容器...${RESET}"
-            read -r -p "确认清理？(y/N): " confirm < /dev/tty
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                docker container prune -f
-                echo -e "${GREEN}✅ 清理完成${RESET}"
-            else
-                echo -e "${CYAN}🔙 已取消清理${RESET}"
-            fi
-            ;;
-        5)
-            echo -e "\n${RED}⚠️ 重置小智服务器容器${RESET}"
-            read -r -p "确认重置？(y/N): " confirm < /dev/tty
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                if docker ps | grep -q "$CONTAINER_NAME"; then
-                    docker stop "$CONTAINER_NAME"
-                fi
+    while true; do
+        clear
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${CYAN}📦 Docker容器管理 (高级) 📦${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        echo "1) 查看所有容器"
+        echo "2) 查看小智服务器容器详情"
+        echo "3) 进入小智服务器容器"
+        echo "4) 清理已停止的容器"
+        echo "5) 重置小智服务器容器"
+        echo "0) 返回Docker工具主页"
+        
+        read -r -p "请选择操作 (0-5): " container_choice < /dev/tty
+        
+        case $container_choice in
+            1)
+                echo -e "\n${CYAN}📋 所有Docker容器:${RESET}"
+                docker ps -a
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            2)
+                echo -e "\n${CYAN}📋 小智服务器容器详情:${RESET}"
                 if docker ps -a | grep -q "$CONTAINER_NAME"; then
-                    docker rm "$CONTAINER_NAME"
+                    docker inspect "$CONTAINER_NAME"
+                else
+                    echo -e "${YELLOW}⚠️ 未找到小智服务器容器${RESET}"
                 fi
-                echo -e "${GREEN}✅ 容器已重置${RESET}"
-            else
-                echo -e "${CYAN}🔙 已取消重置${RESET}"
-            fi
-            ;;
-        0)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选项${RESET}"
-            ;;
-    esac
-    
-    read -r -p "按回车键继续..." < /dev/tty
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            3)
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    echo -e "\n${CYAN}🔗 进入容器...${RESET}"
+                    echo -e "${YELLOW}⚠️ 使用 'exit' 命令退出容器${RESET}"
+                    docker exec -it "$CONTAINER_NAME" /bin/bash
+                else
+                    echo -e "${RED}❌ 容器未运行${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            4)
+                echo -e "\n${YELLOW}🧹 清理已停止的容器...${RESET}"
+                read -r -p "确认清理？(y/N): " confirm < /dev/tty
+                if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                    docker container prune -f
+                    echo -e "${GREEN}✅ 清理完成${RESET}"
+                else
+                    echo -e "${CYAN}🔙 已取消清理${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            5)
+                echo -e "\n${RED}⚠️ 重置小智服务器容器${RESET}"
+                read -r -p "确认重置？(y/N): " confirm < /dev/tty
+                if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                    if docker ps | grep -q "$CONTAINER_NAME"; then
+                        docker stop "$CONTAINER_NAME"
+                    fi
+                    if docker ps -a | grep -q "$CONTAINER_NAME"; then
+                        docker rm "$CONTAINER_NAME"
+                    fi
+                    echo -e "${GREEN}✅ 容器已重置${RESET}"
+                else
+                    echo -e "${CYAN}🔙 已取消重置${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            0)
+                echo -e "${CYAN}🔙 返回Docker工具主页${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选项${RESET}"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # Docker系统信息
 docker_system_info() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}ℹ️ Docker系统信息 ℹ️${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo -e "${CYAN}🐳 Docker版本信息:${RESET}"
-    docker version
-    
-    echo -e "\n${CYAN}📊 Docker系统信息:${RESET}"
-    docker system info
-    
-    echo -e "\n${CYAN}💾 Docker磁盘使用情况:${RESET}"
-    docker system df
-    
-    echo -e "\n${CYAN}🔍 Docker事件信息:${RESET}"
-    docker system events --since "1h" --until "0s" 2>/dev/null | head -20 || echo "无法获取事件信息"
-    
-    read -r -p "按回车键继续..." < /dev/tty
+    while true; do
+        clear
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${CYAN}ℹ️ Docker系统信息 ℹ️${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        echo "1) 查看Docker版本信息"
+        echo "2) 查看Docker系统信息"
+        echo "3) 查看Docker磁盘使用情况"
+        echo "4) 查看Docker事件信息"
+        echo "0) 返回Docker工具主页"
+        
+        read -r -p "请选择操作 (0-4): " info_choice < /dev/tty
+        
+        case $info_choice in
+            1)
+                echo -e "\n${CYAN}🐳 Docker版本信息:${RESET}"
+                docker version
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            2)
+                echo -e "\n${CYAN}📊 Docker系统信息:${RESET}"
+                docker system info
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            3)
+                echo -e "\n${CYAN}💾 Docker磁盘使用情况:${RESET}"
+                docker system df
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            4)
+                echo -e "\n${CYAN}🔍 Docker事件信息:${RESET}"
+                docker system events --since "1h" --until "0s" 2>/dev/null | head -20 || echo "无法获取事件信息"
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            0)
+                echo -e "${CYAN}🔙 返回Docker工具主页${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选项${RESET}"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # Docker深度清理
 docker_deep_cleanup() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${RED}⚠️ Docker深度清理 ⚠️${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo -e "${RED}⚠️ 警告：此操作将清理所有Docker资源${RESET}"
-    echo -e "${RED}⚠️ 包括：容器、镜像、卷、网络、构建缓存${RESET}"
-    echo -e "${RED}⚠️ 此操作不可恢复！${RESET}"
-    echo ""
-    
-    echo "1) 清理未使用的资源"
-    echo "2) 清理所有未运行的容器"
-    echo "3) 清理所有未使用的镜像"
-    echo "4) 清理所有未使用的卷"
-    echo "5) 清理所有未使用的网络"
-    echo "6) 清理构建缓存"
-    echo "7) 完全重置Docker (所有数据)"
-    echo "0) 返回上级菜单"
-    
-    read -r -p "请选择清理操作 (0-7): " cleanup_choice < /dev/tty
-    
-    case $cleanup_choice in
-        1)
-            echo -e "\n${YELLOW}🧹 清理未使用的资源...${RESET}"
-            docker system prune -f
-            echo -e "${GREEN}✅ 清理完成${RESET}"
-            ;;
-        2)
-            echo -e "\n${YELLOW}🧹 清理未运行的容器...${RESET}"
-            docker container prune -f
-            echo -e "${GREEN}✅ 清理完成${RESET}"
-            ;;
-        3)
-            echo -e "\n${YELLOW}🧹 清理未使用的镜像...${RESET}"
-            docker image prune -a -f
-            echo -e "${GREEN}✅ 清理完成${RESET}"
-            ;;
-        4)
-            echo -e "\n${YELLOW}🧹 清理未使用的卷...${RESET}"
-            docker volume prune -f
-            echo -e "${GREEN}✅ 清理完成${RESET}"
-            ;;
-        5)
-            echo -e "\n${YELLOW}🧹 清理未使用的网络...${RESET}"
-            docker network prune -f
-            echo -e "${GREEN}✅ 清理完成${RESET}"
-            ;;
-        6)
-            echo -e "\n${YELLOW}🧹 清理构建缓存...${RESET}"
-            docker builder prune -f
-            echo -e "${GREEN}✅ 清理完成${RESET}"
-            ;;
-        7)
-            echo -e "\n${RED}☠️ 完全重置Docker${RESET}"
-            echo -e "${RED}⚠️ 此操作将删除所有Docker数据，不可恢复！${RESET}"
-            read -r -p "输入 'DELETE ALL' 确认: " confirm < /dev/tty
-            if [ "$confirm" = "DELETE ALL" ]; then
-                docker system prune -a --volumes -f
-                echo -e "${GREEN}✅ Docker已完全重置${RESET}"
-            else
-                echo -e "${CYAN}🔙 已取消重置${RESET}"
-            fi
-            ;;
-        0)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选项${RESET}"
-            ;;
-    esac
-    
-    read -r -p "按回车键继续..." < /dev/tty
+    while true; do
+        clear
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${RED}⚠️ Docker深度清理 ⚠️${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        echo -e "${RED}⚠️ 警告：此操作将清理所有Docker资源${RESET}"
+        echo -e "${RED}⚠️ 包括：容器、镜像、卷、网络、构建缓存${RESET}"
+        echo -e "${RED}⚠️ 此操作不可恢复！${RESET}"
+        echo ""
+        
+        echo "1) 清理未使用的资源"
+        echo "2) 清理所有未运行的容器"
+        echo "3) 清理所有未使用的镜像"
+        echo "4) 清理所有未使用的卷"
+        echo "5) 清理所有未使用的网络"
+        echo "6) 清理构建缓存"
+        echo "7) 完全重置Docker (所有数据)"
+        echo "0) 返回Docker工具主页"
+        
+        read -r -p "请选择清理操作 (0-7): " cleanup_choice < /dev/tty
+        
+        case $cleanup_choice in
+            1)
+                echo -e "\n${YELLOW}🧹 清理未使用的资源...${RESET}"
+                docker system prune -f
+                echo -e "${GREEN}✅ 清理完成${RESET}"
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            2)
+                echo -e "\n${YELLOW}🧹 清理未运行的容器...${RESET}"
+                docker container prune -f
+                echo -e "${GREEN}✅ 清理完成${RESET}"
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            3)
+                echo -e "\n${YELLOW}🧹 清理未使用的镜像...${RESET}"
+                docker image prune -a -f
+                echo -e "${GREEN}✅ 清理完成${RESET}"
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            4)
+                echo -e "\n${YELLOW}🧹 清理未使用的卷...${RESET}"
+                docker volume prune -f
+                echo -e "${GREEN}✅ 清理完成${RESET}"
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            5)
+                echo -e "\n${YELLOW}🧹 清理未使用的网络...${RESET}"
+                docker network prune -f
+                echo -e "${GREEN}✅ 清理完成${RESET}"
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            6)
+                echo -e "\n${YELLOW}🧹 清理构建缓存...${RESET}"
+                docker builder prune -f
+                echo -e "${GREEN}✅ 清理完成${RESET}"
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            7)
+                echo -e "\n${RED}☠️ 完全重置Docker${RESET}"
+                echo -e "${RED}⚠️ 此操作将删除所有Docker数据，不可恢复！${RESET}"
+                read -r -p "输入 'DELETE ALL' 确认: " confirm < /dev/tty
+                if [ "$confirm" = "DELETE ALL" ]; then
+                    docker system prune -a --volumes -f
+                    echo -e "${GREEN}✅ Docker已完全重置${RESET}"
+                else
+                    echo -e "${CYAN}🔙 已取消重置${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            0)
+                echo -e "${CYAN}🔙 返回Docker工具主页${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选项${RESET}"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # Docker网络和端口管理
 docker_network_port_management() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🌐 Docker网络和端口管理 🌐${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "1) 查看Docker网络"
-    echo "2) 查看端口映射"
-    echo "3) 检查端口占用"
-    echo "4) 网络连接测试"
-    echo "5) 查看容器网络详情"
-    echo "0) 返回上级菜单"
-    
-    read -r -p "请选择操作 (0-5): " network_choice < /dev/tty
-    
-    case $network_choice in
-        1)
-            echo -e "\n${CYAN}🌐 Docker网络列表:${RESET}"
-            docker network ls
-            ;;
-        2)
-            echo -e "\n${CYAN}🔗 端口映射列表:${RESET}"
-            docker ps --format "table {{.Names}}\t{{.Ports}}" | head -20
-            ;;
-        3)
-            echo -e "\n${CYAN}🔍 检查端口占用:${RESET}"
-            echo -e "${YELLOW}常用端口: 8000 (API), 8003 (OTA), 8080 (Web)${RESET}"
-            ports=(8000 8003 8080 3000 5000)
-            for port in "${ports[@]}"; do
-                if netstat -tuln 2>/dev/null | grep -q ":$port " || ss -tuln 2>/dev/null | grep -q ":$port "; then
-                    echo -e "${GREEN}✅ 端口 $port: 已被占用${RESET}"
+    while true; do
+        clear
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${CYAN}🌐 Docker网络和端口管理 🌐${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        echo "1) 查看Docker网络"
+        echo "2) 查看端口映射"
+        echo "3) 检查端口占用"
+        echo "4) 网络连接测试"
+        echo "5) 查看容器网络详情"
+        echo "0) 返回Docker工具主页"
+        
+        read -r -p "请选择操作 (0-5): " network_choice < /dev/tty
+        
+        case $network_choice in
+            1)
+                echo -e "\n${CYAN}🌐 Docker网络列表:${RESET}"
+                docker network ls
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            2)
+                echo -e "\n${CYAN}🔗 端口映射列表:${RESET}"
+                docker ps --format "table {{.Names}}\t{{.Ports}}" | head -20
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            3)
+                echo -e "\n${CYAN}🔍 检查端口占用:${RESET}"
+                echo -e "${YELLOW}常用端口: 8000 (API), 8003 (OTA), 8080 (Web)${RESET}"
+                ports=(8000 8003 8080 3000 5000)
+                for port in "${ports[@]}"; do
+                    if netstat -tuln 2>/dev/null | grep -q ":$port " || ss -tuln 2>/dev/null | grep -q ":$port "; then
+                        echo -e "${GREEN}✅ 端口 $port: 已被占用${RESET}"
+                    else
+                        echo -e "${YELLOW}⚠️ 端口 $port: 可用${RESET}"
+                    fi
+                done
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            4)
+                echo -e "\n${CYAN}🌍 网络连接测试:${RESET}"
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    echo "测试容器内部连接..."
+                    docker exec "$CONTAINER_NAME" ping -c 3 8.8.8.8 2>/dev/null || echo "容器网络测试失败"
                 else
-                    echo -e "${YELLOW}⚠️ 端口 $port: 可用${RESET}"
+                    echo -e "${YELLOW}⚠️ 容器未运行${RESET}"
                 fi
-            done
-            ;;
-        4)
-            echo -e "\n${CYAN}🌍 网络连接测试:${RESET}"
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                echo "测试容器内部连接..."
-                docker exec "$CONTAINER_NAME" ping -c 3 8.8.8.8 2>/dev/null || echo "容器网络测试失败"
-            else
-                echo -e "${YELLOW}⚠️ 容器未运行${RESET}"
-            fi
-            ;;
-        5)
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                echo -e "\n${CYAN}🔍 容器网络详情:${RESET}"
-                docker inspect "$CONTAINER_NAME" | grep -A 20 "Networks"
-            else
-                echo -e "${YELLOW}⚠️ 容器未运行${RESET}"
-            fi
-            ;;
-        0)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选项${RESET}"
-            ;;
-    esac
-    
-    read -r -p "按回车键继续..." < /dev/tty
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            5)
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    echo -e "\n${CYAN}🔍 容器网络详情:${RESET}"
+                    docker inspect "$CONTAINER_NAME" | grep -A 20 "Networks"
+                else
+                    echo -e "${YELLOW}⚠️ 容器未运行${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            0)
+                echo -e "${CYAN}🔙 返回Docker工具主页${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选项${RESET}"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # Docker日志管理
 docker_log_management() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}📝 Docker日志管理 📝${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "1) 查看最新50行日志"
-    echo "2) 查看最新100行日志"
-    echo "3) 查看指定时间段日志"
-    echo "4) 实时跟踪日志 (Ctrl+C退出)"
-    echo "5) 搜索日志关键词"
-    echo "6) 导出日志到文件"
-    echo "0) 返回上级菜单"
-    
-    read -r -p "请选择操作 (0-6): " log_choice < /dev/tty
-    
-    case $log_choice in
-        1)
-            echo -e "\n${CYAN}📋 最新50行日志:${RESET}"
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                docker logs --tail 50 "$CONTAINER_NAME"
-            else
-                echo -e "${RED}❌ 容器未运行${RESET}"
-            fi
-            ;;
-        2)
-            echo -e "\n${CYAN}📋 最新100行日志:${RESET}"
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                docker logs --tail 100 "$CONTAINER_NAME"
-            else
-                echo -e "${RED}❌ 容器未运行${RESET}"
-            fi
-            ;;
-        3)
-            echo -e "\n${CYAN}⏰ 指定时间段日志:${RESET}"
-            read -r -p "开始时间 (格式: 2024-01-01 12:00): " start_time < /dev/tty
-            read -r -p "结束时间 (格式: 2024-01-01 13:00): " end_time < /dev/tty
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                docker logs --since "$start_time" --until "$end_time" "$CONTAINER_NAME" 2>/dev/null || echo "无法获取指定时间段日志"
-            else
-                echo -e "${RED}❌ 容器未运行${RESET}"
-            fi
-            ;;
-        4)
-            echo -e "\n${CYAN}📡 实时日志跟踪 (按Ctrl+C退出):${RESET}"
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                docker logs -f "$CONTAINER_NAME"
-            else
-                echo -e "${RED}❌ 容器未运行${RESET}"
-            fi
-            ;;
-        5)
-            echo -e "\n${CYAN}🔍 搜索日志关键词:${RESET}"
-            read -r -p "输入搜索关键词: " keyword < /dev/tty
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                docker logs "$CONTAINER_NAME" 2>/dev/null | grep -i "$keyword" || echo "未找到匹配内容"
-            else
-                echo -e "${RED}❌ 容器未运行${RESET}"
-            fi
-            ;;
-        6)
-            echo -e "\n${CYAN}💾 导出日志到文件:${RESET}"
-            log_file="$HOME/xiaozhi-logs-$(date +%Y%m%d_%H%M%S).txt"
-            if docker ps | grep -q "$CONTAINER_NAME"; then
-                docker logs "$CONTAINER_NAME" > "$log_file" 2>/dev/null
-                echo -e "${GREEN}✅ 日志已导出到: $log_file${RESET}"
-            else
-                echo -e "${RED}❌ 容器未运行${RESET}"
-            fi
-            ;;
-        0)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选项${RESET}"
-            ;;
-    esac
-    
-    read -r -p "按回车键继续..." < /dev/tty
+    while true; do
+        clear
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${CYAN}📝 Docker日志管理 📝${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        echo "1) 查看最新50行日志"
+        echo "2) 查看最新100行日志"
+        echo "3) 查看指定时间段日志"
+        echo "4) 实时跟踪日志 (Ctrl+C退出)"
+        echo "5) 搜索日志关键词"
+        echo "6) 导出日志到文件"
+        echo "0) 返回Docker工具主页"
+        
+        read -r -p "请选择操作 (0-6): " log_choice < /dev/tty
+        
+        case $log_choice in
+            1)
+                echo -e "\n${CYAN}📋 最新50行日志:${RESET}"
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    docker logs --tail 50 "$CONTAINER_NAME"
+                else
+                    echo -e "${RED}❌ 容器未运行${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            2)
+                echo -e "\n${CYAN}📋 最新100行日志:${RESET}"
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    docker logs --tail 100 "$CONTAINER_NAME"
+                else
+                    echo -e "${RED}❌ 容器未运行${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            3)
+                echo -e "\n${CYAN}⏰ 指定时间段日志:${RESET}"
+                read -r -p "开始时间 (格式: 2024-01-01 12:00): " start_time < /dev/tty
+                read -r -p "结束时间 (格式: 2024-01-01 13:00): " end_time < /dev/tty
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    docker logs --since "$start_time" --until "$end_time" "$CONTAINER_NAME" 2>/dev/null || echo "无法获取指定时间段日志"
+                else
+                    echo -e "${RED}❌ 容器未运行${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            4)
+                echo -e "\n${CYAN}📡 实时日志跟踪 (按Ctrl+C退出):${RESET}"
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    docker logs -f "$CONTAINER_NAME"
+                else
+                    echo -e "${RED}❌ 容器未运行${RESET}"
+                    read -r -p "按回车键继续..." < /dev/tty
+                fi
+                ;;
+            5)
+                echo -e "\n${CYAN}🔍 搜索日志关键词:${RESET}"
+                read -r -p "输入搜索关键词: " keyword < /dev/tty
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    docker logs "$CONTAINER_NAME" 2>/dev/null | grep -i "$keyword" || echo "未找到匹配内容"
+                else
+                    echo -e "${RED}❌ 容器未运行${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            6)
+                echo -e "\n${CYAN}💾 导出日志到文件:${RESET}"
+                log_file="$HOME/xiaozhi-logs-$(date +%Y%m%d_%H%M%S).txt"
+                if docker ps | grep -q "$CONTAINER_NAME"; then
+                    docker logs "$CONTAINER_NAME" > "$log_file" 2>/dev/null
+                    echo -e "${GREEN}✅ 日志已导出到: $log_file${RESET}"
+                else
+                    echo -e "${RED}❌ 容器未运行${RESET}"
+                fi
+                read -r -p "按回车键继续..." < /dev/tty
+                ;;
+            0)
+                echo -e "${CYAN}🔙 返回Docker工具主页${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选项${RESET}"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # 显示服务状态详细信息
@@ -6372,6 +6006,325 @@ docker_service_status_display() {
     echo -e "${PURPLE}==================================================${RESET}"
 }
 
+# ========================= 系统监控工具 =========================
+system_monitor_tool() {
+    clear
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${GREEN}🖥️ 系统监控工具 - 实时系统状态监控 🖥️${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    echo -e "${YELLOW}按 Ctrl+C 退出监控模式 | 按 Enter 返回主菜单${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    while true; do
+        clear
+        
+        # 终端大小检测
+        if [ "$(tput cols)" -lt 80 ] || [ "$(tput lines)" -lt 25 ]; then
+            echo -e "${RED}⚠️ 检测到终端窗口太小，建议调整为至少80x25${RESET}"
+            echo -e "${CYAN}当前尺寸: $(tput cols) x $(tput lines)${RESET}"
+            sleep 3
+            return 0
+        fi
+        
+        # 计算时间戳
+        CURRENT_TIME=$(date "+%Y-%m-%d %H:%M:%S")
+        CURRENT_UPTIME=$(uptime -p 2>/dev/null || echo "未知")
+        
+        # ======================= 标题栏 =======================
+        echo -e "\033[1;36m╔════════════════════════════════════════════════════════════════════════════════════════╗\033[0m"
+        echo -e "\033[1;36m║\033[1;32m                        🖥️  系 统 监 控 中 心  -  HACKER DASHBOARD  🖥️                      \033[1;36m║\033[0m"
+        echo -e "\033[1;36m╠════════════════════════════════════════════════════════════════════════════════════════╣\033[0m"
+        echo -e "\033[1;36m║\033[1;33m 当前时间: \033[1;37m$CURRENT_TIME\033[1;33m                    运行时间: \033[1;37m$CURRENT_UPTIME\033[1;36m║\033[0m"
+        echo -e "\033[1;36m╚════════════════════════════════════════════════════════════════════════════════════════╝\033[0m"
+        
+        # ======================= 系统信息 =======================
+        if command -v hostnamectl &> /dev/null; then
+            SYSTEM_INFO=$(hostnamectl | grep -E "Static hostname|Operating System|Kernel|Architecture" | head -4)
+        else
+            SYSTEM_INFO=$(uname -a)
+        fi
+        
+        # ======================= CPU信息 =======================
+        CPU_INFO=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ *//' || echo "CPU信息不可用")
+        CPU_CORES=$(nproc --all 2>/dev/null || echo "0")
+        CPU_LOAD=$(uptime | awk -F'load average:' '{print $2}' | sed 's/,/ /g' || echo "0.00 0.00 0.00")
+        
+        # CPU温度检测（多方式检测）
+        CPU_TEMP=""
+        if [ -f "/sys/class/thermal/thermal_zone0/temp" ]; then
+            TEMP_VALUE=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
+            if [ -n "$TEMP_VALUE" ]; then
+                CPU_TEMP=$((TEMP_VALUE / 1000))°C
+            fi
+        elif command -v vcgencmd &> /dev/null; then
+            CPU_TEMP=$(vcgencmd measure_temp 2>/dev/null | cut -d'=' -f2 | sed 's/[^0-9.]*//g' 2>/dev/null)
+            if [ -n "$CPU_TEMP" ]; then
+                CPU_TEMP="${CPU_TEMP}°C"
+            fi
+        fi
+        
+        # ======================= 内存信息 =======================
+        MEM_TOTAL=$(free -h | awk '/^Mem:/ {print $2}' 2>/dev/null || echo "N/A")
+        MEM_USED=$(free -h | awk '/^Mem:/ {print $3}' 2>/dev/null || echo "N/A")
+        MEM_FREE=$(free -h | awk '/^Mem:/ {print $4}' 2>/dev/null || echo "N/A")
+        MEM_PERCENT=$(free | awk '/^Mem:/ {printf "%.1f%%", $3/$2 * 100}' 2>/dev/null || echo "N/A")
+        
+        # ======================= 磁盘信息 =======================
+        DISK_USAGE=$(df -h / 2>/dev/null | tail -1)
+        DISK_TOTAL=$(echo $DISK_USAGE | awk '{print $2}')
+        DISK_USED=$(echo $DISK_USAGE | awk '{print $3}')
+        DISK_AVAIL=$(echo $DISK_USAGE | awk '{print $4}')
+        DISK_PERCENT=$(echo $DISK_USAGE | awk '{print $5}')
+        
+        # ======================= 网络信息 =======================
+        INTERNAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
+        EXTERNAL_IP=$(curl -s --max-time 3 https://api.ip.sb/ip 2>/dev/null || echo "$INTERNAL_IP")
+        
+        # 网络接口统计
+        INTERFACE=$(ip route | head -1 | awk '{print $5}' 2>/dev/null || echo "eth0")
+        if [ -f "/sys/class/net/$INTERFACE/statistics/rx_bytes" ]; then
+            RX_BYTES=$(cat "/sys/class/net/$INTERFACE/statistics/rx_bytes" 2>/dev/null || echo "0")
+            TX_BYTES=$(cat "/sys/class/net/$INTERFACE/statistics/tx_bytes" 2>/dev/null || echo "0")
+        else
+            RX_BYTES=$(cat /proc/net/dev 2>/dev/null | grep -E "(eth0|enp|ens)" | head -1 | awk '{print $2}' 2>/dev/null || echo "0")
+            TX_BYTES=$(cat /proc/net/dev 2>/dev/null | grep -E "(eth0|enp|ens)" | head -1 | awk '{print $10}' 2>/dev/null || echo "0")
+        fi
+        
+        # 实时网络流量计算
+        if [ -f "/tmp/net_rx_prev" ] && [ -f "/tmp/net_tx_prev" ]; then
+            RX_PREV=$(cat /tmp/net_rx_prev)
+            TX_PREV=$(cat /tmp/net_tx_prev)
+            RX_RATE=$(((RX_BYTES - RX_PREV) / 2))  # 每秒字节数
+            TX_RATE=$(((TX_BYTES - TX_PREV) / 2))
+            RX_RATE_HUMAN=$(echo "$RX_RATE" | numfmt --to=iec-i --suffix=B/s 2>/dev/null || echo "0 B/s")
+            TX_RATE_HUMAN=$(echo "$TX_RATE" | numfmt --to=iec-i --suffix=B/s 2>/dev/null || echo "0 B/s")
+        else
+            RX_RATE_HUMAN="计算中..."
+            TX_RATE_HUMAN="计算中..."
+        fi
+        
+        # 保存当前值供下次计算
+        echo "$RX_BYTES" > /tmp/net_rx_prev
+        echo "$TX_BYTES" > /tmp/net_tx_prev
+        
+        # 网络连接信息
+        # 监听端口
+        LISTEN_PORTS=$(netstat -tlnp 2>/dev/null | grep LISTEN | head -5 | awk '{print $4}' | sed 's/.*://' || echo "无")
+        
+        # 活跃连接数
+        ESTABLISHED_COUNT=$(netstat -an 2>/dev/null | grep ESTABLISHED | wc -l || echo "0")
+        
+        # 获取一些连接详情（最多显示3个）
+        CONNECTION_DETAILS=$(netstat -an 2>/dev/null | grep ESTABLISHED | head -3 | awk '{print $4, $5}' | while read local remote; do
+            local_port=$(echo "$local" | sed 's/.*://')
+            remote_ip=$(echo "$remote" | sed 's/.*://' | cut -d: -f1)
+            remote_port=$(echo "$remote" | sed 's/.*://' | cut -d: -f2)
+            echo "本地:$local_port -> 远程:$remote_ip:$remote_port"
+        done || echo "无活跃连接")
+        
+        # ======================= Docker状态 =======================
+        DOCKER_STATUS="未安装"
+        DOCKER_CONTAINER_STATUS="无"
+        if command -v docker &> /dev/null; then
+            DOCKER_VERSION=$(docker --version 2>/dev/null | head -n1 || echo "未知版本")
+            DOCKER_STATUS="已安装"
+            if docker ps 2>/dev/null | grep -q "$CONTAINER_NAME"; then
+                DOCKER_CONTAINER_STATUS="运行中"
+            elif docker ps -a 2>/dev/null | grep -q "$CONTAINER_NAME"; then
+                DOCKER_CONTAINER_STATUS="已停止"
+            else
+                DOCKER_CONTAINER_STATUS="不存在"
+            fi
+        fi
+        
+        # ======================= CPU核心使用率 =======================
+        # 获取每个CPU核心的使用率
+        CPU_CORE_USAGE=()
+        if [ -f /proc/stat ]; then
+            for i in $(seq 0 $((CPU_CORES - 1))); do
+                if [ -f /sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq ]; then
+                    CORE_USAGE=$(awk -v core=$i '
+                    BEGIN {
+                        # 读取CPU使用率
+                        while ((getline line) > 0) {
+                            if (line ~ /^cpu[0-9]+/) {
+                                if (core == 0 && line ~ /^cpu0/) {
+                                    split(line, fields)
+                                    idle = fields[5]
+                                    total = 0
+                                    for (j=1; j<=4; j++) total += fields[j]
+                                    total += idle
+                                    idle_percent = (idle / total) * 100
+                                    printf "%.1f", idle_percent
+                                    break
+                                }
+                            }
+                        }
+                    }' /proc/stat 2>/dev/null || echo "0")
+                    
+                    if [ "$CORE_USAGE" != "0" ]; then
+                        CPU_USAGE=$(echo "100 - $CORE_USAGE" | bc -l 2>/dev/null || echo "0")
+                        CPU_CORE_USAGE+=("$CPU_USAGE")
+                    else
+                        CPU_CORE_USAGE+=("0.0")
+                    fi
+                else
+                    CPU_CORE_USAGE+=("0.0")
+                fi
+            done
+        fi
+        
+        # ======================= 显示监控界面 =======================
+        echo -e "\033[1;32m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
+        echo -e "\033[1;32m│\033[1;36m  🖥️  系统信息              🏠 主机名: $(hostname)                           \033[1;36m│\033[0m"
+        echo -e "\033[1;32m│\033[1;36m  🔧 架构: $(uname -m | sed 's/x86_64/x64/' | sed 's/aarch64/arm64/')    🌍 内网IP: $INTERNAL_IP                    \033[1;36m│\033[0m"
+        echo -e "\033[1;32m│\033[1;36m  🌐 公网IP: $EXTERNAL_IP                   \033[1;36m│\033[0m"
+        echo -e "\033[1;32m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
+        
+        echo -e "\033[1;34m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
+        echo -e "\033[1;34m│\033[1;33m  🖥️  CPU监控 ($(nproc --all 2>/dev/null || echo '0')核心)                                                     \033[1;34m│\033[0m"
+        echo -e "\033[1;34m│\033[1;37m  型号: $CPU_INFO\033[1;34m│\033[0m"
+        echo -e "\033[1;34m│\033[1;36m  🚀 负载: $CPU_LOAD                                                 \033[1;34m│\033[0m"
+        echo -e "\033[1;34m│\033[1;36m  🌡️  温度: ${CPU_TEMP:-"不可用"}                                           \033[1;34m│\033[0m"
+        echo -e "\033[1;34m│\033[1;36m  📊 核心使用率:                                                     \033[1;34m│\033[0m"
+        
+        # 显示CPU核心使用率
+        CORE_COUNT=0
+        for usage in "${CPU_CORE_USAGE[@]}"; do
+            if [ $((CORE_COUNT % 4)) -eq 0 ]; then
+                echo -n "\033[1;34m│\033[1;36m  "
+            fi
+            printf "CPU%d: %5.1f%%" $CORE_COUNT $usage
+            if [ $((CORE_COUNT % 4)) -eq 3 ]; then
+                echo -e "\033[1;34m│\033[0m"
+            else
+                echo -n "  "
+            fi
+            ((CORE_COUNT++))
+        done
+        
+        # 如果不是4的倍数，补齐剩余空间
+        while [ $((CORE_COUNT % 4)) -ne 0 ]; do
+            echo -n "          "
+            if [ $((CORE_COUNT % 4)) -eq 3 ]; then
+                echo -e "\033[1;34m│\033[0m"
+            else
+                echo -n "  "
+            fi
+            ((CORE_COUNT++))
+        done
+        
+        echo -e "\033[1;34m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
+        
+        echo -e "\033[1;35m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
+        echo -e "\033[1;35m│\033[1;33m  💾 内存监控                                                           \033[1;35m│\033[0m"
+        echo -e "\033[1;35m│\033[1;36m  📈 总内存: $MEM_TOTAL  使用: $MEM_USED ($MEM_PERCENT)  可用: $MEM_FREE                         \033[1;35m│\033[0m"
+        
+        # 内存使用率进度条
+        MEM_PERCENT_NUM=$(echo $MEM_PERCENT | sed 's/%//' 2>/dev/null || echo "0")
+        BAR_LENGTH=50
+        FILLED=$((MEM_PERCENT_NUM * BAR_LENGTH / 100))
+        
+        echo -e "\033[1;35m│\033[1;36m  ████ 使用情况: [\033[1;32m"
+        for i in $(seq 1 $FILLED); do echo -n "█"; done
+        echo -n "\033[1;31m"
+        for i in $(seq $((FILLED + 1)) $BAR_LENGTH); do echo -n "█"; done
+        echo -e "\033[1;36m] $MEM_PERCENT\033[1;35m│\033[0m"
+        
+        echo -e "\033[1;35m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
+        
+        echo -e "\033[1;31m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
+        echo -e "\033[1;31m│\033[1;33m  💽 磁盘监控 (/ 根目录)                                               \033[1;31m│\033[0m"
+        echo -e "\033[1;31m│\033[1;36m  📈 总容量: $DISK_TOTAL  使用: $DISK_USED  可用: $DISK_AVAIL  使用率: $DISK_PERCENT                     \033[1;31m│\033[0m"
+        
+        # 磁盘使用率进度条
+        DISK_PERCENT_NUM=$(echo $DISK_PERCENT | sed 's/%//' 2>/dev/null || echo "0")
+        FILLED=$((DISK_PERCENT_NUM * BAR_LENGTH / 100))
+        
+        echo -e "\033[1;31m│\033[1;36m  ████ 使用情况: [\033[1;32m"
+        for i in $(seq 1 $FILLED); do echo -n "█"; done
+        echo -n "\033[1;31m"
+        for i in $(seq $((FILLED + 1)) $BAR_LENGTH); do echo -n "█"; done
+        echo -e "\033[1;36m] $DISK_PERCENT\033[1;31m│\033[0m"
+        
+        echo -e "\033[1;31m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
+        
+        echo -e "\033[1;33m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
+        echo -e "\033[1;33m│\033[1;33m  🌐 网络监控                                                           \033[1;33m│\033[0m"
+        echo -e "\033[1;33m│\033[1;36m  🔗 接口: $INTERFACE    接收: $(echo $RX_BYTES | numfmt --to=iec-i --suffix=B 2>/dev/null || echo "N/A")  发送: $(echo $TX_BYTES | numfmt --to=iec-i --suffix=B 2>/dev/null || echo "N/A")          \033[1;33m│\033[0m"
+        echo -e "\033[1;33m│\033[1;36m  📈 实时流量: ↓ $RX_RATE_HUMAN  ↑ $TX_RATE_HUMAN                              \033[1;33m│\033[0m"
+        echo -e "\033[1;33m│\033[1;36m  🌍 内网IP: $INTERNAL_IP  公网IP: $EXTERNAL_IP                           \033[1;33m│\033[0m"
+        echo -e "\033[1;33m│\033[1;36m  🔌 活跃连接: $ESTABLISHED_COUNT 个  监听端口: $LISTEN_PORTS                          \033[1;33m│\033[0m"
+        echo -e "\033[1;33m│\033[1;36m  🔗 连接详情:                                                           \033[1;33m│\033[0m"
+        
+        # 显示连接详情
+        CONN_COUNT=0
+        while IFS= read -r conn_line; do
+            if [ $CONN_COUNT -lt 2 ]; then
+                printf "\033[1;33m│\033[1;36m    %-70s\033[1;33m│\n" "$conn_line"
+                ((CONN_COUNT++))
+            fi
+        done <<< "$CONNECTION_DETAILS"
+        
+        # 如果连接数少于2行，补齐剩余空间
+        while [ $CONN_COUNT -lt 2 ]; do
+            printf "\033[1;33m│\033[1;36m    %-70s\033[1;33m│\n" ""
+            ((CONN_COUNT++))
+        done
+        
+        echo -e "\033[1;33m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
+        
+        echo -e "\033[1;30m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
+        echo -e "\033[1;30m│\033[1;33m  🐳 Docker状态                                                          \033[1;30m│\033[0m"
+        echo -e "\033[1;30m│\033[1;36m  📦 状态: $DOCKER_STATUS  版本: $(echo $DOCKER_VERSION | cut -d' ' -f2 | head -1 2>/dev/null || echo "N/A")                  \033[1;30m│\033[0m"
+        echo -e "\033[1;30m│\033[1;36m  🔧 容器: $DOCKER_CONTAINER_STATUS                                               \033[1;30m│\033[0m"
+        echo -e "\033[1;30m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
+        
+        # ======================= 进程信息 =======================
+        echo -e "\033[1;36m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
+        echo -e "\033[1;36m│\033[1;33m  🔄 实时进程 (TOP 5 CPU使用)                                             \033[1;36m│\033[0m"
+        echo -e "\033[1;36m│\033[1;36m  PID    CPU%    MEM%    进程名                                         \033[1;36m│\033[0m"
+        echo -e "\033[1;36m├────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤\033[0m"
+        
+        # 获取TOP 5进程
+        TOP_PROCESSES=$(ps aux --sort=-%cpu | head -6 | tail -5)
+        while IFS= read -r line; do
+            PID=$(echo $line | awk '{print $2}')
+            CPU=$(echo $line | awk '{print $3}' | sed 's/%//')
+            MEM=$(echo $line | awk '{print $4}' | sed 's/%//')
+            COMM=$(echo $line | awk '{print $11}')
+            printf "\033[1;36m│\033[1;37m  %-6s %5.1f%%   %5.1f%%   %-30s\033[1;36m│\n" "$PID" "$CPU" "$MEM" "$COMM"
+        done <<< "$TOP_PROCESSES"
+        
+        echo -e "\033[1;36m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
+        
+        # ======================= 控制信息 =======================
+        echo -e "\033[1;32m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
+        echo -e "\033[1;32m│\033[1;37m  ⌨️  控制台: Ctrl+C 退出  |  Enter 返回菜单  |  自动刷新: 每2秒                 \033[1;32m│\033[0m"
+        echo -e "\033[1;32m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
+        
+        echo -e "\n\033[1;35m正在监控... 下一轮更新于 $(date -d '+2 seconds' '+%H:%M:%S')\033[0m"
+        
+        # 等待2秒，然后检查是否有用户输入
+        sleep 2
+        
+        # 检查是否有键盘输入
+        read -t 0.1 -n 1 input 2>/dev/null
+        if [ -n "$input" ]; then
+            if [ "$input" = $'\x03' ] || [ "$input" = 'q' ] || [ "$input" = 'Q' ]; then
+                echo -e "\n\033[1;32m🔚 退出监控模式...\033[0m"
+                sleep 1
+                return 0
+            elif [ "$input" = $'\n' ] || [ "$input" = '' ]; then
+                echo -e "\n\033[1;32m🔙 返回主菜单...\033[0m"
+                sleep 1
+                return 0
+            fi
+        fi
+        
+    done
+}
+
 # ========================= 主执行函数 =========================
 main() {
     check_working_directory
@@ -6389,4 +6342,236 @@ main() {
 }
 
 # 启动脚本执行
-main "$@"
+main "$@"# ========================= ASR 配置（15个服务商） =========================
+config_asr() {
+    while true; do
+        echo -e "\n${GREEN}【1/5】配置 ASR (语音识别) 服务${RESET}"
+        echo "请选择ASR服务商（共15个）："
+        
+        if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
+            echo " 1) ${GREEN}FunASR (本地)${RESET}"
+            echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
+            echo " 2) FunASRServer (独立部署)"
+            echo " 3) ${GREEN}SherpaASR (本地，多语言)${RESET}"
+            echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
+            echo " 4) ${GREEN}SherpaParaformerASR (本地，中文专用)${RESET}"
+            echo -e "    ${CYAN}✅ 内存充足 (${MEM_TOTAL}GB ≥ 4GB) - 可选择${RESET}"
+            echo " 5) DoubaoASR (火山引擎，按次收费)"
+            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
+            echo " 7) TencentASR (腾讯云)"
+            echo " 8) AliyunASR (阿里云，批量处理)"
+            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
+            echo "10) BaiduASR (百度智能云)"
+            echo "11) OpenaiASR (OpenAI)"
+            echo "12) GroqASR (Groq)"
+            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
+            echo -e "    ${CYAN}✅ 内存充足 - 可选择${RESET}"
+            echo "14) Qwen3ASRFlash (通义千问)"
+            echo "15) XunfeiStreamASR (讯飞，流式)"
+            echo " 0) ${YELLOW} 返回上一步 ${RESET}"
+        elif [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = true ]; then
+            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
+            echo " 2) FunASRServer (独立部署)"
+            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
+            echo " 4) ${YELLOW}SherpaParaformerASR (本地，中文专用)${RESET}"
+            echo -e "    ${CYAN}💡 可用 (${MEM_TOTAL}GB ≥ 2GB) - 轻量级模型${RESET}"
+            echo " 5) DoubaoASR (火山引擎，按次收费)"
+            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
+            echo " 7) TencentASR (腾讯云)"
+            echo " 8) AliyunASR (阿里云，批量处理)"
+            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
+            echo "10) BaiduASR (百度智能云)"
+            echo "11) OpenaiASR (OpenAI)"
+            echo "12) GroqASR (Groq)"
+            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
+            echo -e "    ${CYAN}✅ 内存占用较小 (建议≥2GB)${RESET}"
+            echo "14) Qwen3ASRFlash (通义千问)"
+            echo "15) XunfeiStreamASR (讯飞，流式)"
+            echo " 0) ${YELLOW} 返回上一步 ${RESET}"
+        else
+            echo " 1) ${RED}FunASR (本地)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)${RESET}"
+            echo " 2) FunASRServer (独立部署)"
+            echo -e " 3) ${RED}SherpaASR (本地，多语言)${RESET} ${RED}❌ 内存不足${RESET}"
+            echo -e " 4) ${RED}SherpaParaformerASR (本地，中文专用)${RESET} ${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)${RESET}"
+            echo " 5) DoubaoASR (火山引擎，按次收费)"
+            echo " 6) DoubaoStreamASR (火山引擎，按时收费)"
+            echo " 7) TencentASR (腾讯云)"
+            echo " 8) AliyunASR (阿里云，批量处理)"
+            echo " 9) AliyunStreamASR (阿里云，实时流式) [推荐]"
+            echo "10) BaiduASR (百度智能云)"
+            echo "11) OpenaiASR (OpenAI)"
+            echo "12) GroqASR (Groq)"
+            echo "13) ${GREEN}VoskASR (本地，完全离线)${RESET}"
+            echo -e "    ${CYAN}✅ 内存占用较小 (建议≥2GB)${RESET}"
+            echo "14) Qwen3ASRFlash (通义千问)"
+            echo "15) XunfeiStreamASR (讯飞，流式)"
+            echo " 0) ${YELLOW} 返回上一步 ${RESET}"
+        fi
+        
+        read -r -p "请输入序号 (默认推荐 9，输入0返回上一步): " asr_choice < /dev/tty
+        asr_choice=${asr_choice:-9}
+        
+        # ASR是第一步，输入0直接返回主菜单
+        if [ "$asr_choice" = "0" ]; then
+            echo -e "${CYAN}🔄 取消配置，返回主菜单${RESET}"
+            return 1
+        fi
+        
+        local asr_provider_key
+        case $asr_choice in
+            1)
+                asr_provider_key="FunASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择FunASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            2)
+                asr_provider_key="FunASRServer"
+                echo -e "\n${YELLOW}⚠️ 您选择了 FunASRServer。${RESET}"
+                echo -e "${CYAN}🔗 需要自行部署 FunASR Server 服务${RESET}"
+                read -r -p "请输入 FunASR Server 地址 (默认 http://localhost:10095): " server_url < /dev/tty
+                server_url=${server_url:-"http://localhost:10095"}
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    host: .*/    host: $server_url/" "$CONFIG_FILE"
+                ;;
+            3)
+                asr_provider_key="SherpaASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择SherpaASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            4)
+                asr_provider_key="SherpaParaformerASR"
+                if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)，无法选择SherpaParaformerASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 SherpaParaformerASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            5)
+                asr_provider_key="DoubaoASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
+                read -r -p "请输入 AppID: " appid < /dev/tty
+                read -r -p "请输入 Access Token: " access_token < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            6)
+                asr_provider_key="DoubaoStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了火山引擎 DoubaoStreamASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.volcengine.com/products/voice-interaction${RESET}"
+                read -r -p "请输入 AppID: " appid < /dev/tty
+                read -r -p "请输入 Access Token: " access_token < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            7)
+                asr_provider_key="TencentASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了腾讯云 TencentASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/asr${RESET}"
+                read -r -p "请输入 APPID: " appid < /dev/tty
+                read -r -p "请输入 SecretID: " secret_id < /dev/tty
+                read -r -p "请输入 SecretKey: " secret_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            8)
+                asr_provider_key="AliyunASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                read -r -p "请输入 Appkey: " appkey < /dev/tty
+                read -r -p "请输入 Token: " token < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            9)
+                asr_provider_key="AliyunStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunStreamASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com/${RESET}"
+                read -r -p "请输入 Appkey: " appkey < /dev/tty
+                read -r -p "请输入 Token: " token < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            10)
+                asr_provider_key="BaiduASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了百度智能云 BaiduASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.bce.baidu.com/ai/${RESET}"
+                read -r -p "请输入 APP ID: " app_id < /dev/tty
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                read -r -p "请输入 Secret Key: " secret_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            11)
+                asr_provider_key="OpenaiASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了 OpenAI ASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://platform.openai.com/${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            12)
+                asr_provider_key="GroqASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了 Groq ASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://console.groq.com/${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            13)
+                asr_provider_key="VoskASR"
+                if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                    echo -e "\n${RED}❌ 内存不足，无法选择VoskASR本地模型${RESET}"
+                    echo -e "${YELLOW}💡 请重新选择其他ASR服务商...${RESET}"
+                    sleep 1
+                    continue
+                fi
+                echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            14)
+                asr_provider_key="Qwen3ASRFlash"
+                echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen3ASRFlash。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            15)
+                asr_provider_key="XunfeiStreamASR"
+                echo -e "\n${YELLOW}⚠️ 您选择了讯飞 XunfeiStreamASR。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://www.xfyun.cn${RESET}"
+                read -r -p "请输入 APP ID: " app_id < /dev/tty
+                read -r -p "请输入 API Secret: " api_secret < /dev/tty
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                ;;
+            *)
+                echo -e "\n${RED}❌ 输入无效，请选择1-15范围内的数字，或输入0返回上一步${RESET}"
+                echo -e "${YELLOW}💡 提示：默认推荐选项9（阿里云流式ASR）${RESET}"
+                read -r -p "按回车键重新选择..." < /dev/tty
+                continue
+                ;;
+        esac
+        
+        # 配置完成，返回0表示成功
+        return 0
+    done
+}
