@@ -98,7 +98,7 @@ trap exit_confirm SIGINT
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
-Version="1.2.55"
+Version="1.2.60"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -6129,9 +6129,9 @@ docker_service_status_display() {
 # 固定窗口系统监控工具
 system_monitor_tool() {
     echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${GREEN}🖥️ 固定窗口系统监控工具 🖥️${RESET}"
+    echo -e "${GREEN}🖥️ 手动刷新系统监控工具 🖥️${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
-    echo -e "${YELLOW}📊 实时仪表板 - 数据在固定窗口位置更新${RESET}"
+    echo -e "${YELLOW}📊 详细仪表板 - 数据在固定窗口位置更新${RESET}"
     echo -e "${CYAN}💡 提示: 启动中，准备仪表板界面...${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     
@@ -6149,85 +6149,37 @@ system_monitor_tool() {
     # 隐藏光标
     echo -e "\033[?25l"
     
-    # 清屏并绘制完整的监控界面
-    draw_monitor_dashboard
+    # 初始化数据并显示完整界面
+    clear
+    draw_enhanced_monitor_dashboard
     
-    # 默认刷新时间（秒）
-    local refresh_interval=5
-    
-    # 显示操作提示
-    echo -e "\033[1;33m📊 实时监控系统 | [C]自定义时间  [R]刷新  [Q]退出 | 刷新间隔: ${refresh_interval}秒\033[0m"
-    echo -e "\033[1;32m================================================================================\033[0m"
-    echo ""
-    
-    # 初始化计数器
-    local refresh_count=0
-    local timeout_interval=1  # 输入检测间隔
-    
-    # 自定义刷新时间设置
-    set_custom_refresh_interval() {
-        echo -e "\n\033[1;32m🔧 设置自定义刷新时间（秒）: \033[0m"
-        echo -ne "请输入新的刷新间隔 (1-60秒): \033[0m"
-        
-        # 临时设置较短的超时等待用户输入
-        read -r -t 10 -p "" new_interval 2>/dev/null
-        
-        if [ $? -eq 0 ] && [[ "$new_interval" =~ ^[0-9]+$ ]] && [ "$new_interval" -ge 1 ] && [ "$new_interval" -le 60 ]; then
-            refresh_interval="$new_interval"
-            echo -e "\n\033[1;32m✅ 已更新刷新间隔为: $refresh_interval 秒\033[0m"
-            sleep 2
-        else
-            echo -e "\n\033[1;31m❌ 输入无效，保持当前设置: $refresh_interval 秒\033[0m"
-            sleep 2
-        fi
-        
-        # 重新显示当前状态
-        clear
-        draw_monitor_dashboard
-        echo ""
-        echo -e "\033[1;33m📊 实时监控系统 | [C]自定义时间  [R]刷新  [Q]退出 | 刷新间隔: ${refresh_interval}秒\033[0m"
-        echo -e "\033[1;32m================================================================================\033[0m"
-    }
-    
-    # 主循环 - 实时监控模式
+    # 主循环 - 手动监控模式
     while true; do
-        # 每refresh_interval秒自动刷新数据
-        refresh_count=$((refresh_count + 1))
-        if [ $refresh_count -ge $refresh_interval ]; then
-            update_monitor_data
-            refresh_count=0
-            # 显示底部提示
-            echo ""
-            echo -e "\033[1;33m📊 实时监控系统 | [C]自定义时间  [R]刷新  [Q]退出 | 刷新间隔: ${refresh_interval}秒\033[0m"
-            echo -e "\033[1;32m================================================================================\033[0m"
-        fi
+        # 显示操作提示
+        echo -e "\n\033[1;33m📊 手动监控系统 | [R]刷新  [Q]退出 | 按R手动刷新数据\033[0m"
+        echo -e "\033[1;32m================================================================================\033[0m"
         
-        # 等待用户输入（非阻塞）
+        # 等待用户输入
         local input=""
-        if read -r -t $timeout_interval -n 1 -s input 2>/dev/null; then
-            case "$input" in
-                q|Q)
-                    echo -e "\n\033[1;32m🔚 退出监控模式...\033[0m"
-                    # 恢复光标显示并清理临时文件
-                    echo -e "\033[?25h" 2>/dev/null || true
-                    rm -f /tmp/monitor_rx_prev /tmp/monitor_tx_prev 2>/dev/null || true
-                    sleep 1
-                    break
-                    ;;
-                r|R)
-                    update_monitor_data
-                    echo ""
-                    echo -e "\033[1;33m📊 实时监控系统 | [C]自定义时间  [R]刷新  [Q]退出 | 刷新间隔: ${refresh_interval}秒\033[0m"
-                    echo -e "\033[1;32m================================================================================\033[0m"
-                    ;;
-                c|C)
-                    set_custom_refresh_interval
-                    ;;
-                *)
-                    # 忽略其他按键
-                    ;;
-            esac
-        fi
+        read -r -p "请输入操作 [R-刷新, Q-退出]: " input 2>/dev/null
+        
+        case "$input" in
+            q|Q)
+                echo -e "\n\033[1;32m🔚 退出监控模式...\033[0m"
+                # 恢复光标显示并清理临时文件
+                echo -e "\033[?25h" 2>/dev/null || true
+                rm -f /tmp/monitor_rx_prev /tmp/monitor_tx_prev 2>/dev/null || true
+                sleep 1
+                break
+                ;;
+            r|R)
+                update_enhanced_monitor_data
+                ;;
+            *)
+                echo -e "\033[1;31m❌ 无效输入，请输入 R 或 Q\033[0m"
+                sleep 1
+                ;;
+        esac
     done
     
     # 恢复光标并清理
@@ -6235,22 +6187,23 @@ system_monitor_tool() {
     clear
 }
 
-# 绘制监控仪表板初始界面
-draw_monitor_dashboard() {
+# 绘制增强版监控仪表板初始界面
+draw_enhanced_monitor_dashboard() {
     clear
     
     # 标题栏 - 使用简单边框
     echo -e "\033[1;32m================================================================================\033[0m"
-    echo -e "\033[1;32m                        🖥️  系统监控仪表板  🖥️                        \033[0m"
+    echo -e "\033[1;32m                     🖥️  详细系统监控仪表板  🖥️                     \033[0m"
     echo -e "\033[1;32m================================================================================\033[0m"
     echo -e "\033[1;33m 当前时间: \033[1;37m$(date "+%Y-%m-%d %H:%M:%S")\033[0m"
     echo -e "\033[1;33m 运行时间: \033[1;37m$(uptime -p 2>/dev/null || echo "uptime")\033[0m"
+    echo -e "\033[1;33m 系统负载: \033[1;37m$(uptime | awk -F'load average:' '{print $2}' | sed 's/,/ /g' || echo "0.00 0.00 0.00")\033[0m"
     echo -e "\033[1;32m================================================================================\033[0m"
     echo ""
     
     # 初始化数据并显示
     init_monitor_data
-    update_monitor_data
+    update_enhanced_monitor_data
 }
 
 # 初始化监控数据
@@ -6288,8 +6241,8 @@ get_reliable_external_ip() {
     return 1
 }
 
-# 更新监控数据（完整重绘界面）
-update_monitor_data() {
+# 更新增强版监控数据（完整重绘界面）
+update_enhanced_monitor_data() {
     local current_time uptime
     current_time=$(date "+%Y-%m-%d %H:%M:%S")
     uptime=$(uptime -p 2>/dev/null || echo "uptime")
@@ -6299,51 +6252,55 @@ update_monitor_data() {
     
     # 标题栏
     echo -e "\033[1;32m================================================================================\033[0m"
-    echo -e "\033[1;32m                        🖥️  系统监控仪表板  🖥️                        \033[0m"
+    echo -e "\033[1;32m                     🖥️  详细系统监控仪表板  🖥️                     \033[0m"
     echo -e "\033[1;32m================================================================================\033[0m"
     echo -e "\033[1;33m 当前时间: \033[1;37m$current_time\033[0m"
     echo -e "\033[1;33m 运行时间: \033[1;37m$uptime\033[0m"
+    echo -e "\033[1;33m 系统负载: \033[1;37m$(uptime | awk -F'load average:' '{print $2}' | sed 's/,/ /g' || echo "0.00 0.00 0.00")\033[0m"
     echo -e "\033[1;32m================================================================================\033[0m"
     echo ""
     
     # 更新系统信息
-    update_system_info
+    update_enhanced_system_info
     echo ""
     
     # 更新CPU信息
-    update_cpu_info
+    update_enhanced_cpu_info
     echo ""
     
     # 更新内存信息
-    update_memory_info
-    echo ""
-    
-    # 更新运行进程监控
-    update_running_processes
+    update_enhanced_memory_info
     echo ""
     
     # 更新磁盘信息
-    update_disk_info
+    update_enhanced_disk_info
     echo ""
     
     # 更新网络信息
-    update_network_info
+    update_enhanced_network_info
+    echo ""
+    
+    # 更新进程信息
+    update_enhanced_process_info
     echo ""
     
     # 更新GPU信息
-    update_gpu_info
+    update_enhanced_gpu_info
     echo ""
     
     # 返回监控状态
     echo -e "\033[0m"    # 重置颜色
 }
 
-# 更新系统信息
-update_system_info() {
-    local hostname arch internal_ip external_ip
+# 更新增强版系统信息
+update_enhanced_system_info() {
+    local hostname arch kernel_version boot_time internal_ip external_ip os_version
     hostname=$(hostname)
     arch=$(uname -m)
+    kernel_version=$(uname -r)
+    boot_time=$(who -b 2>/dev/null | awk '{print $3" "$4}' || echo "N/A")
     internal_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
+    os_version=$(lsb_release -d 2>/dev/null | cut -f2 || cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '"' || echo "Linux")
     
     # 获取外网IP（使用可靠函数）
     external_ip=$(get_reliable_external_ip 2>/dev/null)
@@ -6352,55 +6309,120 @@ update_system_info() {
     echo -e "\033[1;33m【系统信息】\033[0m"
     echo -e "\033[1;37m  🏠 主机名: \033[1;32m$hostname\033[0m"
     echo -e "\033[1;37m  🔧 架构: \033[1;32m$arch\033[0m"
+    echo -e "\033[1;37m  📟 内核版本: \033[1;32m$kernel_version\033[0m"
+    echo -e "\033[1;37m  🐧 系统版本: \033[1;32m$os_version\033[0m"
     echo -e "\033[1;37m  🌍 内网IP: \033[1;32m$internal_ip\033[0m"
     echo -e "\033[1;37m  🌐 公网IP: \033[1;32m$external_ip\033[0m"
+    echo -e "\033[1;37m  🚀 启动时间: \033[1;32m$boot_time\033[0m"
+    echo -e "\033[1;37m  👥 在线用户: \033[1;32m$(who | wc -l) 人\033[0m"
 }
 
-# 更新CPU信息
-update_cpu_info() {
-    local cpu_model cores load cpu_usage max_freq min_freq temp
+# 更新增强版CPU信息
+update_enhanced_cpu_info() {
+    local cpu_model cores load cpu_usage max_freq min_freq temp cpu_count thread_count
     cpu_model=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ *//' | cut -c1-60 || echo "CPU信息不可用")
     cores=$(nproc --all 2>/dev/null || echo "0")
+    thread_count=$(nproc --all 2>/dev/null || echo "0")
     load=$(uptime | awk -F'load average:' '{print $2}' | sed 's/,/ /g' || echo "0.00 0.00 0.00")
     
     # 获取CPU使用率
     cpu_usage=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}' 2>/dev/null || echo "0.0")
     
-    # 获取CPU频率和温度
-    max_freq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq 2>/dev/null | awk '{print $1/1000 " MHz"}' || echo "N/A")
-    min_freq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 2>/dev/null | awk '{print $1/1000 " MHz"}' || echo "N/A")
-    
-    if [ -f "/sys/class/thermal/thermal_zone0/temp" ]; then
-        temp=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null | awk '{print $1/1000 "°C"}' || echo "N/A")
+    # 获取CPU频率
+    if [ -f "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq" ]; then
+        max_freq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq 2>/dev/null | awk '{print $1/1000 " MHz"}')
+    elif [ -f "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq" ]; then
+        max_freq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq 2>/dev/null | awk '{print $1/1000 " MHz"}')
     else
-        temp="N/A"
+        max_freq="N/A"
     fi
+    
+    if [ -f "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq" ]; then
+        min_freq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 2>/dev/null | awk '{print $1/1000 " MHz"}')
+    elif [ -f "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq" ]; then
+        min_freq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq 2>/dev/null | awk '{print $1/1000 " MHz"}')
+    else
+        min_freq="N/A"
+    fi
+    
+    # 获取当前频率
+    local current_freq="N/A"
+    if [ -f "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq" ]; then
+        current_freq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null | awk '{print $1/1000 " MHz"}')
+    fi
+    
+    # 获取CPU温度
+    temp="N/A"
+    if [ -f "/sys/class/thermal/thermal_zone0/temp" ]; then
+        temp=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null | awk '{print $1/1000 "°C"}')
+    elif [ -f "/sys/class/thermal/thermal_zone1/temp" ]; then
+        temp=$(cat /sys/class/thermal/thermal_zone1/temp 2>/dev/null | awk '{print $1/1000 "°C"}')
+    fi
+    
+    # 获取CPU缓存信息
+    local cache_l1="N/A" cache_l2="N/A" cache_l3="N/A"
+    cache_l1=$(grep "cache size" /proc/cpuinfo 2>/dev/null | head -1 | awk '{print $4" "$5}' || echo "N/A")
     
     echo -e "\033[1;33m【CPU监控】\033[0m"
     echo -e "\033[1;37m  🏢 型号: \033[1;32m$cpu_model\033[0m"
-    echo -e "\033[1;37m  🏢 核心数: \033[1;32m$cores 核心\033[0m"
+    echo -e "\033[1;37m  🏢 物理核心: \033[1;32m$cores 个\033[0m"
+    echo -e "\033[1;37m  🧵 线程数: \033[1;32m$thread_count 个\033[0m"
     echo -e "\033[1;37m  📊 使用率: \033[1;32m${cpu_usage}%\033[0m"
+    echo -e "\033[1;37m  ⚡ 当前频率: \033[1;32m$current_freq\033[0m"
+    echo -e "\033[1;37m  📈 频率范围: \033[1;32m$min_freq - $max_freq\033[0m"
     echo -e "\033[1;37m  🌡️  温度: \033[1;32m$temp\033[0m"
-    echo -e "\033[1;37m  ⚡ 频率: \033[1;32m$min_freq - $max_freq\033[0m"
-    echo -e "\033[1;37m  🚀 负载: \033[1;32m$load\033[0m"
+    echo -e "\033[1;37m  🚀 系统负载: \033[1;32m$load\033[0m"
+    echo -e "\033[1;37m  💾 缓存: \033[1;32mL1/L2/L3: $cache_l1\033[0m"
 }
 
-# 更新内存信息
-update_memory_info() {
+# 更新增强版内存信息
+update_enhanced_memory_info() {
     # 获取内存信息
     MEM_TOTAL=$(free -h | awk '/^Mem:/ {print $2}' 2>/dev/null || echo "N/A")
     MEM_USED=$(free -h | awk '/^Mem:/ {print $3}' 2>/dev/null || echo "N/A") 
-    MEM_FREE=$(free -h | awk '/^Mem:/ {print $7}' 2>/dev/null || echo "N/A")
+    MEM_FREE=$(free -h | awk '/^Mem:/ {print $4}' 2>/dev/null || echo "N/A")
+    MEM_AVAILABLE=$(free -h | awk '/^Mem:/ {print $7}' 2>/dev/null || echo "N/A")
+    MEM_BUFFERS=$(free -h | awk '/^Mem:/ {print $6}' 2>/dev/null || echo "N/A")
+    MEM_CACHED=$(free -h | awk '/^Mem:/ {print $5}' 2>/dev/null || echo "N/A")
     MEM_PERCENT=$(free | awk '/^Mem:/ {printf "%.1f%%", $3/$2 * 100}' 2>/dev/null || echo "N/A")
+    
+    # 获取交换分区信息
+    SWAP_TOTAL=$(free -h | awk '/^Swap:/ {print $2}' 2>/dev/null || echo "N/A")
+    SWAP_USED=$(free -h | awk '/^Swap:/ {print $3}' 2>/dev/null || echo "N/A")
+    SWAP_FREE=$(free -h | awk '/^Swap:/ {print $4}' 2>/dev/null || echo "N/A")
+    SWAP_PERCENT=$(free | awk '/^Swap:/ {if($2 > 0) printf "%.1f%%", $3/$2 * 100; else print "0%"}' 2>/dev/null || echo "0%")
+    
+    # 获取系统内存详细信息
+    local mem_unit total_kb free_kb available_kb cached_kb buffers_kb
+    if [ -f "/proc/meminfo" ]; then
+        total_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+        free_kb=$(grep MemFree /proc/meminfo | awk '{print $2}')
+        available_kb=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
+        cached_kb=$(grep "^Cached:" /proc/meminfo | awk '{print $2}')
+        buffers_kb=$(grep Buffers /proc/meminfo | awk '{print $2}')
+        
+        # 计算实际使用率（排除缓存和缓冲区）
+        local real_used_kb real_used_percent
+        real_used_kb=$((total_kb - available_kb))
+        if [ $total_kb -gt 0 ]; then
+            real_used_percent=$(echo "scale=1; $real_used_kb * 100 / $total_kb" | bc 2>/dev/null || echo "0.0")
+        else
+            real_used_percent="0.0"
+        fi
+    fi
     
     # 计算使用率
     local used_percent
     used_percent=$(free | awk '/^Mem:/ {printf "%.1f", $3/$2 * 100}' 2>/dev/null || echo "0")
     
     echo -e "\033[1;33m【内存监控】\033[0m"
-    echo -e "\033[1;37m  📈 总内存: \033[1;32m$MEM_TOTAL\033[0m"
-    echo -e "\033[1;37m  📊 使用: \033[1;32m$MEM_USED ($MEM_PERCENT)\033[0m"
-    echo -e "\033[1;37m  🆓 可用: \033[1;32m$MEM_FREE\033[0m"
+    echo -e "\033[1;37m  📈 物理内存: \033[1;32m$MEM_TOTAL\033[0m"
+    echo -e "\033[1;37m  📊 已用: \033[1;32m$MEM_USED ($MEM_PERCENT)\033[0m"
+    echo -e "\033[1;37m  🆓 可用: \033[1;32m$MEM_AVAILABLE\033[0m"
+    echo -e "\033[1;37m  💾 缓存: \033[1;32m$MEM_CACHED\033[0m"
+    echo -e "\033[1;37m  📋 缓冲: \033[1;32m$MEM_BUFFERS\033[0m"
+    echo -e "\033[1;37m  💾 交换分区: \033[1;32m$SWAP_TOTAL (使用: $SWAP_USED/$SWAP_PERCENT)\033[0m"
+    echo -e "\033[1;37m  🔧 实际使用率: \033[1;32m${real_used_percent}%\033[0m"
     
     # 简单的使用率进度条
     local bar_length=50
@@ -6423,46 +6445,122 @@ update_memory_info() {
 }
 
 # 更新运行进程信息
-update_running_processes() {
-    local top_processes process_count
-    
-    # 获取前5个CPU使用最高的进程
-    top_processes=$(ps aux --sort=-%cpu | head -6 | tail -5 | awk '{printf "%-20s %5.1f%% %5.1f%%\n", $11, $3, $4}' 2>/dev/null || echo "无进程信息")
+# 更新增强版进程信息
+update_enhanced_process_info() {
+    local top_cpu_processes top_mem_processes process_count zombie_count running_sleeping stopped
+    local uptime_info load_avg
     
     # 获取进程总数
     process_count=$(ps aux | wc -l 2>/dev/null || echo "0")
     
-    echo -e "\033[1;33m【运行进程】\033[0m"
+    # 获取僵尸进程数
+    zombie_count=$(ps aux | grep '<defunct>' | wc -l 2>/dev/null || echo "0")
+    
+    # 获取运行中和睡眠中的进程数
+    running_sleeping=$(ps aux | awk '$8 ~ /^[RSD]/ {count++} END {print count+0}' 2>/dev/null || echo "0")
+    stopped=$(ps aux | awk '$8 ~ /^T/ {count++} END {print count+0}' 2>/dev/null || echo "0")
+    
+    # 获取前5个CPU使用最高的进程
+    top_cpu_processes=$(ps aux --sort=-%cpu | head -6 | tail -5 | awk '{printf "%-18s %5.1f%% %5.1f%% %5s\n", substr($11,1,18), $3, $4, $2}' 2>/dev/null || echo "无进程信息")
+    
+    # 获取前5个内存使用最高的进程
+    top_mem_processes=$(ps aux --sort=-%mem | head -6 | tail -5 | awk '{printf "%-18s %5.1f%% %5.1f%% %5s\n", substr($11,1,18), $4, $3, $2}' 2>/dev/null || echo "无进程信息")
+    
+    # 获取系统负载信息
+    uptime_info=$(uptime 2>/dev/null | awk '{print $3,$4}' | sed 's/,//')
+    load_avg=$(uptime | awk -F'load average:' '{print $2}' | sed 's/,/ /g')
+    
+    # 获取CPU平均负载
+    local cpu_usage_1min cpu_usage_5min cpu_usage_15min
+    cpu_usage_1min=$(uptime | awk -F'load average:' '{print $2}' | awk -F', ' '{print $1}' | sed 's/ //g')
+    cpu_usage_5min=$(uptime | awk -F'load average:' '{print $2}' | awk -F', ' '{print $2}' | sed 's/ //g')
+    cpu_usage_15min=$(uptime | awk -F'load average:' '{print $2}' | awk -F', ' '{print $3}' | sed 's/ //g')
+    
+    echo -e "\033[1;33m【进程信息】\033[0m"
     echo -e "\033[1;37m  📊 进程总数: \033[1;32m$((process_count-1))\033[0m"
-    echo -e "\033[1;37m  🏆 CPU使用最高的进程:\033[0m"
-    echo -e "\033[1;32m$top_processes\033[0m"
+    echo -e "\033[1;37m  💀 僵尸进程: \033[1;32m$zombie_count\033[0m"
+    echo -e "\033[1;37m  🏃 运行/睡眠: \033[1;32m$running_sleeping\033[0m"
+    echo -e "\033[1;37m  ⏸️  停止进程: \033[1;32m$stopped\033[0m"
+    echo -e "\033[1;37m  🚀 系统负载: \033[1;32m$load_avg\033[0m"
+    echo -e "\033[1;37m  ⏱️  运行时长: \033[1;32m$uptime_info\033[0m"
+    echo ""
+    echo -e "\033[1;37m  🏆 CPU使用最高进程:\033[0m"
+    echo -e "\033[1;32m 进程名              CPU%  MEM%   PID\033[0m"
+    echo -e "\033[1;32m$top_cpu_processes\033[0m"
+    echo ""
+    echo -e "\033[1;37m  💾 内存使用最高进程:\033[0m"
+    echo -e "\033[1;32m 进程名              MEM%  CPU%   PID\033[0m"
+    echo -e "\033[1;32m$top_mem_processes\033[0m"
 }
 
 # 更新磁盘信息
-update_disk_info() {
-    local disk_total disk_used disk_avail disk_percent
+# 更新增强版磁盘信息
+update_enhanced_disk_info() {
+    local disk_total disk_used disk_avail disk_percent filesystem mount_point
     local disk_usage=$(df -h / 2>/dev/null | tail -1)
     disk_total=$(echo $disk_usage | awk '{print $2}' || echo "N/A")
     disk_used=$(echo $disk_usage | awk '{print $3}' || echo "N/A")
     disk_avail=$(echo $disk_usage | awk '{print $4}' || echo "N/A")
     disk_percent=$(echo $disk_usage | awk '{print $5}' || echo "N/A")
+    filesystem=$(echo $disk_usage | awk '{print $1}' || echo "N/A")
+    mount_point=$(echo $disk_usage | awk '{print $6}' || echo "N/A")
+    
+    # 获取磁盘挂载信息
+    local disk_type="N/A"
+    if command -v lsblk >/dev/null 2>&1; then
+        disk_type=$(lsblk -f / 2>/dev/null | grep -E "(ext4|xfs|btrfs|zfs)" | awk '{print $2}' | head -1 || echo "N/A")
+    fi
+    
+    # 获取磁盘I/O统计信息
+    local disk_reads disk_writes
+    if [ -f "/proc/diskstats" ]; then
+        # 读取根分区的I/O统计
+        local disk_stats
+        disk_stats=$(grep "/[^ ]*$" /proc/diskstats 2>/dev/null | head -1)
+        if [ -n "$disk_stats" ]; then
+            disk_reads=$(echo $disk_stats | awk '{print $4}' || echo "0")
+            disk_writes=$(echo $disk_stats | awk '{print $8}' || echo "0")
+        fi
+    fi
+    
+    # 获取磁盘温度（如果有）
+    local disk_temp="N/A"
+    if command -v hddtemp >/dev/null 2>&1; then
+        disk_temp=$(hddtemp /dev/sda 2>/dev/null | grep -o '[0-9]*°C' || echo "N/A")
+    elif [ -f "/sys/class/block/sda/device/hwmon/hwmon*/temp1_input" ]; then
+        disk_temp=$(cat /sys/class/block/sda/device/hwmon/hwmon*/temp1_input 2>/dev/null | awk '{print $1/1000 "°C"}' || echo "N/A")
+    fi
+    
+    # 计算磁盘使用率
+    local used_percent
+    used_percent=$(echo $disk_percent | sed 's/%//')
     
     echo -e "\033[1;33m【磁盘信息】\033[0m"
-    echo -e "\033[1;37m  💽 磁盘: \033[1;32m/ 根目录\033[0m"
+    echo -e "\033[1;37m  💽 主分区: \033[1;32m$mount_point ($filesystem, $disk_type)\033[0m"
     echo -e "\033[1;37m  📈 总容量: \033[1;32m$disk_total\033[0m"
-    echo -e "\033[1;37m  📊 使用: \033[1;32m$disk_used ($disk_percent)\033[0m"
+    echo -e "\033[1;37m  📊 已用: \033[1;32m$disk_used ($disk_percent)\033[0m"
     echo -e "\033[1;37m  🆓 可用: \033[1;32m$disk_avail\033[0m"
+    echo -e "\033[1;37m  📈 I/O统计: \033[1;32m读取:$disk_reads 写入:$disk_writes\033[0m"
+    echo -e "\033[1;37m  🌡️  温度: \033[1;32m$disk_temp\033[0m"
+    
+    # 显示其他重要挂载点
+    echo -e "\033[1;37m  💾 其他挂载点: \033[0m"
+    df -h 2>/dev/null | grep -E "(boot|tmp|var|home)" | awk '{print "    " $1 ": " $5 " used (" $4 " available)"}' | head -3
 }
 
-# 更新网络信息
-update_network_info() {
-    local interface rx_bytes tx_bytes rx_rate tx_rate internal_ip external_ip
+# 更新增强版网络信息
+update_enhanced_network_info() {
+    local interface rx_bytes tx_bytes rx_rate tx_rate internal_ip external_ip dns_servers gateway
     interface=$(ip route | head -1 | awk '{print $5}' 2>/dev/null || echo "eth0")
     
     # 获取IP地址
     internal_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
     external_ip=$(get_reliable_external_ip 2>/dev/null)
     [ -z "$external_ip" ] && external_ip="无法获取公网IP"
+    
+    # 获取网络配置信息
+    dns_servers=$(cat /etc/resolv.conf 2>/dev/null | grep nameserver | awk '{print $2}' | head -2 | tr '\n' ', ' | sed 's/, $//')
+    gateway=$(ip route | grep default | awk '{print $3}' | head -1)
     
     # 获取当前网络统计
     rx_bytes=$(cat /proc/net/dev 2>/dev/null | grep -E "(eth0|enp|ens)" | head -1 | awk '{print $2}' || echo "0")
@@ -6492,33 +6590,51 @@ update_network_info() {
     echo "$rx_bytes" > /tmp/monitor_rx_prev 2>/dev/null
     echo "$tx_bytes" > /tmp/monitor_tx_prev 2>/dev/null
     
+    # 获取网络连接状态
+    local connections dns_status
+    connections=$(ss -tuln 2>/dev/null | wc -l || echo "N/A")
+    dns_status=$(ping -c 1 8.8.8.8 2>/dev/null | grep "1 packets transmitted" | awk '{print $1}' || echo "N/A")
+    
     echo -e "\033[1;33m【网络信息】\033[0m"
-    echo -e "\033[1;37m  🌐 接口: \033[1;32m$interface\033[0m"
-    echo -e "\033[1;37m  📊 流量: \033[1;32m↓ $rx_rate  ↑ $tx_rate\033[0m"
+    echo -e "\033[1;37m  🌐 主接口: \033[1;32m$interface\033[0m"
     echo -e "\033[1;37m  🌍 内网IP: \033[1;32m$internal_ip\033[0m"
     echo -e "\033[1;37m  🌐 公网IP: \033[1;32m$external_ip\033[0m"
+    echo -e "\033[1;37m  🚪 网关: \033[1;32m$gateway\033[0m"
+    echo -e "\033[1;37m  📊 流量: \033[1;32m↓ $rx_rate  ↑ $tx_rate\033[0m"
+    echo -e "\033[1;37m  🔗 活动连接: \033[1;32m$connections\033[0m"
+    echo -e "\033[1;37m  📡 DNS服务器: \033[1;32m$dns_servers\033[0m"
+    echo -e "\033[1;37m  🌐 网络状态: \033[1;32m$dns_status\033[0m"
 }
 
 # 更新GPU信息
-update_gpu_info() {
-    local gpu_info gpu_usage gpu_temp gpu_memory gpu_name
+# 更新增强版GPU信息
+update_enhanced_gpu_info() {
+    local gpu_info gpu_usage gpu_temp gpu_memory gpu_name gpu_power gpu_fan gpu_memory_free gpu_memory_percent
     
     # 尝试多种GPU检测方式
     if command -v nvidia-smi >/dev/null 2>&1; then
         # NVIDIA GPU
-        gpu_info=$(nvidia-smi --query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
+        gpu_info=$(nvidia-smi --query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total,power.draw,fan.speed --format=csv,noheader,nounits 2>/dev/null | head -1)
         if [ -n "$gpu_info" ]; then
             gpu_name=$(echo "$gpu_info" | awk -F', ' '{print $1}')
             gpu_usage=$(echo "$gpu_info" | awk -F', ' '{print $2}')
             gpu_temp=$(echo "$gpu_info" | awk -F', ' '{print $3}')
             gpu_memory_used=$(echo "$gpu_info" | awk -F', ' '{print $4}')
             gpu_memory_total=$(echo "$gpu_info" | awk -F', ' '{print $5}')
+            gpu_power=$(echo "$gpu_info" | awk -F', ' '{print $6}')
+            gpu_fan=$(echo "$gpu_info" | awk -F', ' '{print $7}')
+            
             gpu_memory="${gpu_memory_used}MiB / ${gpu_memory_total}MiB"
+            gpu_memory_percent=$(echo "scale=1; $gpu_memory_used * 100 / $gpu_memory_total" | bc 2>/dev/null || echo "N/A")
+            gpu_power=$(echo "$gpu_power" | sed 's/ W//' 2>/dev/null || echo "N/A")
+            gpu_fan=$(echo "$gpu_fan" | sed 's/%//' 2>/dev/null || echo "N/A")
         else
             gpu_name="NVIDIA GPU"
             gpu_usage="N/A"
             gpu_temp="N/A"
             gpu_memory="N/A"
+            gpu_power="N/A"
+            gpu_fan="N/A"
         fi
     elif command -v rocm-smi >/dev/null 2>&1; then
         # AMD GPU (ROCm)
@@ -6526,24 +6642,46 @@ update_gpu_info() {
         gpu_usage=$(rocm-smi --showmemuse 2>/dev/null | grep "%" | head -1 | awk '{print $2}' | sed 's/%//')
         gpu_temp=$(rocm-smi --showtemp 2>/dev/null | grep "Temperature" | head -1 | awk '{print $3}' | sed 's/C//')
         gpu_memory="ROCm GPU"
+        gpu_power="N/A"
+        gpu_fan="N/A"
+    elif command -v glxinfo >/dev/null 2>&1; then
+        # 使用glxinfo检测GPU
+        gpu_name=$(glxinfo -B 2>/dev/null | grep "OpenGL renderer string" | sed 's/.*: //' | cut -c1-30 || echo "集成GPU")
+        gpu_usage="N/A"
+        gpu_temp="N/A"
+        gpu_memory="N/A"
+        gpu_power="N/A"
+        gpu_fan="N/A"
     elif [ -f "/sys/class/drm/card0/device/vendor" ]; then
         # 通用GPU检测
         gpu_name="集成GPU"
         gpu_usage="N/A"
         gpu_temp="N/A"
         gpu_memory="N/A"
+        gpu_power="N/A"
+        gpu_fan="N/A"
     else
         gpu_name="未检测到GPU"
         gpu_usage="N/A"
         gpu_temp="N/A"
         gpu_memory="N/A"
+        gpu_power="N/A"
+        gpu_fan="N/A"
     fi
     
     echo -e "\033[1;33m【GPU信息】\033[0m"
     echo -e "\033[1;37m  🎮 型号: \033[1;32m$gpu_name\033[0m"
     echo -e "\033[1;37m  💻 使用率: \033[1;32m${gpu_usage}%\033[0m"
     echo -e "\033[1;37m  🌡️ 温度: \033[1;32m${gpu_temp}°C\033[0m"
-    echo -e "\033[1;37m  💾显存: \033[1;32m$gpu_memory\033[0m"
+    echo -e "\033[1;37m  💾显存: \033[1;32m$gpu_memory ($gpu_memory_percent%)\033[0m"
+    echo -e "\033[1;37m  ⚡ 功耗: \033[1;32m$gpu_power W\033[0m"
+    echo -e "\033[1;37m  🌀 风扇: \033[1;32m$gpu_fan%\033[0m"
+    
+    # 显示GPU详细信息
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        echo -e "\033[1;37m  💻 GPU核心频率: \033[1;32m$(nvidia-smi --query-gpu=clocks.gr --format=csv,noheader,nounits 2>/dev/null | head -1 || echo "N/A") MHz\033[0m"
+        echo -e "\033[1;37m  💻 显存频率: \033[1;32m$(nvidia-smi --query-gpu=clocks.mem --format=csv,noheader,nounits 2>/dev/null | head -1 || echo "N/A") MHz\033[0m"
+    fi
 }
 
 # 更新控制提示
