@@ -61,12 +61,12 @@ sudo bash xiaozhi-server-installer-docker.sh
 
 ### 方式一：通过 curl 或 wget 下载并执行（一行命令）
 
-# 使用 curl
+### 使用 curl
 ```bash
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh | sudo tee /tmp/xiaozhi-installer.sh > /dev/null && sudo bash /tmp/xiaozhi-installer.sh
 ```
 
-# 使用 wget
+### 使用 wget
 ```bash
 wget -qO- https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh | sudo tee /tmp/xiaozhi-installer.sh > /dev/null && sudo bash /tmp/xiaozhi-installer.sh
 ```
