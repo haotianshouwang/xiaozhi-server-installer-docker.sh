@@ -6,95 +6,8 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.66（Docker安装兼容性修复版本）
-# 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法
-# v1.2.54 集成：完整集成监控系统v1.2.54，修复所有监控功能，确保语法正确，支持Q键退出
-# v1.2.51（详细监控面板版本）
-# 修复内容：1) 提示信息完全固定在屏幕底部，不随数据刷新消失 2) 添加CPU多核心监控 3) 添加运行进程监控 4) 添加GPU详细信息 5) 添加温度监控
-# v1.2.20:
-# - 修复Docker服务启动流程问题
-# - 确保用户选择Docker操作后正确执行docker-compose up -d
-# - 添加服务启动后的连接信息显示
-# - 优化智能内存风险处理逻辑
-# v1.2.21:
-# - 新增Docker操作工具菜单（选项0）
-# - 集成到主菜单，支持服务管理、镜像清理、系统维护
-# - 包含7个Docker操作子菜单：服务管理、镜像管理、容器管理、系统信息、深度清理、网络端口管理、日志管理
-# - 提供完整的Docker生命周期管理功能
-# - 保持向后兼容，不影响现有功能
-# 详细说明：
-# 0) 现在通过脚本配置密钥和服务商（默认）
-# 1) 稍后手动填写所有配置
-# 2) 退出配置（将使用现有配置文件）
-# 3) 不配置所有配置，直接返回菜单（智能ASR检测，无在线ASR无警告）
-# 4) 返回上一个菜单
-# 修正内容：
-# v1.2.17:
-# - 添加check_asr_config函数，智能检测配置文件中的ASR设置
-# - 添加smart_handle_memory_risk函数，根据ASR类型选择警告策略
-# - 在线ASR配置（阿里云、讯飞、百度等）跳过内存警告，直接Docker操作
-# - 本地ASR配置显示完整内存不足警告和风险提示
-# - 优化Docker管理流程，确保正常返回处理结果
-# - 清理测试代码残留，提升用户体验
-# v1.2.18:
-# - 修复create_default_config_file函数中LLM type设置错误
-# - 将zhipuai类型改为openai类型（ChatGLM实际使用的类型）
-# - 修正LLM和VLLM配置参数，使用正确的base_url和model_name格式
-# v1.2.19:
-# v1.2.20:
-# - 修复Docker服务启动流程问题
-# - 确保用户选择Docker操作后正确执行 docker-compose up -d
-# - 添加专用服务启动函数 start_xiaozhi_service
-# - 优化智能内存风险处理，确保服务能正常启动
-# - 修复内存检测逻辑中bc命令依赖问题
-# - 解决部分系统缺少bc命令导致的内存检测失败
-# - 使用awk替代bc进行除法计算，提高脚本兼容性
-# v1.2.21:
-# - 新增Docker操作工具菜单，集成到主菜单选项0
-# v1.2.23:
-# - 解决GitHub脚本被替换为报告文件导致的语法错误
-# - 提供完整的bash脚本，确保从GitHub下载时正常执行
-# v1.2.26:
-# - 增强网络监控功能：添加实时网络流量监控，每秒流量统计
-# - 网络连接详细信息：显示谁连接我的IP和端口，我连接谁的IP和端口
-# - 活跃连接监控：实时显示活跃连接数量和连接详情
-# - 监听端口显示：显示当前系统监听的端口列表
-# - 网络接口优化：自动检测网络接口，支持多种网络配置
-# - 连接状态跟踪：实时跟踪TCP连接状态和详细信息
-# - 菜单选项优化：退出脚本选项从10改为0，用户体验更友好
-# - 网络数据缓存：实现网络流量实时计算，避免数据丢失
-# - 网络兼容性增强：支持不同Linux发行版的网络统计方式
-
-# v1.2.25:
-# - 新增系统监控工具：高科技风格黑客大屏界面，实时系统状态监控
-# - 详细系统信息：CPU核心使用率、内存使用情况、磁盘使用率、网络状态
-# - 实时进程监控：显示TOP 5 CPU使用进程
-# - 系统健康检查：CPU温度监控、内存风险评估、磁盘空间预警
-# - 网络信息显示：内网IP、公网IP、收发数据流量统计
-# - Docker状态监控：容器运行状态、资源使用情况
-# - 彩色进度条显示：内存和磁盘使用率直观展示
-# - 智能刷新机制：每2秒自动更新，支持键盘快捷键操作
-# - 终端尺寸自适应：自动检测并提示最小窗口尺寸要求
-# - 菜单结构调整：系统监控工具置于选项7，退出选项改为10
-# - 完整向后兼容：不影响现有部署和Docker工具功能
-
-# v1.2.24:
-# - 调整菜单结构：Docker工具从选项0移至选项6
-# - 完善Docker工具功能：所有子函数都支持循环菜单
-# - 优化用户体验：每次操作完成后返回Docker工具主页
-# - 新增Docker系统信息子菜单功能
-# - Docker服务管理：启动/停止/重启/查看状态/资源监控
-# - Docker镜像管理：查看/清理/重新拉取镜像
-# - Docker容器管理：查看/进入/清理/重置容器
-# - Docker系统信息：版本/资源使用/磁盘使用/事件信息
-# - Docker深度清理：选择性清理Docker资源或完全重置
-# - Docker网络端口管理：网络查看/端口检查/连接测试
-# - Docker日志管理：查看/搜索/导出/实时跟踪日志
-# - 保持完全向后兼容，不影响现有部署功能
-# v1.2.22:
-# - 修复case语句语法错误，删除多余分号
-# - 解决Docker操作工具菜单启动时的bash语法问题
-# - 确保脚本可以在所有bash环境中正常运行
+# 版本：1.2.68（Docker安装函数优化版本 - 修复调用问题）
+# 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
@@ -5694,10 +5607,11 @@ docker_operation_tool_menu() {
         echo "5) Docker深度清理 (清理所有Docker资源)"
         echo "6) Docker网络和端口管理"
         echo "7) Docker日志管理 (查看/实时跟踪)"
+        echo "8) Docker安装管理 (安装/卸载Docker引擎)"
         echo "0) 返回主菜单"
         echo -e "${PURPLE}==================================================${RESET}"
         
-        read -r -p "请选择Docker操作 (0-7): " docker_tool_choice < /dev/tty
+        read -r -p "请选择Docker操作 (0-8): " docker_tool_choice < /dev/tty
         
         case $docker_tool_choice in
             1)
@@ -5721,12 +5635,15 @@ docker_operation_tool_menu() {
             7)
                 docker_log_management
                 ;;
+            8)
+                docker_installation_management
+                ;;
             0)
                 echo -e "${CYAN}🔙 返回主菜单${RESET}"
                 return 0
                 ;;
             *)
-                echo -e "${RED}❌ 无效选项，请输入0-7${RESET}"
+                echo -e "${RED}❌ 无效选项，请输入0-8${RESET}"
                 sleep 2
                 ;;
         esac
@@ -6275,6 +6192,246 @@ docker_log_management() {
                 ;;
         esac
     done
+}
+
+# Docker安装管理
+docker_installation_management() {
+    while true; do
+        clear
+        echo -e "\n${PURPLE}==================================================${RESET}"
+        echo -e "${CYAN}🔧 Docker安装管理 🔧${RESET}"
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        # 检查当前Docker状态
+        if command -v docker &> /dev/null; then
+            echo -e "${GREEN}✅ Docker状态: 已安装${RESET}"
+            docker_version=$(docker --version 2>/dev/null | head -n1 || echo "未知版本")
+            echo -e "${CYAN}📋 当前版本: $docker_version${RESET}"
+            
+            # 检查Docker服务状态
+            if systemctl is-active --quiet docker 2>/dev/null; then
+                echo -e "${GREEN}🟢 Docker服务: 运行中${RESET}"
+            elif systemctl is-enabled --quiet docker 2>/dev/null; then
+                echo -e "${YELLOW}🟡 Docker服务: 已安装但未运行${RESET}"
+            else
+                echo -e "${RED}❌ Docker服务: 未安装${RESET}"
+            fi
+            
+            echo -e "\n${WHITE_RED}可用操作:${RESET}"
+            echo "1) 重新安装Docker (更新到最新版本)"
+            echo "2) 卸载Docker (完全清除Docker)"
+            echo "3) 查看Docker详细信息"
+            echo "0) 返回Docker工具主页"
+        else
+            echo -e "${RED}❌ Docker状态: 未安装${RESET}"
+            echo -e "\n${WHITE_RED}可用操作:${RESET}"
+            echo "1) 安装Docker (支持25+种Linux发行版)"
+            echo "0) 返回Docker工具主页"
+        fi
+        
+        echo -e "${PURPLE}==================================================${RESET}"
+        
+        read -r -p "请选择操作 (0-3): " install_choice < /dev/tty
+        
+        case $install_choice in
+            1)
+                if command -v docker &> /dev/null; then
+                    echo -e "\n${YELLOW}⚠️ 检测到Docker已安装${RESET}"
+                    read -r -p "是否重新安装Docker? 这将更新到最新版本 (y/N): " confirm_reinstall < /dev/tty
+                    if [[ "$confirm_reinstall" =~ ^[Yy]$ ]]; then
+                        install_or_update_docker
+                    fi
+                else
+                    echo -e "\n${CYAN}🚀 开始安装Docker...${RESET}"
+                    install_or_update_docker
+                fi
+                ;;
+            2)
+                if command -v docker &> /dev/null; then
+                    echo -e "\n${RED}⚠️ 危险操作：Docker卸载${RESET}"
+                    echo -e "${YELLOW}这将完全删除Docker及其所有数据！${RESET}"
+                    echo -e "${YELLOW}包括所有镜像、容器、数据卷等！${RESET}"
+                    read -r -p "确认卸载Docker? 输入 'UNINSTALL' 确认: " confirm_uninstall < /dev/tty
+                    if [ "$confirm_uninstall" = "UNINSTALL" ]; then
+                        uninstall_docker
+                    else
+                        echo -e "${CYAN}🚫 卸载操作已取消${RESET}"
+                        sleep 2
+                    fi
+                else
+                    echo -e "\n${YELLOW}⚠️ Docker未安装，无需卸载${RESET}"
+                    sleep 2
+                fi
+                ;;
+            3)
+                if command -v docker &> /dev/null; then
+                    docker_detailed_info
+                else
+                    echo -e "\n${RED}❌ Docker未安装，无法显示详细信息${RESET}"
+                    sleep 2
+                fi
+                ;;
+            0)
+                echo -e "${CYAN}🔙 返回Docker工具主页${RESET}"
+                return 0
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选项，请输入0-3${RESET}"
+                sleep 2
+                ;;
+        esac
+    done
+}
+
+# 安装或更新Docker
+install_or_update_docker() {
+    echo -e "\n${BLUE}🐳 Docker安装/更新向导${RESET}"
+    echo -e "${BLUE}=======================================${RESET}"
+    
+    # 检测系统信息
+    echo -e "${CYAN}🔍 检测系统信息...${RESET}"
+    
+    # 检查是否有通用安装器
+    local universal_installer="/workspace/universal_docker_installer.sh"
+    if [ -f "$universal_installer" ]; then
+        echo -e "${GREEN}✅ 发现通用Docker安装器${RESET}"
+        echo -e "${CYAN}🚀 使用智能安装器安装Docker...${RESET}"
+        
+        # 调用通用安装器
+        if bash "$universal_installer"; then
+            echo -e "\n${GREEN}🎉 Docker安装成功！${RESET}"
+            echo -e "${CYAN}您现在可以使用Docker了！${RESET}"
+        else
+            echo -e "\n${RED}❌ Docker安装失败${RESET}"
+            echo -e "${YELLOW}请检查网络连接和系统权限${RESET}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️ 通用安装器未找到，使用源脚本已有安装函数${RESET}"
+        echo -e "${CYAN}🚀 调用成熟的check_and_install_docker()函数...${RESET}"
+        
+        # 调用源脚本中已有的成熟安装函数
+        check_and_install_docker
+        
+        # 检查安装结果
+        if [ $? -eq 0 ]; then
+            echo -e "\n${GREEN}🎉 Docker安装成功！${RESET}"
+            echo -e "${CYAN}Docker已通过成熟安装流程完成配置${RESET}"
+        else
+            echo -e "\n${RED}❌ Docker安装失败${RESET}"
+            echo -e "${YELLOW}请检查网络连接和系统权限${RESET}"
+            return 1
+        fi
+    fi
+    
+    # 验证安装
+    sleep 3
+    if command -v docker &> /dev/null && docker info &> /dev/null; then
+        echo -e "${GREEN}✅ Docker安装验证成功！${RESET}"
+        docker_version=$(docker --version)
+        echo -e "${CYAN}📋 Docker版本: $docker_version${RESET}"
+    else
+        echo -e "${RED}❌ Docker安装验证失败${RESET}"
+        echo -e "${YELLOW}请手动检查Docker安装状态${RESET}"
+    fi
+    
+    read -r -p "按回车键继续..." < /dev/tty
+}
+
+# 卸载Docker
+uninstall_docker() {
+    echo -e "\n${RED}🚨 Docker卸载向导${RESET}"
+    echo -e "${RED}=============================${RESET}"
+    
+    # 停止所有容器
+    echo -e "${CYAN}🛑 停止所有运行中的容器...${RESET}"
+    docker stop $(docker ps -aq) 2>/dev/null || true
+    
+    # 删除所有容器
+    echo -e "${CYAN}🗑️ 删除所有容器...${RESET}"
+    docker rm $(docker ps -aq) 2>/dev/null || true
+    
+    # 删除所有镜像
+    echo -e "${CYAN}🗑️ 删除所有镜像...${RESET}"
+    docker rmi $(docker images -q) 2>/dev/null || true
+    
+    # 删除所有数据卷
+    echo -e "${CYAN}🗑️ 删除所有数据卷...${RESET}"
+    docker volume prune -f 2>/dev/null || true
+    
+    # 删除所有网络
+    echo -e "${CYAN}🗑️ 删除所有网络...${RESET}"
+    docker network prune -f 2>/dev/null || true
+    
+    # 卸载Docker包
+    echo -e "${CYAN}📦 卸载Docker包...${RESET}"
+    
+    # 检测并卸载不同包管理器中的Docker
+    if command -v apt &> /dev/null; then
+        sudo apt remove --purge -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+        sudo apt autoremove -y 2>/dev/null || true
+    elif command -v yum &> /dev/null; then
+        sudo yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine 2>/dev/null || true
+    elif command -v dnf &> /dev/null; then
+        sudo dnf remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine 2>/dev/null || true
+    fi
+    
+    # 删除Docker相关文件和目录
+    echo -e "${CYAN}🧹 清理Docker配置文件...${RESET}"
+    sudo rm -rf /var/lib/docker 2>/dev/null || true
+    sudo rm -rf /var/run/docker 2>/dev/null || true
+    sudo rm -rf /etc/docker 2>/dev/null || true
+    sudo rm -rf ~/.docker 2>/dev/null || true
+    
+    # 删除Docker用户组
+    sudo groupdel docker 2>/dev/null || true
+    
+    echo -e "\n${GREEN}✅ Docker卸载完成！${RESET}"
+    echo -e "${YELLOW}⚠️ 注意：已删除所有Docker相关数据，谨慎操作！${RESET}"
+    
+    read -r -p "按回车键继续..." < /dev/tty
+}
+
+# Docker详细信息显示
+docker_detailed_info() {
+    echo -e "\n${BLUE}🐳 Docker详细信息${RESET}"
+    echo -e "${BLUE}=====================${RESET}"
+    
+    if ! command -v docker &> /dev/null; then
+        echo -e "${RED}❌ Docker未安装${RESET}"
+        sleep 2
+        return 1
+    fi
+    
+    # Docker版本信息
+    echo -e "${CYAN}📋 Docker版本信息:${RESET}"
+    docker version 2>/dev/null || echo "无法获取版本信息"
+    
+    echo -e "\n${CYAN}🔧 系统信息:${RESET}"
+    echo "操作系统: $(cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)"
+    echo "内核版本: $(uname -r)"
+    echo "架构: $(uname -m)"
+    
+    # Docker系统信息
+    echo -e "\n${CYAN}📊 Docker系统信息:${RESET}"
+    docker system df 2>/dev/null || echo "无法获取系统信息"
+    
+    # 容器统计
+    echo -e "\n${CYAN}📦 容器统计:${RESET}"
+    echo "运行中的容器: $(docker ps -q | wc -l)"
+    echo "停止的容器: $(docker ps -aq -f status=exited | wc -l)"
+    echo "镜像总数: $(docker images -q | wc -l)"
+    
+    # Docker服务状态
+    echo -e "\n${CYAN}⚙️ Docker服务状态:${RESET}"
+    if systemctl is-active --quiet docker 2>/dev/null; then
+        echo "服务状态: 🟢 运行中"
+    elif systemctl is-enabled --quiet docker 2>/dev/null; then
+        echo "服务状态: 🟡 已安装但未运行"
+    else
+        echo "服务状态: ❌ 未安装服务"
+    fi
+    
+    read -r -p "按回车键继续..." < /dev/tty
 }
 
 # 显示服务状态详细信息
