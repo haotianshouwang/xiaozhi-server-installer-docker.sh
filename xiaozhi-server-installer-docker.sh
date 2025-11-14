@@ -6,8 +6,7 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.27
-# 更新内容：统一调整所有菜单结构，将退出脚本和返回上一步选项移至菜单末尾
+# 版本：1.2.28（菜单映射修复版本）
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
@@ -315,16 +314,7 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
             break
             ;;
         2)
-            # Docker操作工具
-            docker_operation_tool_menu
-            break
-            ;;
-        3)
-            # 系统监控工具
-            system_monitor_tool
-            break
-            ;;
-        4)
+            # 更新服务器
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 update_server
                 break
@@ -337,7 +327,8 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break
             fi
             ;;
-        5)
+        3)
+            # 仅修改配置文件
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 config_only
                 break  
@@ -350,7 +341,8 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break  
             fi
             ;;
-        6)
+        4)
+            # 测试服务器连接
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 test_server
                 break  
@@ -363,7 +355,8 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break 
             fi
             ;;
-        7)
+        5)
+            # 测试服务器端口
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 test_ports
                 break 
@@ -376,11 +369,23 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
                 break
             fi
             ;;
+        6)
+            # Docker操作工具
+            docker_operation_tool_menu
+            break
+            ;;
+        7)
+            # 系统监控工具
+            system_monitor_tool
+            break
+            ;;
         8)
+            # 查看Docker日志
             docker_logs
             break  
             ;;
         9)
+            # 删除服务器
             if [ "$SERVER_DIR_EXISTS" = true ] || [ "$CONTAINER_EXISTS" = true ]; then
                 delete_server
             else
@@ -403,10 +408,6 @@ read -r -p "按回车键继续..." < /dev/tty < /dev/tty
             sleep 2
             # 不使用return，而是继续循环让用户重新输入
             continue
-            ;;
-        0)
-            echo -e "${GREEN}👋 感谢使用，脚本退出${RESET}"
-            exit 0
             ;;
     esac
     done
@@ -1491,7 +1492,7 @@ config_aliyun_asr() {
     echo -e "\n${GREEN}✅ 阿里云流式ASR配置完成${RESET}"
 }
 
-# ========================= ASR配置 =========================
+# ========================= 高级ASR配置 =========================
 config_asr_advanced() {
     echo -e "${YELLOW}🎤 语音识别(ASR)服务详细配置${RESET}"
     echo -e "${CYAN}请选择ASR服务类型：${RESET}"
@@ -2885,7 +2886,7 @@ config_keys() {
         return 0  # 配置成功完成
 }
 
-# ========================= TTS配置 =========================
+# ========================= 高级TTS配置 =========================
 config_tts_advanced() {
     echo -e "${YELLOW}🎤 语音合成(TTS)服务详细配置${RESET}"
     echo -e "${CYAN}请选择TTS服务类型：${RESET}"
@@ -3217,7 +3218,7 @@ EOF
     echo -e "${YELLOW}💡 请确保服务已启动在 $sovits_v3_url${RESET}"
 }
 
-# LLM配置
+# 高级LLM配置
 config_llm_advanced() {
     echo -e "${YELLOW}🤖 大语言模型(LLM)服务详细配置${RESET}"
     echo -e "${CYAN}请选择LLM服务类型：${RESET}"
@@ -4570,8 +4571,8 @@ show_connection_info() {
     
     echo -e "${GREEN}OTA接口（内网）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
     echo -e "${GREEN}OTA接口（公网）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-    echo -e "${GREEN}Websocket接口（内网）：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
-    echo -e "${GREEN}Websocket接口（公网）：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+    echo -e "${GREEN}Websocket接口：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
+    echo -e "${GREEN}Websocket接口：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
 }
 
