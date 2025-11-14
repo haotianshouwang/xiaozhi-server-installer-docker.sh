@@ -4,13 +4,13 @@ trap exit_confirm SIGINT
 
 # ========================= 基础配置 =========================
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
-# 新功能：端口检测 一键更新 新bug
+# 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.68（Docker安装函数优化版本 - 修复调用问题）
+# 版本：1.2.68
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
-SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、配置ASR/LLM/VLLM/TTS、启动服务"
+SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板"
 Version="1.2.61"
 
 # 配置文件链接
@@ -290,7 +290,6 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
         
         if [ -z "$menu_choice" ]; then
             echo -e "${YELLOW}⚠️ 检测到空输入，请输入有效的选项编号${RESET}"
-            echo -e "${CYAN}💡 已部署：1-9,0 | 未部署：1-3,0${RESET}"
             echo -e "${PURPLE}----------------------------------------${RESET}"
             continue  # 重新开始输入循环
         fi
@@ -406,31 +405,6 @@ read -r -p "按回车键继续..." </dev/tty
     done
 }
 
-get_reliable_external_ip() {
-    local external_ip=""
-    
-    # 使用多个可靠的公网IP获取API，优先级排序
-    local ip_apis=(
-        "https://api.ipify.org"
-        "https://ifconfig.me/ip"
-        "https://icanhazip.com"
-        "https://ident.me"
-        "https://checkip.amazonaws.com"
-        "https://api.ip.sb/ip"
-        "https://ipinfo.io/ip"
-    )
-    
-    for api in "${ip_apis[@]}"; do
-        external_ip=$(curl -s --max-time 3 --connect-timeout 2 --retry 1 --retry-delay 1 "$api" 2>/dev/null | tr -d '\n\r ' | grep -E '^([0-9]{1,3}\.){3}[0-9]{1,3}$')
-        if [ -n "$external_ip" ] && [ "$external_ip" != "127.0.0.1" ] && [ "$external_ip" != "localhost" ]; then
-            echo "$external_ip"
-            return 0
-        fi
-    done
-    
-    # 所有API都失败时，返回空字符串
-    echo ""
-}
 
 check_server_config() {
     # 获取IP地址
@@ -568,17 +542,17 @@ smart_handle_memory_risk() {
 # 退出配置界面
 docker_container_management() {
     echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🐳 退出配置脚本选择  🐳${RESET}"
+    echo -e "${CYAN}🐳 是否启动docker  🐳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
-    echo "1) 不执行docker退出，直接结束脚本"
-    echo "2) 执行docker退出"
+    echo "1) 不启动docker退出，直接结束脚本"
+    echo "2) 启动docker退出"
     echo ""
     
     read -r -p "请选择Docker操作 (1-2，默认1): " docker_choice < /dev/tty
     docker_choice=${docker_choice:-1}
     
     if [ "$docker_choice" = "1" ]; then
-        echo -e "\n${GREEN}✅ 您选择了不执行docker退出${RESET}"
+        echo -e "\n${GREEN}✅ 您选择了不启动docker退出${RESET}"
         echo -e "${CYAN}🛑 脚本将直接结束${RESET}"
         
         read -r -p "按回车键退出脚本..." < /dev/tty
@@ -587,7 +561,7 @@ docker_container_management() {
     
     # 如果选择2执行docker退出
     if [ "$docker_choice" = "2" ]; then
-        echo -e "\n${YELLOW}⚠️ 确认执行Docker操作${RESET}"
+        echo -e "\n${YELLOW}⚠️ 确认启动Docker操作${RESET}"
         echo -e "${CYAN}📋 Docker操作将按正常流程执行${RESET}"
         
         # 显示标准的Docker操作确认信息（温和版本）
@@ -698,13 +672,13 @@ handle_insufficient_memory() {
     echo -e "${RED}💀 这将导致您的服务器无限卡死！${RESET}"
     
     echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🐳 Docker容器管理选择  🐳${RESET}"
+    echo -e "${CYAN}🐳 是否启动docker  🐳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
-    echo "1) 不执行docker退出，直接结束脚本"
-    echo "2) 执行docker退出"
+    echo "1) 不启动docker退出，直接结束脚本"
+    echo "2) 启动docker退出"
     echo ""
     
-    read -r -p "请选择Docker操作 (1-2，默认1): " docker_choice < /dev/tty
+    read -r -p "是否启动Docker (1-2，默认1): " docker_choice < /dev/tty
     docker_choice=${docker_choice:-1}
     
     if [ "$docker_choice" = "1" ]; then
@@ -732,12 +706,13 @@ handle_insufficient_memory() {
         echo -e "${RED}脚本已尽最大努力保护你的服务器${RESET}"
         echo -e "${RED}如果坚持继续，你将承担服务器卡死的全部风险${RESET}"
         echo -e "${RED}作者不承担任何责任${RESET}"
+        echo -e "${YELLOW}祝你好运！${RESET}"
         echo -e "${RED}==================================================${RESET}"
         
         echo -e "\n${RED}🆘 如果你的服务器卡死，请尝试以下方式自救：${RESET}"
         echo -e "${RED}1. 如果你是云服务器，请尝试VNC登录，执行sudo systemctl stop docker${RESET}"
         echo -e "${RED}2. 如果你是云服务器，请检查控制台是否有远程指令${RESET}"
-        echo -e "${RED}3. 如果是云服务器，请配置远程指令：sudo systemctl stop docker${RESET}"
+        echo -e "${RED}3. 请配置远程指令：sudo systemctl stop docker${RESET}"
         echo -e "${RED}4. 如果都没有用，请自行百度解决方案${RESET}"
         echo -e "${RED}5. 最后手段：重装系统${RESET}"
         
@@ -1669,8 +1644,6 @@ read -p "请输入选择 (1-3，默认1): " detailed_choice </dev/tty
     echo "- TTS配置 (EdgeTTS等语音合成服务)"
 }
 
-# ========================= ASR 配置 =========================
-
 # 阿里云ASR配置
 config_aliyun_asr() {
     echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliyunStreamASR。${RESET}"
@@ -1711,7 +1684,6 @@ config_aliyun_asr() {
     echo -e "\n${GREEN}✅ 阿里云流式ASR配置完成${RESET}"
 }
 
-# ========================= ASR配置 =========================
 config_asr_advanced() {
     echo -e "${YELLOW}🎤 语音识别(ASR)服务详细配置${RESET}"
     echo -e "${CYAN}请选择ASR服务类型：${RESET}"
@@ -1766,75 +1738,73 @@ config_asr_advanced() {
             return 2  # 返回码2表示完全退出配置
             ;;
         1)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_funasr_local
-            else
-                echo -e "${RED}💀 内存不足无法选择${RESET}"
-                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
-                sleep 2
-                config_asr_advanced
-            fi
+            echo -e "${YELLOW}⚠️ 暂未实现FunASR本地配置，建议选择FunASRServer或阿里云ASR${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         2)
-            config_funasr_server
+            echo -e "${YELLOW}⚠️ 暂未实现FunASR Server配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             return 0
             ;;
         3)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_sherpa_asr
-            else
-                echo -e "${RED}💀 内存不足无法选择${RESET}"
-                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
-                sleep 2
-                config_asr_advanced
-            fi
+            echo -e "${YELLOW}⚠️ 暂未实现SherpaASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         4)
-            if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = true ]; then
-                config_sherpa_paraformer_asr
-            else
-                echo -e "${RED}💀 内存不足 (${MEM_TOTAL}GB < 2GB) 无法选择${RESET}"
-                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
-                sleep 2
-                config_asr_advanced
-            fi
+            echo -e "${YELLOW}⚠️ 暂未实现SherpaParaformerASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         5)
-            if [ "$IS_MEMORY_SUFFICIENT" = true ]; then
-                config_vosk_asr
-            else
-                echo -e "${RED}💀 内存不足无法选择${RESET}"
-                echo -e "${YELLOW}请重新选择ASR服务类型...${RESET}"
-                sleep 2
-                config_asr_advanced
-            fi
+            echo -e "${YELLOW}⚠️ 暂未实现VoskASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         6)
             config_aliyun_asr
             ;;
         7)
-            config_aliyun_batch_asr
+            echo -e "${YELLOW}⚠️ 暂未实现阿里云批量ASR配置，请选择阿里云流式ASR${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         8)
-            config_doubao_stream_asr
+            echo -e "${YELLOW}⚠️ 暂未实现火山引擎流式ASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         9)
-            config_doubao_asr
+            echo -e "${YELLOW}⚠️ 暂未实现火山引擎批量ASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         10)
-            config_tencent_asr
+            echo -e "${YELLOW}⚠️ 暂未实现腾讯云ASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         11)
-            config_baidu_asr
+            echo -e "${YELLOW}⚠️ 暂未实现百度智能云ASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         12)
-            config_openai_asr
+            echo -e "${YELLOW}⚠️ 暂未实现OpenAI ASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         13)
-            config_groq_asr
+            echo -e "${YELLOW}⚠️ 暂未实现Groq ASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         14)
-            config_qwen_asr
+            echo -e "${YELLOW}⚠️ 暂未实现通义千问ASR配置，请选择其他ASR服务${RESET}"
+            sleep 2
+            config_asr_advanced
             ;;
         15)
             config_xunfei_stream_asr
@@ -1846,7 +1816,6 @@ config_asr_advanced() {
     esac
 }
 
-# ========================= ASR 配置 =========================
 config_asr() {
     while true; do
         echo -e "\n${GREEN}【1/6】配置 ASR (语音识别) 服务${RESET}"
@@ -2082,7 +2051,6 @@ config_asr() {
     done
 }
 
-# ========================= LLM 配置 =========================
 # 确保当前目录安全
 check_working_directory() {
     if ! pwd >/dev/null 2>&1; then
@@ -2525,7 +2493,7 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " vllm_ch
     done
 }
 
-# ========================= TTS 配置（16个服务商） =========================
+# ========================= TTS 配置 =========================
 config_tts() {
     while true; do
         echo -e "\n\n${GREEN}【4/6】配置 TTS (语音合成) 服务${RESET}"
@@ -2994,7 +2962,6 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
     done
 }
 
-# ========================= Memory 配置 =========================
 config_memory() {
     while true; do
         echo -e "\n\n${GREEN}【5/6】配置 Memory (记忆) 服务${RESET}"
@@ -3047,7 +3014,6 @@ read -r -p "请输入 API Key: " mem0_api_key < /dev/tty
     done
 }
 
-# ========================= 服务器地址配置 =========================
 config_server() {
     echo -e "\n\n${GREEN}【6/6】配置服务器地址 (自动生成)${RESET}"
 
@@ -3100,7 +3066,6 @@ read -r -p "请输入序号 (默认1): " deploy_choice < /dev/tty
     echo -e "${deploy_type_color}💡 请在填写OTA地址时使用上述完整地址${RESET}"
 }
 
-# ========================= 核心服务配置入口 =========================
 config_keys() {
 
     if [ "${SKIP_DETAILED_CONFIG:-false}" = true ]; then
@@ -3123,7 +3088,7 @@ config_keys() {
         echo -e "${PURPLE}==================================================${RESET}"
         echo "0) 现在通过脚本配置密钥和服务商"
         echo "1) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
-        echo "2) 退出配置（将使用现有配置文件）"
+        echo "2) 退出配置并退出脚本"
         echo "3) 不配置所有配置，直接返回菜单"
         echo "4) 返回上一个菜单"
         read -r -p "请选择（默认0）：" key_choice < /dev/tty
@@ -3253,7 +3218,7 @@ config_keys() {
         while [ $config_step -le $max_steps ]; do
             case $config_step in
                 1)
-                    echo -e "\n${CYAN}=== 第1步：配置 ASR (语音识别) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [1/6]：配置 ASR (语音识别) 服务 ===${RESET}"
                     config_asr_advanced
                     local asr_result=$?
                     if [ $asr_result -eq 2 ]; then
@@ -3272,7 +3237,7 @@ config_keys() {
                     fi
                     ;;
                 2)
-                    echo -e "\n${CYAN}=== 第2步：配置 LLM (大语言模型) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [2/6]：配置 LLM (大语言模型) 服务 ===${RESET}"
                     config_llm_advanced
                     local llm_result=$?
                     if [ $llm_result -eq 2 ]; then
@@ -3285,7 +3250,7 @@ config_keys() {
                     fi
                     ;;
                 3)
-                    echo -e "\n${CYAN}=== 第3步：配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [3/6]：配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
                     config_vllm
                     local vllm_result=$?
                     if [ $vllm_result -eq 2 ]; then
@@ -3298,7 +3263,7 @@ config_keys() {
                     fi
                     ;;
                 4)
-                    echo -e "\n${CYAN}=== 第4步：配置 TTS (语音合成) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [4/6]：配置 TTS (语音合成) 服务 ===${RESET}"
                     config_tts_advanced
                     local tts_result=$?
                     if [ $tts_result -eq 2 ]; then
@@ -3311,7 +3276,7 @@ config_keys() {
                     fi
                     ;;
                 5)
-                    echo -e "\n${CYAN}=== 第5步：配置 Memory (记忆) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [5/6]：配置 Memory (记忆) 服务 ===${RESET}"
                     config_memory
                     local memory_result=$?
                     if [ $memory_result -eq 2 ]; then
@@ -3329,10 +3294,10 @@ config_keys() {
         
         echo -e "\n${GREEN}🎉 所有服务配置完成！${RESET}"
         
-        echo -e "\n${CYAN}=== 第6步：配置服务器地址 (自动生成) ===${RESET}"
+        echo -e "\n${CYAN}=== [6/6]：配置服务器地址 (自动生成) ===${RESET}"
         config_server
         if [ $? -eq 1 ]; then
-            echo -e "\n${CYAN}=== 重新配置 Memory (记忆) 服务 ===${RESET}"
+            echo -e "\n${CYAN}=== 配置 Memory (记忆) 服务 ===${RESET}"
             config_memory
             if [ $? -eq 1 ]; then
                 return 1  # 直接返回，不再继续配置流程
@@ -3345,7 +3310,6 @@ config_keys() {
         return 0  # 配置成功完成
 }
 
-# ========================= 高级TTS配置 =========================
 config_tts_advanced() {
     echo -e "${YELLOW}🎤 语音合成(TTS)服务详细配置${RESET}"
     echo -e "${CYAN}请选择TTS服务类型：${RESET}"
@@ -4465,8 +4429,6 @@ EOF
     echo -e "${GREEN}✅ MiniMax流式TTS配置完成${RESET}"
 }
 
-# ========================= 新增TTS配置函数 =========================
-
 # 阿里云流式CosyVoice配置
 config_aliyun_stream_tts() {
     echo -e "\n${CYAN}☁️ 配置阿里云流式CosyVoice TTS${RESET}"
@@ -4986,7 +4948,6 @@ EOF
     echo -e "${GREEN}✅ ACGN TTS配置完成${RESET}"
 }
 
-# ========================= 服务启动 =========================
 start_service() {
     check_docker_installed
     echo -e "\n${BLUE}🚀 开始启动服务...${RESET}"
@@ -5012,32 +4973,7 @@ start_service() {
 }
 
 # ========================= 连接信息展示 =========================
-show_connection_info() {
-    echo -e "\n${YELLOW}⏳ Docker服务启动中，等待10秒确保服务完全启动...${RESET}"
-    echo -e "${YELLOW}🔄 倒计时：${RESET}"
-    for i in {10..1}; do
-        echo -ne "\r${YELLOW}   倒计时: ${i} 秒${RESET}"
-        sleep 1
-    done
-    echo -e "\n${GREEN}✅ 等待完成，开始进行端口检查${RESET}"
-    
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}📡 服务器连接地址信息${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    echo -e "内网地址：$INTERNAL_IP"
-    echo -e "公网地址：$EXTERNAL_IP"
-    echo -e "${PURPLE}--------------------------------------------------${RESET}"
-    
-    echo -e "${GREEN}OTA接口（内网）：${BOLD}http://$INTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-    echo -e "${GREEN}OTA接口（公网）：${BOLD}http://$EXTERNAL_IP:8003/xiaozhi/ota/${RESET}"
-    echo -e "${GREEN}Websocket接口：${BOLD}ws://$INTERNAL_IP:8000/xiaozhi/v1/${RESET}"
-    echo -e "${GREEN}Websocket接口：${BOLD}ws://$EXTERNAL_IP:8000/xiaozhi/v1/${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-}
 
-# ========================= 部署操作函数 =========================
-
-# 全新部署
 deploy_server() {
     echo -e "${CYAN}🚀 开始全新部署小智服务器${RESET}"
     
@@ -5776,7 +5712,6 @@ read -r -p "按回车键返回主菜单..." < /dev/tty
     return 
 }
 
-# ========================= 系统检查函数 =========================
 check_system() {
     echo -e "\n${CYAN}🔍 正在检测系统环境...${RESET}"
     local os_kernel=$(uname -s)
@@ -5818,8 +5753,6 @@ read -r -p "❓ 是否强制执行？(Y/N，默认N): " choice < /dev/tty
     
     echo -e "${GREEN}✅ 系统检测通过，继续执行脚本...${RESET}"
 }
-
-# ========================= Docker操作工具菜单 =========================
 
 docker_operation_tool_menu() {
     while true; do
@@ -6710,15 +6643,12 @@ docker_service_status_display() {
     echo -e "${PURPLE}==================================================${RESET}"
 }
 
-# ========================= 固定窗口监控系统 =========================
-
-# 固定窗口系统监控工具
 system_monitor_tool() {
     echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${GREEN}🖥️ 手动刷新系统监控工具 🖥️${RESET}"
+    echo -e "${GREEN}         🖥️ 系统监控工具 🖥️${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
-    echo -e "${YELLOW}📊 详细仪表板 - 数据在固定窗口位置更新${RESET}"
-    echo -e "${CYAN}💡 提示: 启动中，准备仪表板界面...${RESET}"
+    echo -e "${YELLOW}        📊 详细仪表板 📊${RESET}"
+    echo -e "${CYAN}    💡 提示: 启动中，准备仪表板界面...${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     
     # 终端大小检测
@@ -6835,7 +6765,7 @@ get_reliable_external_ip() {
     return 1
 }
 
-# 更新增强版监控数据（完整重绘界面）
+# 监控数据
 update_enhanced_monitor_data() {
     local current_time uptime
     current_time=$(date "+%Y-%m-%d %H:%M:%S")
@@ -6846,7 +6776,7 @@ update_enhanced_monitor_data() {
     
     # 标题栏
     echo -e "\033[1;32m================================================================================\033[0m"
-    echo -e "\033[1;32m                     🖥️  详细系统监控仪表板  🖥️                     \033[0m"
+    echo -e "\033[1;32m                     🖥️  系统监控仪表板  🖥️                     \033[0m"
     echo -e "\033[1;32m================================================================================\033[0m"
     echo -e "\033[1;33m 当前时间: \033[1;37m$current_time\033[0m"
     echo -e "\033[1;33m 运行时间: \033[1;37m$uptime\033[0m"
@@ -6886,7 +6816,7 @@ update_enhanced_monitor_data() {
     echo -e "\033[0m"    # 重置颜色
 }
 
-# 更新增强版系统信息
+# 系统信息
 update_enhanced_system_info() {
     local hostname arch kernel_version boot_time internal_ip external_ip os_version
     hostname=$(hostname)
@@ -6911,7 +6841,7 @@ update_enhanced_system_info() {
     echo -e "\033[1;37m  👥 在线用户: \033[1;32m$(who | wc -l) 人\033[0m"
 }
 
-# 更新增强版CPU信息
+# CPU信息
 update_enhanced_cpu_info() {
     local cpu_model cores load cpu_usage max_freq min_freq temp cpu_count thread_count
     cpu_model=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ *//' | cut -c1-60 || echo "CPU信息不可用")
@@ -6969,7 +6899,7 @@ update_enhanced_cpu_info() {
     echo -e "\033[1;37m  💾 缓存: \033[1;32mL1/L2/L3: $cache_l1\033[0m"
 }
 
-# 更新增强版内存信息
+# 增强版内存信息
 update_enhanced_memory_info() {
     # 获取内存信息
     MEM_TOTAL=$(free -h | awk '/^Mem:/ {print $2}' 2>/dev/null || echo "N/A")
@@ -7087,8 +7017,7 @@ update_enhanced_process_info() {
     echo -e "\033[1;32m$top_mem_processes\033[0m"
 }
 
-# 更新磁盘信息
-# 更新增强版磁盘信息
+# 磁盘信息
 update_enhanced_disk_info() {
     local disk_total disk_used disk_avail disk_percent filesystem mount_point
     local disk_usage=$(df -h / 2>/dev/null | tail -1)
@@ -7117,7 +7046,7 @@ update_enhanced_disk_info() {
         fi
     fi
     
-    # 获取磁盘温度（如果有）
+    # 获取磁盘温度
     local disk_temp="N/A"
     if command -v hddtemp >/dev/null 2>&1; then
         disk_temp=$(hddtemp /dev/sda 2>/dev/null | grep -o '[0-9]*°C' || echo "N/A")
@@ -7142,7 +7071,7 @@ update_enhanced_disk_info() {
     df -h 2>/dev/null | grep -E "(boot|tmp|var|home)" | awk '{print "    " $1 ": " $5 " used (" $4 " available)"}' | head -3
 }
 
-# 更新增强版网络信息
+# 网络信息
 update_enhanced_network_info() {
     local interface rx_bytes tx_bytes rx_rate tx_rate internal_ip external_ip dns_servers gateway
     interface=$(ip route | head -1 | awk '{print $5}' 2>/dev/null || echo "eth0")
@@ -7167,7 +7096,7 @@ update_enhanced_network_info() {
         tx_prev=$(cat /tmp/monitor_tx_prev)
         
         if [ "$rx_bytes" -gt "$rx_prev" ] && [ "$tx_bytes" -gt "$tx_prev" ]; then
-            rx_rate=$(((rx_bytes - rx_prev) / 2))  # 简化计算
+            rx_rate=$(((rx_bytes - rx_prev) / 2)) 
             tx_rate=$(((tx_bytes - tx_prev) / 2))
             rx_rate=$(echo "$rx_rate" | numfmt --to=iec-i --suffix=B/s 2>/dev/null || echo "$rx_rate B/s")
             tx_rate=$(echo "$tx_rate" | numfmt --to=iec-i --suffix=B/s 2>/dev/null || echo "$tx_rate B/s")
@@ -7275,7 +7204,6 @@ update_enhanced_network_info() {
 }
 
 # 更新GPU信息
-# 更新增强版GPU信息
 update_enhanced_gpu_info() {
     local gpu_info gpu_usage gpu_temp gpu_memory gpu_name gpu_power gpu_fan gpu_memory_free gpu_memory_percent
     
@@ -7359,7 +7287,6 @@ update_enhanced_gpu_info() {
 
 # 更新控制提示
 update_control_hints() {
-    # 移除动态提示显示，提示信息固定在屏幕底部
     return 0
 }
 
