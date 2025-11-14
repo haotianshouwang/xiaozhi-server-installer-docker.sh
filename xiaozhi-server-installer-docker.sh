@@ -6406,9 +6406,10 @@ update_memory_info() {
     MEM_PERCENT=$(free | awk '/^Mem:/ {printf "%.1f%%", $3/$2 * 100}' 2>/dev/null || echo "N/A")
     
     # 计算进度条
-    local bar_length=40 used_percent color_code
+    local bar_length=40 used_percent used_length color_code
     used_percent=$(free | awk '/^Mem:/ {printf "%.1f", $3/$2 * 100}' 2>/dev/null || echo "0")
-    used_length=$((used_percent * bar_length / 100))
+    # 将浮点数转换为整数（四舍五入）
+    used_length=$(echo "scale=0; ($used_percent * $bar_length) / 100" | bc 2>/dev/null || echo "0")
     
     if (( $(echo "$used_percent > 80" | bc -l 2>/dev/null || echo "0") )); then
         color_code="\033[1;31m"  # 红色警告
