@@ -6,7 +6,9 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.39（固定窗口监控系统界面显示修复版本）
+# 版本：1.2.41（监控系统自动退出提示修复版本）
+# 修复内容：解决监控系统在没有用户输入时自动显示退出提示的问题
+# v1.2.40: 修复监控系统界面显示混乱问题
 # 修复内容：完全重写系统监控工具，实现真正的固定窗口实时更新，类似top/htop仪表板
 # v1.2.20:
 # - 修复Docker服务启动流程问题
@@ -6121,18 +6123,21 @@ system_monitor_tool() {
     # 清屏并绘制完整的监控界面
     draw_monitor_dashboard
     
-    # 主循环 - 固定窗口更新模式
+    # 主循环 - 固定窗口更新模式，避免自动超时导致的输出
+    local refresh_count=0
     while true; do
-        # 等待用户输入（5秒超时）
-        if read -r -t 5 -n 1 input; then
+        # 使用非阻塞方式检查输入
+        if read -r -n 1 -t 0.1 input 2>/dev/null; then
             case "$input" in
                 q|Q)
                     echo -e "\n\033[1;32m🔚 退出监控模式...\033[0m"
                     break
                     ;;
                 r|R)
-                    echo -e "\033[1;32m🔄 手动刷新数据...\033[0m"
+                    echo -ne "\033[1;32m\033[50;1H"  # 移动光标到底部
+                    echo -e "🔄 手动刷新数据..."
                     update_monitor_data
+                    echo -ne "\033[50;1H\033[K"  # 清理刷新提示
                     continue
                     ;;
                 *)
@@ -6141,8 +6146,13 @@ system_monitor_tool() {
                     ;;
             esac
         else
-            # 自动刷新模式，静默更新数据
-            update_monitor_data
+            # 每10秒自动刷新一次
+            refresh_count=$((refresh_count + 1))
+            if [ $refresh_count -ge 10 ]; then
+                update_monitor_data
+                refresh_count=0
+            fi
+            sleep 1
         fi
     done
     
@@ -6155,6 +6165,9 @@ system_monitor_tool() {
 draw_monitor_dashboard() {
     clear
     
+    # 确保屏幕完全清理
+    sleep 0.1
+    
     # 标题栏
     echo -e "\033[1;36m╔════════════════════════════════════════════════════════════════════════════════════════╗\033[0m"
     echo -e "\033[1;36m║\033[1;32m                        🖥️  系统监控仪表板  -  HACKER DASHBOARD  🖥️                      \033[1;36m║\033[0m"
@@ -6162,7 +6175,9 @@ draw_monitor_dashboard() {
     
     # 初始化数据并显示
     init_monitor_data
+    sleep 0.2  # 确保初始化完成
     update_monitor_data
+    sleep 0.1  # 确保更新完成
 }
 
 # 初始化监控数据
@@ -6204,8 +6219,10 @@ update_monitor_data() {
     update_control_hints
     
     # 返回监控状态（静默更新，避免与监控界面冲突）
-    echo -e "\033[42;80H" # 移动光标到屏幕右下角
-    echo -n ""           # 不显示内容
+    # 使用更可靠的光标定位
+    lines=$(tput lines 2>/dev/null || echo 40)
+    cols=$(tput cols 2>/dev/null || echo 100)
+    echo -ne "\033[${lines};${cols}H" # 移动光标到底部右侧
     echo -e "\033[0m"    # 重置颜色
 }
 
@@ -6330,7 +6347,7 @@ update_network_info() {
 # 更新控制提示
 update_control_hints() {
     echo -e "\033[36;2H\033[1;32m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
-    echo -e "\033[37;2H\033[1;32m│\033[1;37m  ⌨️  控制台: R=刷新数据  Q=退出监控  |  自动刷新: 每5秒                 \033[1;32m│\033[0m"
+    echo -e "\033[37;2H\033[1;32m│\033[1;37m  ⌨️  控制台: R=刷新数据  Q=退出监控  |  自动刷新: 每10秒                \033[1;32m│\033[0m"
     echo -e "\033[38;2H\033[1;32m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
 }
 # ========================= 主执行函数 =========================
