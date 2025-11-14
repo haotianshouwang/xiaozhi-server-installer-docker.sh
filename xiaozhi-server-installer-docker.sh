@@ -6,7 +6,7 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.36（固定窗口监控系统错误修复版本）
+# 版本：1.2.37（固定窗口监控系统兼容性修复版本）
 # 修复内容：完全重写系统监控工具，实现真正的固定窗口实时更新，类似top/htop仪表板
 # v1.2.20:
 # - 修复Docker服务启动流程问题
@@ -317,7 +317,7 @@ check_memory_size() {
     fi
     
     # 转换为GB（1GB = 1048576 KB）
-    mem_total_gb=$(echo "scale=1; $mem_total_kb / 1048576" | bc 2>/dev/null || echo "$((mem_total_kb / 1048576))")
+    mem_total_gb=$(awk -v kb="$mem_total_kb" 'BEGIN {printf "%.1f", kb / 1048576}')
     
     # 检查是否小于4GB
     if [ "$mem_total_kb" -lt 4194304 ]; then  # 4GB = 4*1024*1024 = 4194304 KB
@@ -6252,18 +6252,18 @@ update_memory_info() {
     # 计算进度条
     local bar_length=40 used_percent color_code
     used_percent=$(free | awk '/^Mem:/ {printf "%.1f", $3/$2 * 100}' 2>/dev/null || echo "0")
-    used_length=$(echo "$used_percent * $bar_length / 100" | bc -l | xargs printf "%.0f")
+    used_length=$(awk -v percent="$used_percent" -v length="$bar_length" 'BEGIN {printf "%.0f", percent * length / 100}')
     
-    if (( $(echo "$used_percent > 80" | bc -l 2>/dev/null || echo "0") )); then
+    if (( $(awk -v percent="$used_percent" 'BEGIN {print (percent > 80) ? 1 : 0}') )); then
         color_code="\033[1;31m"  # 红色警告
-    elif (( $(echo "$used_percent > 60" | bc -l 2>/dev/null || echo "0") )); then
+    elif (( $(awk -v percent="$used_percent" 'BEGIN {print (percent > 60) ? 1 : 0}') )); then
         color_code="\033[1;33m"  # 黄色注意
     else
         color_code="\033[1;32m"  # 绿色正常
     fi
     
     local filled=$(printf "%*s" $used_length | tr ' ' '█')
-    local empty=$(printf "%*s" $(echo "$bar_length - $used_length" | bc -l | xargs printf "%.0f") | tr ' ' '█')
+    local empty=$(printf "%*s" $(awk -v total="$bar_length" -v used="$used_length" 'BEGIN {printf "%.0f", total - used}') | tr ' ' '█')
     
     echo -e "\033[18;2H\033[1;32m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
     echo -e "\033[19;2H\033[1;32m│\033[1;37m  💾 内存监控                                                           \033[1;32m│\033[0m"
