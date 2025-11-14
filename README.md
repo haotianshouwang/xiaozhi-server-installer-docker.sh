@@ -10,9 +10,10 @@
 - **一键Docker部署**：自动安装Docker和Docker Compose
 - **智能系统检测**：自动检测系统兼容性和资源状况
 - **交互式配置**：提供用户友好的配置界面
-- **多云API支持**：支持阿里云、腾讯云、百度、OpenAI等15种ASR服务
-- **本地模型支持**：支持FunASR、SherpaASR、VoskASR等本地语音识别模型
-- **完整容器管理**：启动、停止、重启、日志查看、连接测试
+- **配置文件支持**：支持阿里云、腾讯云、百度、OpenAI等15种api配置文件配置
+- **本地模型支持**：支持FunASR、SherpaASR、VoskASR等本地语音识别模型的配置
+- **完整容器管理**：安装、启动、停止、重启、日志查看、连接测试
+- **完整服务器监控**：查看cpu、内存、gpu、网络的详细监控
 
 ### 最低要求
 - **操作系统**：Linux（Ubuntu 18.04+, CentOS 7+, Debian 9+）
@@ -58,14 +59,59 @@ sudo bash xiaozhi-server-installer-docker.sh
 
 ## 执行指令
 
-### 方式一：管道执行（推荐）
+### 方式一：通过 curl 或 wget 下载并执行（一行命令）
+
+# 使用 curl
+```bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh | sudo tee /tmp/xiaozhi-installer.sh > /dev/null && sudo bash /tmp/xiaozhi-installer.sh
+```
+
+# 使用 wget
+```bash
+wget -qO- https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh | sudo tee /tmp/xiaozhi-installer.sh > /dev/null && sudo bash /tmp/xiaozhi-installer.sh
+```
+
+### 方式二：管道执行
 ```bash
 # 直接通过管道执行，无需下载文件
+curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh| sudo bash
+```
+
+```bash
+# 备用加速站点
+curl -fsSL https://gh.llkk.cc/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh | sudo bash
+```
+
+```bash
+# GitHub 链接
 curl -fsSL https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh | sudo bash
 ```
 
-### 方式二：下载后执行
+### 方式三：下载后执行
 ```bash
+# 1. 下载脚本
+curl -O https://gh-proxy.org/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh
+
+# 2. 添加执行权限
+chmod +x xiaozhi-server-installer-docker.sh
+
+# 3. 以root权限执行
+sudo ./xiaozhi-server-installer-docker.sh
+```
+```bash
+#备用加速站点
+# 1. 下载脚本
+curl -O https://gh.llkk.cc/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh
+
+# 2. 添加执行权限
+chmod +x xiaozhi-server-installer-docker.sh
+
+# 3. 以root权限执行
+sudo ./xiaozhi-server-installer-docker.sh
+```
+
+```bash
+# GitHub链接
 # 1. 下载脚本
 curl -O https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh
 
@@ -76,17 +122,12 @@ chmod +x xiaozhi-server-installer-docker.sh
 sudo ./xiaozhi-server-installer-docker.sh
 ```
 
-### 方式三：国内用户加速版
+### 方式四：国内用户加速版
 ```bash
 # 使用GitHub Proxy加速下载
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh | sudo bash
 ```
 
-### 方式四：备用镜像
-```bash
-# 如果主链接不可用，使用备用链接
-curl -fsSL https://mirror.ghproxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/xiaozhi-server-installer-docker.sh | sudo bash
-```
 
 ## 部署流程
 
@@ -314,16 +355,6 @@ rm -rf ~/xiaozhi-server/models/*
 - **API文档**：各云服务商官方文档
 - **Docker文档**：https://docs.docker.com
 
-## 版本历史
-
-### 当前版本：v1.0.7-pipeline-support
-- ✅ 支持管道执行 (curl ... | sudo bash)
-- ✅ 修复阿里云ASR多参数配置
-- ✅ 修复Gemini反向代理配置
-- ✅ 完善ASR/TTS配置完整性
-- ✅ 优化内存检测和警告机制
-- ✅ 改进用户界面和交互体验
-
 ### 主要改进
 - **内存管理**：智能检测服务器内存，自动显示合适的ASR选项
 - **错误处理**：增强错误提示和恢复机制
@@ -342,6 +373,6 @@ rm -rf ~/xiaozhi-server/models/*
 ---
 
 **作者**：昊天兽王
-**版本**：v114514
+**版本**：1.2.68
 **更新日期**：2025-11-14  
 **文档版本**：1.0
