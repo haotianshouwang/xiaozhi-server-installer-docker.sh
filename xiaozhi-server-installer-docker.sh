@@ -6154,11 +6154,9 @@ system_monitor_tool() {
     
     # 默认刷新时间（秒）
     local refresh_interval=5
-    echo -e "${YELLOW}📊 自定义监控设置:${RESET}"
-    echo -e "${CYAN}默认刷新间隔: $refresh_interval 秒${RESET}"
-    echo -e "${YELLOW}💡 您可以在监控过程中按 [C] 键自定义刷新时间${RESET}"
-    echo -e "${CYAN}💡 提示: 监控面板采用固定窗口模式，只更新数据内容，位置保持不变${RESET}"
-    sleep 3
+    
+    # 将说明信息以固定位置显示在界面顶部，而不是输出到屏幕
+    echo -e "\033[1;2H\033[K\033[1;33m📊 默认刷新间隔: $refresh_interval 秒 | [C]自定义时间 [R]刷新 [Q]退出 | 固定窗口模式\033[0m"
     
     # 在屏幕最底部显示固定提示信息
     show_fixed_prompt() {
@@ -6206,8 +6204,9 @@ system_monitor_tool() {
             show_fixed_prompt  # 刷新后重新显示底部提示
         fi
         
-        # 等待用户输入（timeout_interval秒超时）
-        if read -r -t $timeout_interval -n 1 input 2>/dev/null; then
+        # 等待用户输入（使用改进的非阻塞输入检测）
+        local input=""
+        if read -r -t $timeout_interval -n 1 -s input 2>/dev/null || read -r -t 0.1 -n 1 input 2>/dev/null; then
             case "$input" in
                 q|Q)
                     echo -e "\n\033[1;32m🔚 退出监控模式...\033[0m"
