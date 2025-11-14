@@ -6,9 +6,9 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.52（固定窗口+自定义刷新时间版本）
+# 版本：1.2.54（完整功能监控系统集成版本）
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法
-# v1.2.52 修复：修复MEM_FREE未绑定变量错误，确保内存监控正常显示
+# v1.2.54 集成：完整集成监控系统v1.2.54，修复所有监控功能，确保语法正确，支持Q键退出
 # v1.2.51（详细监控面板版本）
 # 修复内容：1) 提示信息完全固定在屏幕底部，不随数据刷新消失 2) 添加CPU多核心监控 3) 添加运行进程监控 4) 添加GPU详细信息 5) 添加温度监控
 # v1.2.20:
@@ -6214,6 +6214,10 @@ system_monitor_tool() {
             case "$input" in
                 q|Q)
                     echo -e "\n\033[1;32m🔚 退出监控模式...\033[0m"
+                    # 恢复光标显示并清理临时文件
+                    echo -e "\033[?25h" 2>/dev/null || true
+                    rm -f /tmp/monitor_rx_prev /tmp/monitor_tx_prev 2>/dev/null || true
+                    sleep 1
                     break
                     ;;
                 r|R)
@@ -6243,6 +6247,9 @@ draw_monitor_dashboard() {
     echo -e "\033[1;36m╔════════════════════════════════════════════════════════════════════════════════════════╗\033[0m"
     echo -e "\033[1;36m║\033[1;32m                        🖥️  系统监控仪表板  -  HACKER DASHBOARD  🖥️                      \033[1;36m║\033[0m"
     echo -e "\033[1;36m╠════════════════════════════════════════════════════════════════════════════════════════╣\033[0m"
+    echo -e "\033[1;36m║\033[1;33m 当前时间: \033[1;37m$(date "+%Y-%m-%d %H:%M:%S")\033[1;33m                    运行时间: \033[1;37m$(uptime -p 2>/dev/null || echo "uptime")\033[1;36m║\033[0m"
+    echo -e "\033[1;36m╚════════════════════════════════════════════════════════════════════════════════════════╝\033[0m"
+    echo ""
     
     # 初始化数据并显示
     init_monitor_data
@@ -6257,6 +6264,31 @@ init_monitor_data() {
     tx_bytes=$(cat /proc/net/dev 2>/dev/null | grep -E "(eth0|enp|ens)" | head -1 | awk '{print $10}' || echo "0")
     echo "$rx_bytes" > /tmp/monitor_rx_prev 2>/dev/null
     echo "$tx_bytes" > /tmp/monitor_tx_prev 2>/dev/null
+}
+
+# 获取公网IP的可靠函数
+get_reliable_external_ip() {
+    local external_ip=""
+    local ip_apis=(
+        "https://api.ipify.org"
+        "https://ifconfig.me/ip"
+        "https://icanhazip.com"
+        "https://ident.me"
+        "https://checkip.amazonaws.com"
+        "https://api.ip.sb/ip"
+        "https://ipinfo.io/ip"
+    )
+    
+    for api in "${ip_apis[@]}"; do
+        external_ip=$(curl -s --max-time 3 --connect-timeout 2 --retry 1 --retry-delay 1 "$api" 2>/dev/null | tr -d '\n\r ' | grep -E '^([0-9]{1,3}\.){3}[0-9]{1,3}$')
+        if [ -n "$external_ip" ] && [ "$external_ip" != "127.0.0.1" ] && [ "$external_ip" != "localhost" ]; then
+            echo "$external_ip"
+            return 0
+        fi
+    done
+    
+    echo "无法获取公网IP"
+    return 1
 }
 
 # 更新监控数据（固定位置更新）
@@ -6301,8 +6333,9 @@ update_system_info() {
     arch=$(uname -m)
     internal_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
     
-    # 获取外网IP（简化）
-    external_ip="$internal_ip"
+    # 获取外网IP（使用可靠函数）
+    external_ip=$(get_reliable_external_ip 2>/dev/null)
+    [ -z "$external_ip" ] && external_ip="无法获取公网IP"
     
     echo -e "\033[5;2H\033[1;32m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
     echo -e "\033[6;2H\033[1;32m│\033[1;37m  🖥️  系统信息              🏠 主机名: $hostname \033[1;33m                 \033[1;32m│\033[0m"
@@ -6334,7 +6367,7 @@ update_cpu_info() {
     # 获取每个核心的使用率
     local core_usage=""
     local core_count=0
-    for ((i=0; i<8 && i<c cores; i++)); do  # 最多显示8个核心
+    for ((i=0; i<8 && i<cores; i++)); do  # 最多显示8个核心
         if [ -f "/proc/stat" ]; then
             local usage=$(awk -v cpu="cpu$i" '/^cpu/ {if ($1 == cpu) {user=nice=system=idle=iowait=irq=softirq=steal=0; user+=$2; nice+=$3; system+=$4; idle+=$5; iowait+=$6; irq+=$7; softirq+=$8; steal+=$9; total=user+nice+system+idle+iowait+irq+softirq+steal; if (total>0) printf "%.1f", 100-(idle/total*100)}}' /proc/stat 2>/dev/null || echo "0.0")
             if [ "$usage" != "" ]; then
@@ -6528,131 +6561,7 @@ update_control_hints() {
     # 移除动态提示显示，提示信息固定在屏幕底部
     return 0
 }
-system_monitor_tool() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${GREEN}🖥️ 系统监控工具 - 高科技监控仪表盘 🖥️${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    echo -e "${YELLOW}📊 固定窗口模式 - 数据在固定位置实时更新${RESET}"
-    echo -e "${CYAN}💡 提示: 按 R 键手动刷新，按 Q 键退出${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    sleep 2
-    
-    # 终端大小检测
-    if [ "$(tput cols)" -lt 80 ] || [ "$(tput lines)" -lt 25 ]; then
-        echo -e "${RED}⚠️ 检测到终端窗口太小，建议调整为至少80x25${RESET}"
-        echo -e "${CYAN}当前尺寸: $(tput cols) x $(tput lines)${RESET}"
-        echo -e "${YELLOW}按任意键继续...${RESET}"
-        read -r
-        return 0
-    fi
-    
-    # 保存初始光标位置并隐藏光标
-    echo -e "\033[1;1H"
-    echo -e "\033[?25l"
-    
-    # 保存网络流量基准值
-    echo "0" > /tmp/net_rx_prev
-    echo "0" > /tmp/net_tx_prev
-    
-    # 初始化窗口（只在第一次运行时）
-    first_run=true
-    
-    while true; do
-        # 计算时间戳
-        CURRENT_TIME=$(date "+%Y-%m-%d %H:%M:%S")
-        CURRENT_UPTIME=$(uptime -p 2>/dev/null || echo "未知")
-        
-        if [ "$first_run" = true ]; then
-            # 清屏并绘制初始界面
-            clear
-            echo -e "\033[1;36m╔════════════════════════════════════════════════════════════════════════════════════════╗\033[0m"
-            echo -e "\033[1;36m║\033[1;32m                        🖥️  系 统 监 控 中 心  -  HACKER DASHBOARD  🖥️                      \033[1;36m║\033[0m"
-            echo -e "\033[1;36m╠════════════════════════════════════════════════════════════════════════════════════════╣\033[0m"
-            echo -e "\033[1;36m║\033[1;33m 当前时间: \033[1;37m$CURRENT_TIME\033[1;33m                    运行时间: \033[1;37m$CURRENT_UPTIME\033[1;36m║\033[0m"
-            echo -e "\033[1;36m╚════════════════════════════════════════════════════════════════════════════════════════╝\033[0m"
-            echo ""
-            first_run=false
-        else
-            # 只更新标题栏的时间信息
-            echo -e "\033[3;14H\033[1;37m$CURRENT_TIME\033[0m"
-            echo -e "\033[3;63H\033[1;37m$CURRENT_UPTIME\033[0m"
-        fi
-        
-        # ======================= 系统信息获取 =======================
-        HOSTNAME=$(hostname)
-        ARCH=$(uname -m)
-        
-        # ======================= CPU信息 =======================
-        CPU_INFO=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ *//' || echo "CPU信息不可用")
-        CPU_CORES=$(nproc --all 2>/dev/null || echo "0")
-        CPU_LOAD=$(uptime | awk -F'load average:' '{print $2}' | sed 's/,/ /g' || echo "0.00 0.00 0.00")
-        
-        # ======================= 内存信息 =======================
-        MEM_TOTAL=$(free -h | awk '/^Mem:/ {print $2}' 2>/dev/null || echo "N/A")
-        MEM_USED=$(free -h | awk '/^Mem:/ {print $3}' 2>/dev/null || echo "N/A")
-        MEM_FREE=$(free -h | awk '/^Mem:/ {print $7}' 2>/dev/null || echo "N/A")
-        MEM_PERCENT=$(free | awk '/^Mem:/ {printf "%.1f%%", $3/$2 * 100}' 2>/dev/null || echo "N/A")
-        MEM_PERCENT_NUM=$(free | awk '/^Mem:/ {printf "%.1f", $3/$2 * 100}' 2>/dev/null || echo "0")
-        
-        # ======================= 磁盘信息 =======================
-        DISK_USAGE=$(df -h / 2>/dev/null | tail -1)
-        DISK_TOTAL=$(echo $DISK_USAGE | awk '{print $2}')
-        DISK_USED=$(echo $DISK_USAGE | awk '{print $3}')
-        DISK_AVAIL=$(echo $DISK_USAGE | awk '{print $4}')
-        DISK_PERCENT=$(echo $DISK_USAGE | awk '{print $5}')
-        
-        # ======================= 网络信息 =======================
-        INTERNAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
-        EXTERNAL_IP=$(get_reliable_external_ip 2>/dev/null)
-        [ -z "$EXTERNAL_IP" ] && EXTERNAL_IP="无法获取公网IP"
-        [ -z "$EXTERNAL_IP" ] && EXTERNAL_IP="无法获取公网IP"
-        
-        # 网络接口统计
-        INTERFACE=$(ip route | head -1 | awk '{print $5}' 2>/dev/null || echo "eth0")
-        if [ -f "/sys/class/net/$INTERFACE/statistics/rx_bytes" ]; then
-            RX_BYTES=$(cat "/sys/class/net/$INTERFACE/statistics/rx_bytes" 2>/dev/null || echo "0")
-            TX_BYTES=$(cat "/sys/class/net/$INTERFACE/statistics/tx_bytes" 2>/dev/null || echo "0")
-        else
-            RX_BYTES=$(cat /proc/net/dev 2>/dev/null | grep -E "(eth0|enp|ens)" | head -1 | awk '{print $2}' 2>/dev/null || echo "0")
-            TX_BYTES=$(cat /proc/net/dev 2>/dev/null | grep -E "(eth0|enp|ens)" | head -1 | awk '{print $10}' 2>/dev/null || echo "0")
-        fi
-        
-        # 实时网络流量计算
-        if [ -f "/tmp/net_rx_prev" ] && [ -f "/tmp/net_tx_prev" ]; then
-            RX_PREV=$(cat /tmp/net_rx_prev)
-            TX_PREV=$(cat /tmp/net_tx_prev)
-            RX_RATE=$(((RX_BYTES - RX_PREV) / 2))  # 每秒字节数
-            TX_RATE=$(((TX_BYTES - TX_PREV) / 2))
-            RX_RATE_HUMAN=$(echo "$RX_RATE" | numfmt --to=iec-i --suffix=B/s 2>/dev/null || echo "0 B/s")
-            TX_RATE_HUMAN=$(echo "$TX_RATE" | numfmt --to=iec-i --suffix=B/s 2>/dev/null || echo "0 B/s")
-        else
-            RX_RATE_HUMAN="计算中..."
-            TX_RATE_HUMAN="计算中..."
-        fi
-        
-        # 保存当前值供下次计算
-        echo "$RX_BYTES" > /tmp/net_rx_prev
-        echo "$TX_BYTES" > /tmp/net_tx_prev
-        
-        # 网络连接信息
-        # 监听端口
-        LISTEN_PORTS=$(netstat -tlnp 2>/dev/null | grep LISTEN | head -5 | awk '{print $4}' | sed 's/.*://' || echo "无")
-        
-        # 活跃连接数
-        ESTABLISHED_COUNT=$(netstat -an 2>/dev/null | grep ESTABLISHED | wc -l || echo "0")
-        
-        # 获取一些连接详情（最多显示3个）
-        CONNECTION_DETAILS=$(netstat -an 2>/dev/null | grep ESTABLISHED | head -3 | awk '{print $4, $5}' | while read local remote; do
-            local_port=$(echo "$local" | sed 's/.*://')
-            remote_ip=$(echo "$remote" | sed 's/.*://' | cut -d: -f1)
-            remote_port=$(echo "$remote" | sed 's/.*://' | cut -d: -f2)
-            echo "本地:$local_port -> 远程:$remote_ip:$remote_port"
-        done || echo "无活跃连接")
-        
-        # ======================= Docker状态 =======================
-        DOCKER_STATUS="未安装"
-        DOCKER_CONTAINER_STATUS="无"
+
         if command -v docker &> /dev/null; then
             DOCKER_VERSION=$(docker --version 2>/dev/null | head -n1 || echo "未知版本")
             DOCKER_STATUS="已安装"
@@ -6701,183 +6610,7 @@ system_monitor_tool() {
                 fi
             done
         fi
-        
-        # ======================= 显示监控界面 =======================
-        echo -e "\033[1;32m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
-        echo -e "\033[1;32m│\033[1;36m  🖥️  系统信息              🏠 主机名: $(hostname)                           \033[1;36m│\033[0m"
-        echo -e "\033[1;32m│\033[1;36m  🔧 架构: $(uname -m | sed 's/x86_64/x64/' | sed 's/aarch64/arm64/')    🌍 内网IP: $INTERNAL_IP                    \033[1;36m│\033[0m"
-        echo -e "\033[1;32m│\033[1;36m  🌐 公网IP: $EXTERNAL_IP                   \033[1;36m│\033[0m"
-        echo -e "\033[1;32m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
-        
-        echo -e "\033[1;34m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
-        echo -e "\033[1;34m│\033[1;33m  🖥️  CPU监控 ($(nproc --all 2>/dev/null || echo '0')核心)                                                     \033[1;34m│\033[0m"
-        echo -e "\033[1;34m│\033[1;37m  型号: $CPU_INFO\033[1;34m│\033[0m"
-        echo -e "\033[1;34m│\033[1;36m  🚀 负载: $CPU_LOAD                                                 \033[1;34m│\033[0m"
-        echo -e "\033[1;34m│\033[1;36m  🌡️  温度: ${CPU_TEMP:-"不可用"}                                           \033[1;34m│\033[0m"
-        echo -e "\033[1;34m│\033[1;36m  📊 核心使用率:                                                     \033[1;34m│\033[0m"
-        
-        # 显示CPU核心使用率
-        CORE_COUNT=0
-        for usage in "${CPU_CORE_USAGE[@]}"; do
-            if [ $((CORE_COUNT % 4)) -eq 0 ]; then
-                echo -n "\033[1;34m│\033[1;36m  "
-            fi
-            printf "CPU%d: %5.1f%%" $CORE_COUNT $usage
-            if [ $((CORE_COUNT % 4)) -eq 3 ]; then
-                echo -e "\033[1;34m│\033[0m"
-            else
-                echo -n "  "
-            fi
-            ((CORE_COUNT++))
-        done
-        
-        # 如果不是4的倍数，补齐剩余空间
-        while [ $((CORE_COUNT % 4)) -ne 0 ]; do
-            echo -n "          "
-            if [ $((CORE_COUNT % 4)) -eq 3 ]; then
-                echo -e "\033[1;34m│\033[0m"
-            else
-                echo -n "  "
-            fi
-            ((CORE_COUNT++))
-        done
-        
-        echo -e "\033[1;34m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
-        
-        echo -e "\033[1;35m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
-        echo -e "\033[1;35m│\033[1;33m  💾 内存监控                                                           \033[1;35m│\033[0m"
-        echo -e "\033[1;35m│\033[1;36m  📈 总内存: $MEM_TOTAL  使用: $MEM_USED ($MEM_PERCENT)  可用: $MEM_FREE                         \033[1;35m│\033[0m"
-        
-        # 内存使用率进度条 - 使用awk替代bc，避免依赖问题
-        MEM_PERCENT_NUM=$(echo $MEM_PERCENT | sed 's/%//' 2>/dev/null || echo "0")
-        BAR_LENGTH=50
-        # 使用awk进行精确计算，支持小数
-        FILLED=$(awk -v percent="$MEM_PERCENT_NUM" -v length="$BAR_LENGTH" 'BEGIN {printf "%.0f", percent * length / 100}' 2>/dev/null || echo "0")
-        
-        echo -e "\033[1;35m│\033[1;36m  ████ 使用情况: [\033[1;32m"
-        for i in $(seq 1 $FILLED); do echo -n "█"; done
-        echo -n "\033[1;31m"
-        for i in $(seq $((FILLED + 1)) $BAR_LENGTH); do echo -n "█"; done
-        echo -e "\033[1;36m] $MEM_PERCENT\033[1;35m│\033[0m"
-        
-        echo -e "\033[1;35m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
-        
-        echo -e "\033[1;31m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
-        echo -e "\033[1;31m│\033[1;33m  💽 磁盘监控 (/ 根目录)                                               \033[1;31m│\033[0m"
-        echo -e "\033[1;31m│\033[1;36m  📈 总容量: $DISK_TOTAL  使用: $DISK_USED  可用: $DISK_AVAIL  使用率: $DISK_PERCENT                     \033[1;31m│\033[0m"
-        
-        # 磁盘使用率进度条 - 使用awk替代bash算术扩展，支持小数
-        DISK_PERCENT_NUM=$(echo $DISK_PERCENT | sed 's/%//' 2>/dev/null || echo "0")
-        # 使用awk进行精确计算，支持小数
-        FILLED=$(awk -v percent="$DISK_PERCENT_NUM" -v length="$BAR_LENGTH" 'BEGIN {printf "%.0f", percent * length / 100}' 2>/dev/null || echo "0")
-        
-        echo -e "\033[1;31m│\033[1;36m  ████ 使用情况: [\033[1;32m"
-        for i in $(seq 1 $FILLED); do echo -n "█"; done
-        echo -n "\033[1;31m"
-        for i in $(seq $((FILLED + 1)) $BAR_LENGTH); do echo -n "█"; done
-        echo -e "\033[1;36m] $DISK_PERCENT\033[1;31m│\033[0m"
-        
-        echo -e "\033[1;31m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
-        
-        echo -e "\033[1;33m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
-        echo -e "\033[1;33m│\033[1;33m  🌐 网络监控                                                           \033[1;33m│\033[0m"
-        echo -e "\033[1;33m│\033[1;36m  🔗 接口: $INTERFACE    接收: $(echo $RX_BYTES | numfmt --to=iec-i --suffix=B 2>/dev/null || echo "N/A")  发送: $(echo $TX_BYTES | numfmt --to=iec-i --suffix=B 2>/dev/null || echo "N/A")          \033[1;33m│\033[0m"
-        echo -e "\033[1;33m│\033[1;36m  📈 实时流量: ↓ $RX_RATE_HUMAN  ↑ $TX_RATE_HUMAN                              \033[1;33m│\033[0m"
-        echo -e "\033[1;33m│\033[1;36m  🌍 内网IP: $INTERNAL_IP  公网IP: $EXTERNAL_IP                           \033[1;33m│\033[0m"
-        echo -e "\033[1;33m│\033[1;36m  🔌 活跃连接: $ESTABLISHED_COUNT 个  监听端口: $LISTEN_PORTS                          \033[1;33m│\033[0m"
-        echo -e "\033[1;33m│\033[1;36m  🔗 连接详情:                                                           \033[1;33m│\033[0m"
-        
-        # 显示连接详情
-        CONN_COUNT=0
-        while IFS= read -r conn_line; do
-            if [ $CONN_COUNT -lt 2 ]; then
-                printf "\033[1;33m│\033[1;36m    %-70s\033[1;33m│\n" "$conn_line"
-                ((CONN_COUNT++))
-            fi
-        done <<< "$CONNECTION_DETAILS"
-        
-        # 如果连接数少于2行，补齐剩余空间
-        while [ $CONN_COUNT -lt 2 ]; do
-            printf "\033[1;33m│\033[1;36m    %-70s\033[1;33m│\n" ""
-            ((CONN_COUNT++))
-        done
-        
-        echo -e "\033[1;33m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
-        
-        echo -e "\033[1;30m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
-        echo -e "\033[1;30m│\033[1;33m  🐳 Docker状态                                                          \033[1;30m│\033[0m"
-        echo -e "\033[1;30m│\033[1;36m  📦 状态: $DOCKER_STATUS  版本: $(echo $DOCKER_VERSION | cut -d' ' -f2 | head -1 2>/dev/null || echo "N/A")                  \033[1;30m│\033[0m"
-        echo -e "\033[1;30m│\033[1;36m  🔧 容器: $DOCKER_CONTAINER_STATUS                                               \033[1;30m│\033[0m"
-        echo -e "\033[1;30m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
-        
-        # ======================= 进程信息 =======================
-        echo -e "\033[1;36m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
-        echo -e "\033[1;36m│\033[1;33m  🔄 实时进程 (TOP 5 CPU使用)                                             \033[1;36m│\033[0m"
-        echo -e "\033[1;36m│\033[1;36m  PID    CPU%    MEM%    进程名                                         \033[1;36m│\033[0m"
-        echo -e "\033[1;36m├────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤\033[0m"
-        
-        # 获取TOP 5进程
-        TOP_PROCESSES=$(ps aux --sort=-%cpu | head -6 | tail -5)
-        while IFS= read -r line; do
-            PID=$(echo $line | awk '{print $2}')
-            CPU=$(echo $line | awk '{print $3}' | sed 's/%//')
-            MEM=$(echo $line | awk '{print $4}' | sed 's/%//')
-            COMM=$(echo $line | awk '{print $11}')
-            printf "\033[1;36m│\033[1;37m  %-6s %5.1f%%   %5.1f%%   %-30s\033[1;36m│\n" "$PID" "$CPU" "$MEM" "$COMM"
-        done <<< "$TOP_PROCESSES"
-        
-        echo -e "\033[1;36m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
-        
-        # ======================= 控制信息 =======================
-        echo -e "\033[1;32m┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\033[0m"
-        echo -e "\033[1;32m│\033[1;37m  ⌨️  控制台: Ctrl+C 退出  |  Enter 返回菜单  |  自动刷新: 每2秒                 \033[1;32m│\033[0m"
-        echo -e "\033[1;32m└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\033[0m"
-        
-        # 显示操作提示
-        echo -e "\n\033[1;36m╔════════════════════════════════════════════════════════════════════════════════════════╗\033[0m"
-        echo -e "\033[1;36m║\033[1;33m 操作提示: [R] 刷新数据  [Q] 退出监控  [Ctrl+C] 强制退出  \033[1;36m║\033[0m"
-        echo -e "\033[1;36m╚════════════════════════════════════════════════════════════════════════════════════════╝\033[0m"
-        echo -e "\033[1;35m🔄 等待操作... 请按 R 键刷新数据\033[0m"
-        
-        # 清理之前的输入缓冲区
-        while read -r -t 0.1; do :; done 2>/dev/null
-        
-        # 清理之前的输入缓冲区
-        while read -r -t 0.1; do :; done 2>/dev/null
-        
-        # 等待用户输入（阻塞模式，但有超时保护）
-        echo -ne "\033[1;35m📝 请输入操作 [R=刷新, Q=退出]: \033[0m"
-        read -r -t 30 input
-        
-        # 只有在非空输入时才处理命令
-        if [ -n "$input" ]; then
-            case "$input" in
-                r|R)
-                    echo -e "\033[1;32m🔄 刷新数据... \033[0m"
-                    sleep 0.5
-                    continue  # 重新显示数据
-                    ;;
-                q|Q)
-                    echo -e "\n\033[1;32m🔚 退出监控模式...\033[0m"
-                    sleep 1
-                    return 0
-                    ;;
-                *)
-                    echo -e "\033[1;31m❌ 无效选择，请按 R 刷新或 Q 退出\033[0m"
-                    echo -e "\033[1;35m⏱️ 5秒后自动刷新... \033[0m"
-                    sleep 5
-                    continue
-                    ;;
-            esac
-        else
-            # 空输入时显示等待状态，然后继续监控
-            echo -e "\033[1;33m⏰ 超时未输入，5秒后自动刷新...\033[0m"
-            sleep 5
-            continue
-        fi
-        
-    done
-}
+# ========================= 主执行函数 =========================
 
 # ========================= 主执行函数 =========================
 main() {
@@ -6896,7 +6629,9 @@ main() {
 }
 
 # 启动脚本执行
-main "$@"# ========================= ASR 配置（15个服务商） =========================
+main "$@"
+
+# ========================= ASR 配置（15个服务商） =========================
 config_asr() {
     while true; do
         echo -e "\n${GREEN}【1/5】配置 ASR (语音识别) 服务${RESET}"
@@ -7125,7 +6860,9 @@ config_asr() {
                 ;;
         esac
         
-        # 配置完成，返回0表示成功
-        return 0
+        # 如果配置成功，退出循环
+        if [ -n "$asr_provider_key" ]; then
+            break
+        fi
     done
 }
