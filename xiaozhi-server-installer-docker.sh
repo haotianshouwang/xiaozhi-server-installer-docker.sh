@@ -6,7 +6,7 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务
 # 新功能：端口检测 一键更新 新bug
 # 作者：昊天兽王
-# 版本：1.2.65（增强网络监控功能版本）
+# 版本：1.2.66（Docker安装兼容性修复版本）
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法
 # v1.2.54 集成：完整集成监控系统v1.2.54，修复所有监控功能，确保语法正确，支持Q键退出
 # v1.2.51（详细监控面板版本）
@@ -1006,6 +1006,167 @@ EOF
     echo -e "${GREEN}✅ 已配置Docker镜像源：$mirror_url${RESET}"
 }
 
+# 检测当前Linux发行版
+detect_linux_distribution() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    elif [ -f /etc/redhat-release ]; then
+        if grep -q "CentOS" /etc/redhat-release; then
+            echo "centos"
+        elif grep -q "Red Hat" /etc/redhat-release; then
+            echo "rhel"
+        elif grep -q "OpenCloudOS" /etc/redhat-release; then
+            echo "opencloudos"
+        else
+            echo "rhel"
+        fi
+    elif [ -f /etc/debian_version ]; then
+        echo "debian"
+    else
+        echo "unknown"
+    fi
+}
+
+# 检测系统版本信息
+get_system_info() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID $VERSION_ID"
+    else
+        uname -s
+    fi
+}
+
+# 针对OpenCloudOS等特殊发行版的Docker安装
+install_docker_opencloudos() {
+    echo -e "${BLUE}🔄 OpenCloudOS专用Docker安装脚本${RESET}"
+    
+    # 首先尝试使用官方安装脚本，但跳过发行版检查
+    echo -e "${CYAN}尝试跳过发行版检查安装Docker...${RESET}"
+    
+    # 创建临时安装脚本，跳过发行版检查
+    local temp_script="/tmp/docker-install-opencloudos.sh"
+    curl -fsSL https://get.docker.com -o "$temp_script"
+    
+    if [ $? -eq 0 ]; then
+        # 跳过发行版检查的安装
+        if sudo DOCKER_BUILDKIT=1 DOCKER_INSTALL_SCRIPT='skip_os_check' bash -s docker --skip-os-check < "$temp_script" 2>/dev/null; then
+            rm -f "$temp_script"
+            echo -e "${GREEN}✅ OpenCloudOS Docker安装成功（跳过系统检查）${RESET}"
+            return 0
+        else
+            echo -e "${YELLOW}⚠️ 官方脚本跳过检查失败，尝试手动安装...${RESET}"
+        fi
+        rm -f "$temp_script"
+    fi
+    
+    # 手动安装Docker
+    echo -e "${CYAN}手动安装Docker组件...${RESET}"
+    
+    # 安装基础依赖
+    local pkg_manager=$(detect_package_manager)
+    case $pkg_manager in
+        yum|dnf)
+            echo -e "${BLUE}使用YUM/DNF安装Docker依赖...${RESET}"
+            sudo yum install -y yum-utils device-mapper-persistent-data lvm2 2>/dev/null || sudo dnf install -y yum-utils device-mapper-persistent-data lvm2
+            
+            # 添加Docker仓库
+            echo -e "${BLUE}配置Docker软件仓库...${RESET}"
+            if ! sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null; then
+                # 如果添加失败，手动创建repo文件
+                sudo mkdir -p /etc/yum.repos.d
+                echo "[docker-ce-stable]
+name=Docker CE Stable - \$basearch
+baseurl=https://download.docker.com/linux/centos/\$releasever/stable/\$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://download.docker.com/linux/centos/gpg" | sudo tee /etc/yum.repos.d/docker-ce.repo > /dev/null
+            fi
+            
+            # 安装Docker
+            if sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin 2>/dev/null || sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin 2>/dev/null; then
+                echo -e "${GREEN}✅ OpenCloudOS Docker手动安装成功${RESET}"
+                return 0
+            fi ;;
+        *)
+            echo -e "${YELLOW}⚠️ 不支持的包管理器: $pkg_manager${RESET}"
+            return 1 ;;
+    esac
+    
+    # 使用Docker二进制文件安装（最后备用方案）
+    echo -e "${CYAN}尝试使用Docker静态二进制文件安装...${RESET}"
+    
+    # 获取最新Docker版本
+    local docker_version=$(curl -s https://api.github.com/repos/docker/docker-ce/releases/latest 2>/dev/null | grep '"tag_name":' | cut -d'"' -f4 | sed 's/v//')
+    local docker_url="https://download.docker.com/linux/static/stable/x86_64/docker-${docker_version}.tgz"
+    
+    if curl -fsSL "$docker_url" | sudo tar -xz -C /usr/local/bin --strip-components=1 docker/docker 2>/dev/null; then
+        sudo chmod +x /usr/local/bin/docker
+        sudo chmod +x /usr/local/bin/dockerd
+        sudo chmod +x /usr/local/bin/docker-compose
+        
+        # 创建Docker服务文件
+        echo -e "${BLUE}创建Docker服务...${RESET}"
+        sudo mkdir -p /etc/docker
+        echo '{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}' | sudo tee /etc/docker/daemon.json
+        
+        # 创建systemd服务文件
+        sudo tee /etc/systemd/system/docker.service > /dev/null <<EOF
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target docker.socket
+Wants=network-online.target
+Requires=docker.socket
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/dockerd
+ExecReload=/bin/kill -s HUP \$MAINPID
+TimeoutSec=0
+RestartSec=2
+Restart=always
+StartLimitInterval=0
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+Delegate=yes
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        
+        # 创建docker.socket文件
+        sudo tee /etc/systemd/system/docker.socket > /dev/null <<EOF
+[Unit]
+Description=Docker Socket for the API
+
+[Socket]
+ListenStream=/var/run/docker.sock
+SocketMode=0660
+SocketUser=root
+SocketGroup=docker
+
+[Install]
+WantedBy=sockets.target
+EOF
+        
+        # 重新加载systemd并启动服务
+        sudo systemctl daemon-reload
+        sudo systemctl enable docker
+        sudo systemctl start docker
+        
+        echo -e "${GREEN}✅ OpenCloudOS Docker静态二进制安装成功${RESET}"
+        return 0
+    fi
+    
+    echo -e "${RED}❌ OpenCloudOS Docker安装失败${RESET}"
+    return 1
+}
+
 check_and_install_docker() {
     echo -e "\n${BLUE}🔍 检测Docker安装状态...${RESET}"
     if command -v docker &> /dev/null && docker --version &> /dev/null; then
@@ -1052,6 +1213,11 @@ read -r -p "🔧 是否安装Docker？(y/n，默认y): " docker_install_choice <
             retry_exec "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release || sudo yum install -y ca-certificates curl gnupg lsb-release || sudo dnf install -y ca-certificates curl gnupg lsb-release || sudo pacman -S --noconfirm ca-certificates curl gnupg lsb-release || sudo zypper install -y ca-certificates curl gnupg lsb-release || sudo apk add ca-certificates curl gnupg lsb-release" "安装Docker依赖" ;;
     esac
     
+    # 获取系统信息
+    local os_info=$(get_system_info)
+    local os_id=$(detect_linux_distribution)
+    echo -e "${CYAN}🖥️ 检测到系统: $os_info${RESET}"
+    
     # 多镜像源Docker安装
     local docker_install_success=false mirror_count=0
     declare -a mirrors=(
@@ -1060,6 +1226,7 @@ read -r -p "🔧 是否安装Docker？(y/n，默认y): " docker_install_choice <
         "Docker官方|https://get.docker.com|sudo bash -s docker"
         "清华源|备用方法1|install_docker_tsinghua"
         "阿里云源|备用方法2|install_docker_aliyun"
+        "OpenCloudOS专用|特殊方法|install_docker_opencloudos"
     )
     
     echo -e "${BLUE}🔄 多镜像源Docker安装...${RESET}"
@@ -1072,8 +1239,16 @@ read -r -p "🔧 是否安装Docker？(y/n，默认y): " docker_install_choice <
             install_docker_tsinghua && { docker_install_success=true; break; }
         elif [[ "$mirror_cmd" == "install_docker_aliyun" ]]; then
             install_docker_aliyun && { docker_install_success=true; break; }
+        elif [[ "$mirror_cmd" == "install_docker_opencloudos" ]]; then
+            # 只有当检测到opencloudos时才尝试
+            if [[ "$os_id" == "opencloudos" ]]; then
+                install_docker_opencloudos && { docker_install_success=true; break; }
+            else
+                echo -e "${YELLOW}⚠️ OpenCloudOS专用方法，仅适用于OpenCloudOS系统，跳过...${RESET}"
+                continue
+            fi
         else
-            if eval "curl -fsSL $mirror_url | $mirror_cmd"; then
+            if eval "curl -fsSL $mirror_url | $mirror_cmd 2>/dev/null"; then
                 echo -e "${GREEN}✅ $mirror_name Docker安装成功${RESET}"
                 docker_install_success=true; break
             else
@@ -1092,6 +1267,15 @@ read -r -p "🔧 是否安装Docker？(y/n，默认y): " docker_install_choice <
         echo -e "${RED}❌ Docker安装完全失败${RESET}"
         echo -e "${YELLOW}请检查网络连接或手动安装Docker${RESET}"
         echo -e "${CYAN}手动安装：curl -fsSL https://get.docker.com | sudo bash${RESET}"
+        
+        # 针对特殊发行版提供额外建议
+        if [[ "$os_id" == "opencloudos" ]]; then
+            echo -e "${YELLOW}🔧 OpenCloudOS系统建议：${RESET}"
+            echo -e "${CYAN}1. 尝试：curl -fsSL https://get.docker.com | sudo bash --skip-os-check${RESET}"
+            echo -e "${CYAN}2. 手动安装：sudo yum install -y docker-ce docker-ce-cli containerd.io${RESET}"
+            echo -e "${CYAN}3. 配置镜像源并重启服务：sudo systemctl restart docker${RESET}"
+        fi
+        
         exit 1
     fi
     
