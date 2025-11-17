@@ -9486,4 +9486,6 @@ convert_asr_to_cloud() {
 }
 
 # 启动脚本执行
+}
+}
 main "$@"
