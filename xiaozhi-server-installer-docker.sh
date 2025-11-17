@@ -2,67 +2,156 @@
 set -uo pipefail
 trap exit_confirm SIGINT
 
-# ========================= 基础配置 =========================
+# ========================================================
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.68
+# 版本：2.0.0
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
-AUTHOR="昊天兽王" 
-SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板"
-Version="1.2.61"
 
-# 配置文件链接
-CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
-CONFIG_FILE_URL_BACKUP="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
-CONFIG_FILE_URL_FALLBACK="https://mirror.ghproxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
-DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/docker-compose.yml"
+# ========================= 常量定义 =========================
+readonly SCRIPT_AUTHOR="昊天兽王"
+readonly SCRIPT_NAME="xiaozhi-server-installer"
+readonly SCRIPT_VERSION="2.0.0"
+readonly SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板 "
 
-MAIN_DIR="$HOME/xiaozhi-server"
-CONTAINER_NAME="xiaozhi-esp32-server"
+# ========================= URL和路径配置 =========================
 
-CONFIG_FILE="$MAIN_DIR/data/.config.yaml"
-LOCAL_ASR_MODEL_URL="https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/model.pt"
-RETRY_MAX=3
-RETRY_DELAY=3
+# 官方配置文件下载链接（多级备用）
+readonly CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
+readonly CONFIG_FILE_URL_BACKUP="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
+readonly CONFIG_FILE_URL_FALLBACK="https://mirror.ghproxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
 
-# 颜色定义
-RED="\033[31m" GREEN="\033[32m" YELLOW="\033[33m" BLUE="\033[34m" PURPLE="\033[35m" CYAN="\033[36m" WHITE_RED="\033[31;47;1m" RESET="\033[0m" BOLD="\033[1m"
+# Docker Compose文件链接
+readonly DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/docker-compose.yml"
 
-# 全局变量
+# 本地ASR模型下载链接
+readonly LOCAL_ASR_MODEL_URL="https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/model.pt"
+
+# ========================= 系统路径配置 =========================
+readonly MAIN_DIR="$HOME/xiaozhi-server"
+readonly CONTAINER_NAME="xiaozhi-esp32-server"
+readonly CONFIG_FILE="$MAIN_DIR/data/.config.yaml"
+
+# ========================= 通用配置 =========================
+readonly RETRY_MAX=3
+readonly RETRY_DELAY=3
+
+# ========================= 颜色主题 =========================
+readonly COLOR_RED="\033[31m"
+readonly COLOR_GREEN="\033[32m"
+readonly COLOR_YELLOW="\033[33m"
+readonly COLOR_BLUE="\033[34m"
+readonly COLOR_PURPLE="\033[35m"
+readonly COLOR_CYAN="\033[36m"
+readonly COLOR_WHITE_RED="\033[31;47;1m"
+readonly COLOR_RESET="\033[0m"
+readonly COLOR_BOLD="\033[1m"
+
+# 兼容性别名
+readonly RED="${COLOR_RED}" 
+readonly GREEN="${COLOR_GREEN}" 
+readonly YELLOW="${COLOR_YELLOW}" 
+readonly BLUE="${COLOR_BLUE}" 
+readonly PURPLE="${COLOR_PURPLE}" 
+readonly CYAN="${COLOR_CYAN}" 
+readonly WHITE_RED="${COLOR_WHITE_RED}" 
+readonly RESET="${COLOR_RESET}" 
+readonly BOLD="${COLOR_BOLD}"
+
+# ========================= 全局变量定义 =========================
+
+# 用户配置变量
 CHATGLM_API_KEY=""
-IS_MEMORY_SUFFICIENT=false
-IS_SHERPA_PARAFORMER_AVAILABLE=false
-CPU_MODEL="" CPU_CORES="" MEM_TOTAL="" DISK_AVAIL=""
-NET_INTERFACE="" NET_SPEED="" INTERNAL_IP="" EXTERNAL_IP="" OS_VERSION=""
-CURRENT_DEPLOY_TYPE="" CONFIG_DOWNLOAD_NEEDED="true" USE_EXISTING_CONFIG=false SKIP_DETAILED_CONFIG=false
 
-# 服务器状态检测变量
+# 系统检测变量
+readonly IS_MEMORY_SUFFICIENT=false
+readonly IS_SHERPA_PARAFORMER_AVAILABLE=false
+
+# 系统信息变量
+CPU_MODEL=""
+CPU_CORES=""
+MEM_TOTAL=""
+DISK_AVAIL=""
+NET_INTERFACE=""
+NET_SPEED=""
+INTERNAL_IP=""
+EXTERNAL_IP=""
+OS_VERSION=""
+
+# 部署配置变量
+CURRENT_DEPLOY_TYPE=""
+CONFIG_DOWNLOAD_NEEDED="true"
+USE_EXISTING_CONFIG=false
+SKIP_DETAILED_CONFIG=false
+
+# ========================= 服务器状态变量 =========================
 CONTAINER_RUNNING=false
 CONTAINER_EXISTS=false
 SERVER_DIR_EXISTS=false
 CONFIG_EXISTS=false
 
-# ========================= 工具函数 =========================
+# ========================= Docker信息变量 =========================
+DOCKER_VERSION=""
+DOCKER_STATUS=""
+DOCKER_CONTAINER_STATUS=""
 
-# 安全输入函数，确保工作目录稳定
+# ========================= 核心工具函数 =========================
+
+# 安全输入函数 - 确保输入操作在正确的目录下执行
+# 防止在错误目录下执行操作导致配置或文件丢失
 safe_read() {
-    local prompt="$1"
-    local var_name="$2"
-    
-    # 保存当前工作目录
-    local pwd_backup
-    pwd_backup="$(pwd)" 2>/dev/null || pwd_backup="/tmp"
-    
-    # 执行读取操作
-read -r -p "$prompt" "$var_name" < /dev/tty
-    
-    # 恢复工作目录
-    cd "$pwd_backup" 2>/dev/null || true
-    
-    return 0
+    echo -n "请输入: " >&2
+    read -r
+    echo "$REPLY"
 }
+
+# 退出确认函数 - 优雅退出脚本
+# 在用户按Ctrl+C或选择退出时调用
+exit_confirm() {
+    echo -e "\n\n${YELLOW}⚠️  脚本执行被中断${RESET}"
+    echo -e "${CYAN}感谢使用小智服务器部署脚本！${RESET}"
+    echo -e "${BLUE}如有问题请反馈给开发者：${SCRIPT_AUTHOR}${RESET}"
+    exit 130
+}
+
+# 重试执行函数 - 自动重试失败的命令
+# 参数: $1=命令, $2=重试次数(可选), $3=重试间隔(可选)
+retry_exec() {
+    local command="$1"
+    local max_attempts="${2:-$RETRY_MAX}"
+    local delay="${3:-$RETRY_DELAY}"
+    local attempt=1
+    
+    while [ $attempt -le $max_attempts ]; do
+        echo -e "${CYAN}🔄 执行第${attempt}次尝试...${RESET}"
+        if eval "$command"; then
+            echo -e "${GREEN}✅ 命令执行成功${RESET}"
+            return 0
+        else
+            echo -e "${YELLOW}⚠️  第${attempt}次尝试失败${RESET}"
+            if [ $attempt -lt $max_attempts ]; then
+                echo -e "${YELLOW}⏳ 等待${delay}秒后重试...${RESET}"
+                sleep "$delay"
+            fi
+        fi
+        attempt=$((attempt + 1))
+    done
+    
+    echo -e "${RED}❌ 命令执行失败，已重试${max_attempts}次${RESET}"
+    return 1
+}
+
+# ========================= 系统权限检测函数 =========================
+
+# 检查root权限函数
+# 确保脚本在适当的权限下运行
+check_root_permission() {
+    echo -e "\n${CYAN}🔐 检查root权限...${RESET}"
+    if [ "$EUID" -eq 0 ]; then
+        echo -e "${GREEN}✅ 当前以root权限运行${RESET}"
+        return 0
 
 check_root_permission() {
     echo -e "\n${CYAN}🔐 检查root权限...${RESET}"
@@ -7321,25 +7410,6 @@ force_uninstall_docker() {
     return 0
 }
 
-# 检测包管理器
-detect_package_manager() {
-    if command -v apt-get &> /dev/null; then
-        echo "apt"
-    elif command -v yum &> /dev/null; then
-        echo "yum"
-    elif command -v dnf &> /dev/null; then
-        echo "dnf"
-    elif command -v pacman &> /dev/null; then
-        echo "pacman"
-    elif command -v zypper &> /dev/null; then
-        echo "zypper"
-    elif command -v apk &> /dev/null; then
-        echo "apk"
-    else
-        echo "unknown"
-    fi
-}
-
 # Docker服务修复函数
 fix_docker_service() {
     echo -e "\n${YELLOW}🔧 Docker服务修复工具${RESET}"
@@ -8267,54 +8337,28 @@ update_control_hints() {
     return 0
 }
 
-        if command -v docker &> /dev/null; then
-            DOCKER_VERSION=$(docker --version 2>/dev/null | head -n1 || echo "未知版本")
-            DOCKER_STATUS="已安装"
-            if docker ps 2>/dev/null | grep -q "$CONTAINER_NAME"; then
-                DOCKER_CONTAINER_STATUS="运行中"
-            elif docker ps -a 2>/dev/null | grep -q "$CONTAINER_NAME"; then
-                DOCKER_CONTAINER_STATUS="已停止"
-            else
-                DOCKER_CONTAINER_STATUS="不存在"
-            fi
+# 更新Docker信息
+update_enhanced_docker_info() {
+    if command -v docker &> /dev/null; then
+        DOCKER_VERSION=$(docker --version 2>/dev/null | head -n1 || echo "未知版本")
+        DOCKER_STATUS="已安装"
+        if docker ps 2>/dev/null | grep -q "$CONTAINER_NAME"; then
+            DOCKER_CONTAINER_STATUS="运行中"
+        elif docker ps -a 2>/dev/null | grep -q "$CONTAINER_NAME"; then
+            DOCKER_CONTAINER_STATUS="已停止"
+        else
+            DOCKER_CONTAINER_STATUS="不存在"
         fi
-        
-        # ======================= CPU核心使用率 =======================
-        # 获取每个CPU核心的使用率
-        CPU_CORE_USAGE=()
-        if [ -f /proc/stat ]; then
-            for i in $(seq 0 $((CPU_CORES - 1))); do
-                if [ -f /sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq ]; then
-                    CORE_USAGE=$(awk -v core=$i '
-                    BEGIN {
-                        # 读取CPU使用率
-                        while ((getline line) > 0) {
-                            if (line ~ /^cpu[0-9]+/) {
-                                if (core == 0 && line ~ /^cpu0/) {
-                                    split(line, fields)
-                                    idle = fields[5]
-                                    total = 0
-                                    for (j=1; j<=4; j++) total += fields[j]
-                                    total += idle
-                                    idle_percent = (idle / total) * 100
-                                    printf "%.1f", idle_percent
-                                    break
-                                }
-                            }
-                        }
-                    }' /proc/stat 2>/dev/null || echo "0")
-                    
-                    if [ "$CORE_USAGE" != "0" ]; then
-                        CPU_USAGE=$(echo "100 - $CORE_USAGE" | bc -l 2>/dev/null || echo "0")
-                        CPU_CORE_USAGE+=("$CPU_USAGE")
-                    else
-                        CPU_CORE_USAGE+=("0.0")
-                    fi
-                else
-                    CPU_CORE_USAGE+=("0.0")
-                fi
-            done
-        fi
+    else
+        DOCKER_VERSION="未安装"
+        DOCKER_STATUS="未安装"
+        DOCKER_CONTAINER_STATUS="不存在"
+    fi
+    
+    echo -e "\033[1;33m【Docker信息】\033[0m"
+    echo -e "\033[1;37m  🐳 Docker版本: \033[1;32m$DOCKER_VERSION\033[0m"
+    echo -e "\033[1;37m  📊 状态: \033[1;32m$DOCKER_STATUS\033[0m"
+    echo -e "\033[1;37m  🐋 容器状态: \033[1;32m$DOCKER_CONTAINER_STATUS\033[0m"
 }
 
 # ========================= 配置文件管理菜单 =========================
@@ -8919,7 +8963,8 @@ backup_restore_config() {
             echo -e "${CYAN}📂 找到最新备份: $LATEST_BACKUP${RESET}"
             
             RESTORE_COUNT=0
-            for config_file in "$LATEST_BACKUP"/*.yaml "$LATEST_BACKUP"/.config.yaml 2>/dev/null; do
+            for config_file in "$LATEST_BACKUP"/*.yaml "$LATEST_BACKUP"/.config.yaml; do
+                [ -e "$config_file" ] 2>/dev/null || continue
                 if [ -f "$config_file" ]; then
                     # 确定目标路径
                     if [[ "$config_file" == *"/data/.config.yaml"* ]]; then
@@ -9143,86 +9188,113 @@ main() {
 }
 
 # ========================= 配置文件操作函数 =========================
+# ========================= 配置文件管理函数 =========================
+
+# 创建默认配置文件函数
+# 自动下载官方配置模板或创建最小化模板
+# 支持配置文件备份和恢复
 create_default_config() {
-    echo -e "${CYAN}创建默认配置文件...${RESET}"
+    echo -e "${CYAN}🔄 开始创建默认配置文件...${RESET}"
     
-    # 创建目录
-    mkdir -p "$(dirname "$CONFIG_FILE")"
+    # 验证目录路径
+    local config_dir
+    config_dir="$(dirname "$CONFIG_FILE")"
+    if [ ! -d "$config_dir" ]; then
+        echo -e "${YELLOW}📁 创建配置文件目录: $config_dir${RESET}"
+        mkdir -p "$config_dir" || {
+            echo -e "${RED}❌ 创建配置文件目录失败${RESET}"
+            return 1
+        }
+    fi
     
-    # 创建默认配置内容
+    # 备份现有配置文件（如果存在）
+    if [ -f "$CONFIG_FILE" ]; then
+        local backup_file
+        backup_file="${CONFIG_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
+        echo -e "${YELLOW}📋 检测到现有配置文件，创建备份: $(basename "$backup_file")${RESET}"
+        cp "$CONFIG_FILE" "$backup_file" || {
+            echo -e "${RED}❌ 创建配置文件备份失败${RESET}"
+            return 1
+        }
+        echo -e "${GREEN}✅ 备份已保存: $backup_file${RESET}"
+    fi
+    
+    # 下载官方配置文件模板
+    echo -e "${CYAN}📥 尝试下载官方配置文件模板...${RESET}"
+    if download_config_with_fallback "$CONFIG_FILE"; then
+        echo -e "${GREEN}✅ 官方配置文件模板下载成功${RESET}"
+        echo -e "${GREEN}✅ 配置文件保存位置: $CONFIG_FILE${RESET}"
+        echo -e "${CYAN}📝 配置文件大小: $(du -h "$CONFIG_FILE" 2>/dev/null | cut -f1 || echo "未知")${RESET}"
+        echo -e "${YELLOW}💡 提示：配置文件已经初始化，您现在可以通过配置管理菜单来修改各项设置${RESET}"
+        return 0
+    else
+        echo -e "${YELLOW}⚠️ 下载官方配置文件失败，创建最小化模板...${RESET}"
+        
+        # 创建最小化配置文件模板
+        if create_fallback_config; then
+            echo -e "${GREEN}✅ 最小化配置文件创建成功${RESET}"
+            return 1  # 返回1表示使用了fallback配置
+        else
+            echo -e "${RED}❌ 创建最小化配置文件失败${RESET}"
+            return 2  # 返回2表示完全失败
+        fi
+    fi
+}
+
+# 创建fallback配置文件
+# 当官方配置下载失败时使用
+create_fallback_config() {
     cat > "$CONFIG_FILE" << 'EOF'
-# 小智服务器配置文件
-# 创建时间: $(date)
+# 小智服务器配置文件 (最小化模板)
+# 警告：这是基础模板，建议下载完整配置以获得完整功能
 
-# 服务器基础配置
 server:
-  host: "0.0.0.0"
-  port: 9000
-  debug: false
+  ip: "0.0.0.0"
+  port: 8000
+  http_port: 8003
+  websocket: "ws://localhost:8000/xiaozhi/v1/"
+  vision_explain: "http://localhost:8003/mcp/vision/explain"
+  timezone_offset: +8
 
-# API配置
-api:
-  # OpenAI API配置
-  openai:
-    api_key: ""
-    base_url: "https://api.openai.com/v1"
-    model: "gpt-3.5-turbo"
-  
-  # 阿里云API配置
-  aliyun:
-    access_key_id: ""
-    access_key_secret: ""
-    endpoint: "dasheng.aliyuncs.com"
-
-# ASR (语音识别) 配置
-asr:
-  # 本地ASR配置
-  local:
-    enabled: false
-    model_path: ""
-  
-  # 在线ASR配置
-  online:
-    provider: "aliyun"  # aliyun, azure, openai
-    language: "zh-CN"
-
-# TTS (文本转语音) 配置
-tts:
-  provider: "edge"  # edge, aliyun, openai
-  voice: "zh-CN-XiaoxiaoNeural"
-  speed: 1.0
-
-# LLM (大语言模型) 配置
+# 大语言模型配置
 llm:
-  provider: "openai"  # openai, aliyun, azure
+  type: "openai"  # openai, aliyun, qwen, local等
   model: "gpt-3.5-turbo"
-  temperature: 0.7
-  max_tokens: 2000
+  api_key: ""     # 请填入您的API密钥
+  base_url: "https://api.openai.com/v1"
+  
+# 语音识别配置
+asr:
+  type: "aliyun"  # 本地FunASR使用local, 云服务商使用对应名称
+  language: "zh-CN"
+  access_key_id: ""     # 阿里云AccessKeyId
+  access_key_secret: "" # 阿里云AccessKeySecret
+  
+# 文本转语音配置
+tts:
+  type: "edge"   # edge, aliyun, openai等
+  voice: "zh-CN-XiaoxiaoNeural"
+  volume: 50
+  rate: 0
+  pitch: 0
+  style: "neutral"
+  role: "Female1"
 
-# 设备配置
-device:
-  microphone_index: 0
-  speaker_index: 0
-  volume: 0.8
+# 插件配置
+plugins:
+  switch_bot:
+    enable: false
+  mqtt:
+    enable: false
+  weather:
+    enable: false
 
-# 日志配置
-logging:
-  level: "INFO"
-  file: "logs/xiaozhi.log"
-  max_size: "100MB"
-  backup_count: 5
-
-# 安全配置
-security:
-  enable_auth: false
-  allowed_ips: []
-  rate_limit:
-    enabled: true
-    requests_per_minute: 60
+# 人设配置 (可选)
+personality: "你是一个友好的AI助手，具有专业的语音交互能力。"
 EOF
-
-    echo -e "${GREEN}✅ 默认配置文件已创建: $CONFIG_FILE${RESET}"
+    
     echo -e "${YELLOW}📝 请根据实际需要修改配置文件内容${RESET}"
+    return 0
 }
 
 validate_config_file() {
@@ -9321,7 +9393,8 @@ restore_config_files() {
     echo -e "${CYAN}📂 找到最新备份: $LATEST_BACKUP${RESET}"
     
     RESTORE_COUNT=0
-    for config_file in "$LATEST_BACKUP"/*.yaml "$LATEST_BACKUP"/.config.yaml 2>/dev/null; do
+    for config_file in "$LATEST_BACKUP"/*.yaml "$LATEST_BACKUP"/.config.yaml; do
+        [ -e "$config_file" ] 2>/dev/null || continue
         if [ -f "$config_file" ]; then
             # 确定目标路径
             if [[ "$config_file" == *"/data/.config.yaml"* ]]; then
