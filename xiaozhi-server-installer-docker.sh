@@ -152,12 +152,6 @@ check_root_permission() {
     if [ "$EUID" -eq 0 ]; then
         echo -e "${GREEN}✅ 当前以root权限运行${RESET}"
         return 0
-
-check_root_permission() {
-    echo -e "\n${CYAN}🔐 检查root权限...${RESET}"
-    if [ "$EUID" -eq 0 ]; then
-        echo -e "${GREEN}✅ 当前以root权限运行${RESET}"
-        return 0
     elif sudo -n true 2>/dev/null; then
         echo -e "${GREEN}✅ 检测到sudo权限，可执行必要的管理操作${RESET}"
         return 0
@@ -9486,6 +9480,4 @@ convert_asr_to_cloud() {
 }
 
 # 启动脚本执行
-}
-}
 main "$@"
