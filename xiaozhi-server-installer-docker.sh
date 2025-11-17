@@ -1119,8 +1119,19 @@ read -r -p "🔧 是否安装Docker？(y/n，默认y): " docker_install_choice <
     local os_id=$(detect_linux_distribution)
     echo -e "${CYAN}🖥️ 检测到系统: $os_info${RESET}"
     
+    # CentOS 7特殊处理
+    if [[ "$os_id" == "centos" ]] && grep -q "CentOS Linux 7" /etc/os-release 2>/dev/null; then
+        echo -e "${YELLOW}⚠️ 检测到CentOS 7，使用专门的安装方法${RESET}"
+        if install_docker_centos7; then
+            docker_install_success=true
+        else
+            echo -e "${YELLOW}⚠️ CentOS 7专门安装失败，使用通用方法...${RESET}"
+        fi
+    fi
+    
     # 多镜像源Docker安装
-    local docker_install_success=false mirror_count=0
+    local docker_install_success=${docker_install_success:-false}
+    local mirror_count=0
     declare -a mirrors=(
         "阿里云镜像|https://get.docker.com|sudo bash -s docker --mirror Aliyun"
         "华为云镜像|https://get.docker.com|sudo bash -s docker --mirror HuaweiCloud"
@@ -1257,6 +1268,157 @@ install_docker_aliyun() {
     fi
     echo -e "${RED}❌ 阿里云源Docker安装失败${RESET}"
     return 1
+}
+
+# CentOS 7专门安装函数
+install_docker_centos7() {
+    echo -e "\n${YELLOW}🔧 CentOS 7 Docker专门安装${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    # 检查系统版本
+    if ! grep -q "CentOS Linux 7" /etc/os-release 2>/dev/null; then
+        echo -e "${RED}❌ 此函数仅适用于CentOS 7${RESET}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}🔍 系统检测：CentOS 7${RESET}"
+    echo -e "${YELLOW}⚠️ 警告：CentOS 7已停止支持，建议升级到CentOS 8 Stream或更高版本${RESET}"
+    
+    # 检查网络连接
+    echo -e "\n${BLUE}🌐 检查网络连接...${RESET}"
+    if ! ping -c 1 8.8.8.8 &> /dev/null; then
+        echo -e "${RED}❌ 网络连接异常${RESET}"
+        return 1
+    fi
+    echo -e "${GREEN}✅ 网络连接正常${RESET}"
+    
+    # 清理之前的Docker安装
+    echo -e "\n${BLUE}🧹 清理之前的Docker安装...${RESET}"
+    sudo yum remove -y docker docker-client docker-client-latest docker-common \
+        docker-latest docker-latest-logrotate docker-logrotate docker-engine 2>/dev/null || true
+    sudo rm -rf /var/lib/docker /var/run/docker* 2>/dev/null || true
+    echo -e "${GREEN}✅ 清理完成${RESET}"
+    
+    # 创建必要的目录
+    echo -e "\n${BLUE}📁 创建必要目录...${RESET}"
+    sudo mkdir -p /usr/share/keyrings /etc/yum.repos.d 2>/dev/null || true
+    sudo chmod 755 /usr/share/keyrings 2>/dev/null || true
+    echo -e "${GREEN}✅ 目录创建完成${RESET}"
+    
+    # 配置YUM源 - 使用阿里云镜像
+    echo -e "\n${BLUE}📦 配置Docker YUM源...${RESET}"
+    
+    if curl -fsSL --connect-timeout 10 https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo -o /tmp/docker-ce.repo; then
+        if sudo cp /tmp/docker-ce.repo /etc/yum.repos.d/docker-ce.repo; then
+            echo -e "${GREEN}✅ 阿里云YUM源配置成功${RESET}"
+        else
+            echo -e "${RED}❌ YUM源配置失败${RESET}"
+            return 1
+        fi
+    else
+        echo -e "${YELLOW}⚠️ 网络连接问题，创建备用YUM源配置...${RESET}"
+        # 手动创建Docker CE repo配置
+        sudo tee /etc/yum.repos.d/docker-ce.repo > /dev/null <<'EOF'
+[docker-ce-stable]
+name=Docker CE Stable - $basearch
+baseurl=https://download.docker.com/linux/centos/7/stable/x86_64
+enabled=1
+gpgcheck=1
+gpgkey=https://download.docker.com/linux/centos/gpg
+EOF
+    fi
+    
+    # 清理YUM缓存并更新
+    echo -e "\n${BLUE}🔄 更新YUM缓存...${RESET}"
+    sudo yum clean all >/dev/null 2>&1
+    if sudo yum makecache fast >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ YUM缓存更新成功${RESET}"
+    else
+        echo -e "${YELLOW}⚠️ YUM缓存更新失败，继续安装...${RESET}"
+    fi
+    
+    # 安装Docker CE
+    echo -e "\n${BLUE}🐳 安装Docker CE...${RESET}"
+    
+    # 首先安装containerd.io
+    echo -e "${CYAN}安装containerd.io...${RESET}"
+    if sudo yum install -y containerd.io >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ containerd.io安装成功${RESET}"
+    else
+        echo -e "${YELLOW}⚠️ containerd.io安装失败${RESET}"
+        return 1
+    fi
+    
+    # 安装Docker CE
+    echo -e "${CYAN}安装docker-ce...${RESET}"
+    if sudo yum install -y docker-ce docker-ce-cli >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Docker CE安装成功${RESET}"
+    else
+        echo -e "${RED}❌ Docker CE安装失败${RESET}"
+        return 1
+    fi
+    
+    # 配置Docker服务
+    echo -e "\n${BLUE}⚙️ 配置Docker服务...${RESET}"
+    sudo systemctl daemon-reload
+    
+    # 配置Docker镜像加速器
+    echo -e "\n${BLUE}🚀 配置Docker镜像加速器...${RESET}"
+    sudo mkdir -p /etc/docker
+    sudo tee /etc/docker/daemon.json > /dev/null <<'EOF'
+{
+    "registry-mirrors": [
+        "https://docker.mirrors.ustc.edu.cn",
+        "https://hub-mirror.c.163.com",
+        "https://mirror.baidubce.com"
+    ]
+}
+EOF
+    
+    # 启动Docker服务
+    echo -e "${CYAN}启动Docker服务...${RESET}"
+    if sudo systemctl start docker && sudo systemctl enable docker >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Docker服务启动成功${RESET}"
+    else
+        echo -e "${RED}❌ Docker服务启动失败${RESET}"
+        sudo systemctl status docker || true
+        return 1
+    fi
+    
+    # 配置用户权限
+    echo -e "\n${BLUE}👥 配置用户权限...${RESET}"
+    sudo usermod -aG docker $USER || sudo usermod -aG docker $(whoami)
+    
+    # 验证安装
+    echo -e "\n${BLUE}✅ 验证Docker安装...${RESET}"
+    sleep 3
+    
+    if command -v docker &> /dev/null && docker --version &> /dev/null; then
+        echo -e "${GREEN}✅ Docker安装成功！${RESET}"
+        echo -e "${CYAN}版本：$(docker --version)${RESET}"
+        
+        if sudo systemctl is-active docker &> /dev/null; then
+            echo -e "${GREEN}✅ Docker服务运行中${RESET}"
+        else
+            echo -e "${YELLOW}⚠️ Docker服务未运行${RESET}"
+        fi
+        
+        if docker info &> /dev/null; then
+            echo -e "${GREEN}✅ Docker可以正常连接${RESET}"
+        else
+            echo -e "${YELLOW}⚠️ Docker连接测试失败${RESET}"
+        fi
+        
+        echo -e "\n${GREEN}🎉 CentOS 7 Docker安装完成！${RESET}"
+        echo -e "${YELLOW}💡 注意事项：${RESET}"
+        echo -e "1. 请重新登录或执行 'newgrp docker' 来激活用户组权限"
+        echo -e "2. CentOS 7已停止支持，建议升级系统"
+        
+        return 0
+    else
+        echo -e "${RED}❌ Docker安装验证失败${RESET}"
+        return 1
+    fi
 }
 
 check_docker_installed() {
@@ -6398,7 +6560,9 @@ docker_installation_management() {
             echo -e "\n${WHITE_RED}可用操作:${RESET}"
             echo "1) 重新安装Docker (更新到最新版本)"
             echo "2) 卸载Docker (完全清除Docker)"
-            echo "3) 查看Docker详细信息"
+            echo "3) 强制卸载Docker (彻底清理残留文件)"
+            echo "4) 查看Docker详细信息"
+            echo "5) 修复Docker服务 (解决服务启动问题)"
             echo "0) 返回Docker工具主页"
         else
             echo -e "${RED}❌ Docker状态: 未安装${RESET}"
@@ -6409,7 +6573,7 @@ docker_installation_management() {
         
         echo -e "${PURPLE}==================================================${RESET}"
         
-        read -r -p "请选择操作 (0-3): " install_choice < /dev/tty
+        read -r -p "请选择操作 (0-5): " install_choice < /dev/tty
         
         case $install_choice in
             1)
@@ -6442,10 +6606,36 @@ docker_installation_management() {
                 fi
                 ;;
             3)
+                if command -v docker &> /dev/null || [ -d "/var/lib/docker" ] || [ -S "/var/run/docker.sock" ]; then
+                    echo -e "\n${RED}⚠️ 危险操作：Docker强制卸载${RESET}"
+                    echo -e "${YELLOW}这将强制删除所有Docker相关的文件、命令和服务！${RESET}"
+                    echo -e "${YELLOW}适合解决Docker卸载不彻底的问题${RESET}"
+                    echo -e "${YELLOW}包括所有镜像、容器、数据卷等！${RESET}"
+                    read -r -p "确认强制卸载Docker? 输入 'FORCE_UNINSTALL' 确认: " confirm_force_uninstall < /dev/tty
+                    if [ "$confirm_force_uninstall" = "FORCE_UNINSTALL" ]; then
+                        force_uninstall_docker
+                    else
+                        echo -e "${CYAN}🚫 强制卸载操作已取消${RESET}"
+                        sleep 2
+                    fi
+                else
+                    echo -e "\n${YELLOW}⚠️ Docker未安装，无需强制卸载${RESET}"
+                    sleep 2
+                fi
+                ;;
+            4)
                 if command -v docker &> /dev/null; then
                     docker_detailed_info
                 else
                     echo -e "\n${RED}❌ Docker未安装，无法显示详细信息${RESET}"
+                    sleep 2
+                fi
+                ;;
+            5)
+                if command -v docker &> /dev/null; then
+                    fix_docker_service
+                else
+                    echo -e "\n${RED}❌ Docker未安装，无法修复服务${RESET}"
                     sleep 2
                 fi
                 ;;
@@ -6454,7 +6644,7 @@ docker_installation_management() {
                 return 0
                 ;;
             *)
-                echo -e "${RED}❌ 无效选项，请输入0-3${RESET}"
+                echo -e "${RED}❌ 无效选项，请输入0-5${RESET}"
                 sleep 2
                 ;;
         esac
@@ -6778,6 +6968,519 @@ uninstall_docker() {
     fi
     
     echo -e "\n${GREEN}==================================================${RESET}"
+    
+    read -r -p "按回车键继续..." < /dev/tty
+    return 0
+}
+
+# Docker强制完全卸载函数
+force_uninstall_docker() {
+    echo -e "\n${RED}🔥 Docker强制完全卸载工具${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    echo -e "${YELLOW}⚠️ 这将强制删除所有Docker相关的文件、命令和服务！${RESET}"
+    echo -e "${CYAN}🔧 适合解决Docker卸载不彻底的问题${RESET}"
+    
+    # 检查是否以root权限运行
+    if [[ $EUID -eq 0 ]]; then
+        echo -e "${RED}❌ 请不要以root权限运行此脚本${RESET}"
+        echo -e "${CYAN}使用方式: sudo bash $0${RESET}"
+        read -r -p "按回车键继续..." < /dev/tty
+        return 1
+    fi
+    
+    # 确认操作
+    echo -e "\n${YELLOW}确认要强制完全卸载Docker吗？${RESET}"
+    echo -e "${CYAN}这将删除：${RESET}"
+    echo -e "  • 所有Docker命令和二进制文件"
+    echo -e "  • 所有Docker数据、配置和缓存"
+    echo -e "  • 所有Docker镜像、容器、数据卷"
+    echo -e "  • 所有Docker系统服务和配置文件"
+    echo -e "  • docker用户组和权限"
+    echo ""
+    read -r -p "输入 'FORCE_UNINSTALL' 确认强制卸载: " confirm
+    if [ "$confirm" != "FORCE_UNINSTALL" ]; then
+        echo -e "${YELLOW}操作已取消${RESET}"
+        sleep 1
+        return 0
+    fi
+    
+    echo -e "\n${RED}🔥 开始强制卸载Docker...${RESET}"
+    
+    # 1. 停止所有Docker相关进程
+    echo -e "\n${CYAN}🔄 步骤1: 强制停止所有Docker进程...${RESET}"
+    
+    # 停止Docker服务
+    sudo systemctl stop docker 2>/dev/null || true
+    sudo systemctl stop docker.socket 2>/dev/null || true
+    sudo systemctl disable docker 2>/dev/null || true
+    sudo systemctl disable docker.socket 2>/dev/null || true
+    
+    # 强制杀死所有Docker相关进程
+    docker_pids=$(pgrep -f "docker" 2>/dev/null || echo "")
+    if [ -n "$docker_pids" ]; then
+        echo -e "${YELLOW}正在强制停止Docker进程...${RESET}"
+        sudo kill -9 $docker_pids 2>/dev/null || true
+        sleep 2
+    fi
+    
+    container_pids=$(pgrep -f "containerd" 2>/dev/null || echo "")
+    if [ -n "$container_pids" ]; then
+        echo -e "${YELLOW}正在强制停止containerd进程...${RESET}"
+        sudo kill -9 $container_pids 2>/dev/null || true
+        sleep 1
+    fi
+    
+    echo -e "${GREEN}✅ Docker进程已停止${RESET}"
+    
+    # 2. 检测包管理器并彻底卸载
+    echo -e "\n${CYAN}🔄 步骤2: 彻底卸载Docker包...${RESET}"
+    
+    # 强制删除所有可能的Docker包
+    echo -e "${BLUE}强制删除Docker相关包...${RESET}"
+    
+    if command -v apt-get &> /dev/null; then
+        echo -e "${CYAN}使用APT包管理器强制卸载...${RESET}"
+        sudo apt-get remove --purge --force-yes -y \
+            docker docker-engine docker.io containerd \
+            containerd.io runc docker-ce docker-ce-cli \
+            docker-compose-plugin docker-compose \
+            docker-virtualization docker-client \
+            docker-client-latest docker-common \
+            docker-latest docker-latest-logrotate \
+            docker-logrotate docker-engine \
+            docker-rootless-extras 2>/dev/null || true
+        
+        sudo apt-get autoremove -y --force-yes 2>/dev/null || true
+        sudo apt-get autoclean 2>/dev/null || true
+        
+    elif command -v yum &> /dev/null; then
+        echo -e "${CYAN}使用YUM包管理器强制卸载...${RESET}"
+        sudo yum remove -y --setopt=protected_multilib=false \
+            docker docker-client docker-client-latest \
+            docker-common docker-latest docker-latest-logrotate \
+            docker-logrotate docker-engine docker-ee \
+            containerd containerd.io runc \
+            docker-ce docker-ce-cli \
+            docker-compose-plugin docker-compose 2>/dev/null || true
+        
+    elif command -v dnf &> /dev/null; then
+        echo -e "${CYAN}使用DNF包管理器强制卸载...${RESET}"
+        sudo dnf remove -y \
+            docker docker-client docker-client-latest \
+            docker-common docker-latest docker-latest-logrotate \
+            docker-logrotate docker-engine docker-ee \
+            containerd containerd.io runc \
+            docker-ce docker-ce-cli \
+            docker-compose-plugin docker-compose 2>/dev/null || true
+        
+    elif command -v pacman &> /dev/null; then
+        echo -e "${CYAN}使用Pacman包管理器强制卸载...${RESET}"
+        sudo pacman -R --noconfirm docker 2>/dev/null || true
+        
+    elif command -v zypper &> /dev/null; then
+        echo -e "${CYAN}使用Zypper包管理器强制卸载...${RESET}"
+        sudo zypper remove -y docker 2>/dev/null || true
+        
+    elif command -v apk &> /dev/null; then
+        echo -e "${CYAN}使用APK包管理器强制卸载...${RESET}"
+        sudo apk del docker 2>/dev/null || true
+    fi
+    
+    echo -e "${GREEN}✅ Docker包已卸载${RESET}"
+    
+    # 3. 手动强制删除所有Docker相关文件和目录
+    echo -e "\n${CYAN}🔄 步骤3: 强制删除所有Docker文件和目录...${RESET}"
+    
+    echo -e "${BLUE}删除Docker数据目录...${RESET}"
+    sudo rm -rf /var/lib/docker 2>/dev/null || true
+    sudo rm -rf /var/run/docker 2>/dev/null || true
+    sudo rm -rf /var/run/docker.sock 2>/dev/null || true
+    sudo rm -rf /run/docker.sock 2>/dev/null || true
+    sudo rm -rf /var/lib/containerd 2>/dev/null || true
+    
+    echo -e "${BLUE}删除Docker配置目录...${RESET}"
+    sudo rm -rf /etc/docker 2>/dev/null || true
+    sudo rm -rf /etc/default/docker 2>/dev/null || true
+    sudo rm -rf ~/.docker 2>/dev/null || true
+    
+    echo -e "${BLUE}删除Docker系统服务文件...${RESET}"
+    sudo rm -f /etc/systemd/system/docker.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/docker.socket 2>/dev/null || true
+    sudo rm -f /lib/systemd/system/docker.service 2>/dev/null || true
+    sudo rm -f /lib/systemd/system/docker.socket 2>/dev/null || true
+    sudo rm -f /usr/lib/systemd/system/docker.service 2>/dev/null || true
+    sudo rm -f /usr/lib/systemd/system/docker.socket 2>/dev/null || true
+    
+    echo -e "${GREEN}✅ Docker目录和服务文件已删除${RESET}"
+    
+    # 4. 强制删除所有Docker可执行文件
+    echo -e "\n${CYAN}🔄 步骤4: 强制删除Docker可执行文件...${RESET}"
+    
+    echo -e "${BLUE}删除主要Docker命令...${RESET}"
+    sudo rm -f /usr/bin/docker 2>/dev/null || true
+    sudo rm -f /usr/bin/dockerd 2>/dev/null || true
+    sudo rm -f /usr/bin/docker-compose 2>/dev/null || true
+    sudo rm -f /usr/bin/docker-compose-plugin 2>/dev/null || true
+    sudo rm -f /usr/bin/docker-init 2>/dev/null || true
+    sudo rm -f /usr/bin/docker-proxy 2>/dev/null || true
+    
+    echo -e "${BLUE}删除Docker相关的containerd和runc...${RESET}"
+    sudo rm -f /usr/bin/containerd 2>/dev/null || true
+    sudo rm -f /usr/bin/containerd-shim 2>/dev/null || true
+    sudo rm -f /usr/bin/containerd-shim-runc-v2 2>/dev/null || true
+    sudo rm -f /usr/bin/runc 2>/dev/null || true
+    
+    echo -e "${BLUE}删除/usr/local/bin中的Docker命令...${RESET}"
+    sudo rm -f /usr/local/bin/docker 2>/dev/null || true
+    sudo rm -f /usr/local/bin/dockerd 2>/dev/null || true
+    sudo rm -f /usr/local/bin/docker-compose 2>/dev/null || true
+    
+    echo -e "${GREEN}✅ Docker可执行文件已删除${RESET}"
+    
+    # 5. 删除Docker用户组和权限
+    echo -e "\n${CYAN}🔄 步骤5: 删除Docker用户组...${RESET}"
+    
+    echo -e "${BLUE}删除docker用户组...${RESET}"
+    sudo groupdel docker 2>/dev/null || true
+    
+    echo -e "${BLUE}从所有用户中移除docker组权限...${RESET}"
+    sudo sed -i '/^docker:/d' /etc/group 2>/dev/null || true
+    sudo sed -i '/docker/d' /etc/subuid /etc/subgid 2>/dev/null || true
+    
+    echo -e "${GREEN}✅ Docker用户组已删除${RESET}"
+    
+    # 6. 清理Docker相关的环境变量和配置
+    echo -e "\n${CYAN}🔄 步骤6: 清理Docker环境变量...${RESET}"
+    
+    echo -e "${BLUE}从环境变量中移除Docker相关配置...${RESET}"
+    sudo sed -i '/DOCKER_/d' /etc/environment 2>/dev/null || true
+    sudo sed -i '/docker/d' ~/.bashrc 2>/dev/null || true
+    sudo sed -i '/docker/d' ~/.zshrc 2>/dev/null || true
+    
+    # 删除Docker配置文件
+    echo -e "${BLUE}删除Docker配置文件...${RESET}"
+    sudo rm -f /etc/profile.d/docker.sh 2>/dev/null || true
+    sudo rm -f /etc/bash_completion.d/docker 2>/dev/null || true
+    
+    echo -e "${GREEN}✅ Docker环境配置已清理${RESET}"
+    
+    # 7. 重新加载systemd配置
+    echo -e "\n${CYAN}🔄 步骤7: 重新加载systemd配置...${RESET}"
+    
+    sudo systemctl daemon-reload 2>/dev/null || true
+    sudo systemctl reset-failed 2>/dev/null || true
+    sudo systemctl mask docker.service 2>/dev/null || true
+    sudo systemctl mask docker.socket 2>/dev/null || true
+    
+    echo -e "${GREEN}✅ systemd配置已重载${RESET}"
+    
+    # 8. 清理可能残留的Docker相关文件
+    echo -e "\n${CYAN}🔄 步骤8: 清理残留文件...${RESET}"
+    
+    echo -e "${BLUE}搜索并删除所有Docker相关文件...${RESET}"
+    
+    # 搜索可能的Docker相关文件和目录
+    sudo find /usr -name "*docker*" -type f 2>/dev/null | head -50 | while read -r file; do
+        sudo rm -f "$file" 2>/dev/null || true
+    done
+    
+    sudo find /var -name "*docker*" -type d 2>/dev/null | head -20 | while read -r dir; do
+        sudo rm -rf "$dir" 2>/dev/null || true
+    done
+    
+    sudo find /etc -name "*docker*" 2>/dev/null | head -20 | while read -r file; do
+        sudo rm -f "$file" 2>/dev/null || true
+    done
+    
+    echo -e "${GREEN}✅ 残留文件已清理${RESET}"
+    
+    # 9. 更新包管理器缓存
+    echo -e "\n${CYAN}🔄 步骤9: 更新包管理器缓存...${RESET}"
+    
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update 2>/dev/null || true
+    elif command -v yum &> /dev/null; then
+        sudo yum clean all 2>/dev/null || true
+    elif command -v dnf &> /dev/null; then
+        sudo dnf clean all 2>/dev/null || true
+    fi
+    
+    echo -e "${GREEN}✅ 包管理器缓存已更新${RESET}"
+    
+    # 10. 验证卸载结果
+    echo -e "\n${CYAN}🔄 步骤10: 验证卸载结果...${RESET}"
+    
+    echo -e "${BLUE}检查Docker命令是否存在...${RESET}"
+    if command -v docker &> /dev/null; then
+        echo -e "${RED}❌ Docker命令仍然存在: $(which docker)${RESET}"
+        echo -e "${YELLOW}尝试手动删除: sudo rm -f $(which docker)${RESET}"
+        sudo rm -f $(which docker) 2>/dev/null || true
+    else
+        echo -e "${GREEN}✅ Docker命令已完全删除${RESET}"
+    fi
+    
+    echo -e "\n${BLUE}检查Docker进程是否运行...${RESET}"
+    if pgrep -f docker &> /dev/null; then
+        echo -e "${RED}❌ Docker进程仍在运行${RESET}"
+        pgrep -af docker || true
+    else
+        echo -e "${GREEN}✅ 无Docker进程运行${RESET}"
+    fi
+    
+    echo -e "\n${BLUE}检查Docker目录是否存在...${RESET}"
+    if [ -d "/var/lib/docker" ] || [ -d "/var/run/docker.sock" ]; then
+        echo -e "${RED}❌ Docker目录仍存在${RESET}"
+        ls -la /var/lib/docker 2>/dev/null || true
+        ls -la /var/run/docker.sock 2>/dev/null || true
+    else
+        echo -e "${GREEN}✅ Docker目录已完全删除${RESET}"
+    fi
+    
+    echo -e "\n${BLUE}检查Docker服务状态...${RESET}"
+    if systemctl is-enabled --quiet docker 2>/dev/null; then
+        echo -e "${RED}❌ Docker服务仍被启用${RESET}"
+    else
+        echo -e "${GREEN}✅ Docker服务已禁用${RESET}"
+    fi
+    
+    # 最终验证
+    echo -e "\n${CYAN}🔍 最终验证...${RESET}"
+    if command -v docker &> /dev/null; then
+        echo -e "${RED}❌ Docker卸载失败，Docker命令仍存在${RESET}"
+        echo -e "${YELLOW}💡 建议重启系统后再次检查${RESET}"
+    else
+        echo -e "${GREEN}✅ Docker已完全卸载！${RESET}"
+    fi
+    
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${GREEN}🎉 Docker强制卸载完成！${RESET}"
+    echo -e "${YELLOW}💡 如果Docker命令仍存在，建议重启系统后再次验证${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    read -r -p "按回车键继续..." < /dev/tty
+    return 0
+}
+
+# 检测包管理器
+detect_package_manager() {
+    if command -v apt-get &> /dev/null; then
+        echo "apt"
+    elif command -v yum &> /dev/null; then
+        echo "yum"
+    elif command -v dnf &> /dev/null; then
+        echo "dnf"
+    elif command -v pacman &> /dev/null; then
+        echo "pacman"
+    elif command -v zypper &> /dev/null; then
+        echo "zypper"
+    elif command -v apk &> /dev/null; then
+        echo "apk"
+    else
+        echo "unknown"
+    fi
+}
+
+# Docker服务修复函数
+fix_docker_service() {
+    echo -e "\n${YELLOW}🔧 Docker服务修复工具${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    # 检查Docker是否已安装
+    if ! command -v docker &> /dev/null; then
+        echo -e "${RED}❌ Docker未安装，无法修复服务${RESET}"
+        echo -e "${CYAN}请先安装Docker：curl -fsSL https://get.docker.com | sudo bash${RESET}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}🔍 诊断Docker服务问题...${RESET}"
+    
+    # 1. 检查systemd服务状态
+    echo -e "\n${BLUE}1️⃣ 检查systemd服务状态${RESET}"
+    if systemctl list-units --all | grep -q docker.service; then
+        echo -e "${GREEN}✅ Docker服务单元存在${RESET}"
+        
+        # 显示服务状态
+        echo -e "${CYAN}服务状态信息：${RESET}"
+        systemctl status docker --no-pager -l || true
+        
+        # 检查服务是否启用
+        if systemctl is-enabled docker &> /dev/null; then
+            echo -e "${GREEN}✅ Docker服务已启用${RESET}"
+        else
+            echo -e "${YELLOW}⚠️ Docker服务未启用${RESET}"
+        fi
+        
+        # 检查服务是否激活
+        if systemctl is-active docker &> /dev/null; then
+            echo -e "${GREEN}✅ Docker服务已激活${RESET}"
+        else
+            echo -e "${RED}❌ Docker服务未激活${RESET}"
+        fi
+    else
+        echo -e "${RED}❌ Docker服务单元不存在${RESET}"
+        echo -e "${YELLOW}需要创建服务单元${RESET}"
+    fi
+    
+    # 2. 检查dockerd进程
+    echo -e "\n${BLUE}2️⃣ 检查dockerd进程${RESET}"
+    if pgrep -f dockerd &> /dev/null; then
+        echo -e "${YELLOW}⚠️ 发现运行中的dockerd进程${RESET}"
+        echo -e "${CYAN}进程信息：${RESET}"
+        ps aux | grep dockerd | grep -v grep || true
+    else
+        echo -e "${GREEN}✅ 没有运行中的dockerd进程${RESET}"
+    fi
+    
+    # 3. 检查Docker socket
+    echo -e "\n${BLUE}3️⃣ 检查Docker socket${RESET}"
+    if [ -S /var/run/docker.sock ]; then
+        echo -e "${GREEN}✅ Docker socket存在${RESET}"
+        ls -la /var/run/docker.sock
+    else
+        echo -e "${YELLOW}⚠️ Docker socket不存在${RESET}"
+        echo -e "${CYAN}这可能是服务未启动的原因${RESET}"
+    fi
+    
+    # 4. 检查依赖包
+    echo -e "\n${BLUE}4️⃣ 检查Docker依赖包${RESET}"
+    local pkg_manager=$(detect_package_manager)
+    echo -e "${CYAN}包管理器：$pkg_manager${RESET}"
+    
+    case $pkg_manager in
+        apt)
+            echo -e "${CYAN}检查关键包：${RESET}"
+            for pkg in docker-ce docker-ce-cli containerd.io; do
+                if dpkg -l | grep -q "^ii.*$pkg"; then
+                    echo -e "${GREEN}✅ $pkg 已安装${RESET}"
+                else
+                    echo -e "${RED}❌ $pkg 未安装${RESET}"
+                fi
+            done
+            ;;
+        yum|dnf)
+            echo -e "${CYAN}检查关键包：${RESET}"
+            for pkg in docker-ce docker-ce-cli containerd.io; do
+                if rpm -qa | grep -q "$pkg"; then
+                    echo -e "${GREEN}✅ $pkg 已安装${RESET}"
+                else
+                    echo -e "${RED}❌ $pkg 未安装${RESET}"
+                fi
+            done
+            ;;
+    esac
+    
+    # 5. 检查错误日志
+    echo -e "\n${BLUE}5️⃣ 检查最近的错误日志${RESET}"
+    echo -e "${CYAN}最近5条Docker相关日志：${RESET}"
+    journalctl -u docker --no-pager -n 5 || echo -e "${YELLOW}无法获取日志${RESET}"
+    
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    
+    # 开始修复过程
+    echo -e "\n${CYAN}🚀 开始修复Docker服务...${RESET}"
+    
+    # 修复步骤
+    echo -e "\n${BLUE}🛠️ 修复步骤：${RESET}"
+    
+    # 步骤1: 停止可能冲突的进程
+    echo -e "\n${YELLOW}步骤1: 停止冲突进程${RESET}"
+    sudo systemctl stop docker 2>/dev/null || true
+    sudo pkill -f dockerd 2>/dev/null || true
+    sudo pkill -f containerd 2>/dev/null || true
+    echo -e "${GREEN}✅ 冲突进程已停止${RESET}"
+    
+    # 步骤2: 清理socket文件
+    echo -e "\n${YELLOW}步骤2: 清理socket文件${RESET}"
+    sudo rm -f /var/run/docker.sock 2>/dev/null || true
+    sudo rm -f /var/run/docker.pid 2>/dev/null || true
+    echo -e "${GREEN}✅ Socket文件已清理${RESET}"
+    
+    # 步骤3: 重新加载systemd配置
+    echo -e "\n${YELLOW}步骤3: 重新加载systemd配置${RESET}"
+    sudo systemctl daemon-reload
+    echo -e "${GREEN}✅ Systemd配置已重新加载${RESET}"
+    
+    # 步骤4: 创建Docker用户组（如果不存在）
+    echo -e "\n${YELLOW}步骤4: 确保Docker用户组存在${RESET}"
+    if ! getent group docker > /dev/null 2>&1; then
+        sudo groupadd docker
+        echo -e "${GREEN}✅ Docker用户组已创建${RESET}"
+    else
+        echo -e "${GREEN}✅ Docker用户组已存在${RESET}"
+    fi
+    
+    # 步骤5: 配置socket权限
+    echo -e "\n${YELLOW}步骤5: 配置socket权限${RESET}"
+    sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+    sudo chown root:docker /var/run/docker.sock 2>/dev/null || true
+    echo -e "${GREEN}✅ Socket权限已配置${RESET}"
+    
+    # 步骤6: 启动Docker服务
+    echo -e "\n${YELLOW}步骤6: 启动Docker服务${RESET}"
+    if sudo systemctl start docker; then
+        echo -e "${GREEN}✅ Docker服务启动成功${RESET}"
+    else
+        echo -e "${RED}❌ Docker服务启动失败${RESET}"
+        echo -e "${CYAN}尝试查看详细错误：${RESET}"
+        sudo systemctl status docker --no-pager -l
+        
+        # 尝试重新安装服务文件
+        echo -e "\n${YELLOW}尝试重新创建服务文件...${RESET}"
+        sudo rm -f /etc/systemd/system/docker.service
+        sudo systemctl daemon-reload
+        sudo systemctl enable docker
+        sudo systemctl start docker
+        
+        if sudo systemctl is-active docker &> /dev/null; then
+            echo -e "${GREEN}✅ 重启后Docker服务成功${RESET}"
+        else
+            echo -e "${RED}❌ 仍然无法启动Docker服务${RESET}"
+            echo -e "${CYAN}建议运行：journalctl -xeu docker 查看详细错误${RESET}"
+            return 1
+        fi
+    fi
+    
+    # 步骤7: 启用Docker服务
+    echo -e "\n${YELLOW}步骤7: 启用Docker服务${RESET}"
+    if sudo systemctl enable docker; then
+        echo -e "${GREEN}✅ Docker服务已启用${RESET}"
+    else
+        echo -e "${YELLOW}⚠️ Docker服务启用可能有问题${RESET}"
+    fi
+    
+    # 步骤8: 验证修复
+    echo -e "\n${BLUE}8️⃣ 验证修复结果${RESET}"
+    sleep 3
+    
+    # 检查服务状态
+    if systemctl is-active --quiet docker; then
+        echo -e "${GREEN}✅ Docker服务运行中${RESET}"
+    else
+        echo -e "${RED}❌ Docker服务未运行${RESET}"
+    fi
+    
+    # 检查socket
+    if [ -S /var/run/docker.sock ]; then
+        echo -e "${GREEN}✅ Docker socket正常${RESET}"
+    else
+        echo -e "${RED}❌ Docker socket异常${RESET}"
+    fi
+    
+    # 检查Docker命令
+    if docker info &> /dev/null; then
+        echo -e "${GREEN}✅ Docker可以正常连接${RESET}"
+        echo -e "${CYAN}Docker版本：$(docker --version)${RESET}"
+        echo -e "${CYAN}API版本：$(docker version --format '{{.Server.APIVersion}}' 2>/dev/null || echo "未知")${RESET}"
+    else
+        echo -e "${RED}❌ Docker无法正常连接${RESET}"
+        echo -e "${YELLOW}建议检查防火墙或SELinux设置${RESET}"
+    fi
+    
+    echo -e "\n${GREEN}🎉 Docker服务修复完成！${RESET}"
+    echo -e "${YELLOW}💡 如果还有问题，请运行以下命令查看详细错误：${RESET}"
+    echo -e "${CYAN}journalctl -xeu docker${RESET}"
+    echo -e "${CYAN}systemctl status docker${RESET}"
+    echo -e "${CYAN}docker info${RESET}"
     
     read -r -p "按回车键继续..." < /dev/tty
     return 0
