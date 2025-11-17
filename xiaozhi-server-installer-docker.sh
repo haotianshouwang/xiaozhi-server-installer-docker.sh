@@ -6,7 +6,7 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.76（修复人设配置和阿里云配置共享功能）
+# 版本：1.2.78（修复ASR配置菜单函数调用问题）
 # 修复内容（V1.2.76）：
 # - 修复人设配置函数返回语句缺失问题
 # - 新增阿里云配置智能共享功能
@@ -3686,12 +3686,12 @@ config_keys() {
         
         # 简化的线性配置流程，支持返回上一步
         local config_step=1
-        local max_steps=5
+        local max_steps=6
         
         while [ $config_step -le $max_steps ]; do
             case $config_step in
                 1)
-                    echo -e "\n${CYAN}=== [1/6]：配置 ASR (语音识别) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [1/7]：配置 ASR (语音识别) 服务 ===${RESET}"
                     config_asr_advanced
                     local asr_result=$?
                     if [ $asr_result -eq 2 ]; then
@@ -3710,7 +3710,7 @@ config_keys() {
                     fi
                     ;;
                 2)
-                    echo -e "\n${CYAN}=== [2/6]：配置 LLM (大语言模型) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [2/7]：配置 LLM (大语言模型) 服务 ===${RESET}"
                     config_llm_advanced
                     local llm_result=$?
                     if [ $llm_result -eq 2 ]; then
@@ -3723,7 +3723,7 @@ config_keys() {
                     fi
                     ;;
                 3)
-                    echo -e "\n${CYAN}=== [3/6]：配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [3/7]：配置 VLLM (视觉大语言模型) 服务 ===${RESET}"
                     config_vllm
                     local vllm_result=$?
                     if [ $vllm_result -eq 2 ]; then
@@ -3736,7 +3736,7 @@ config_keys() {
                     fi
                     ;;
                 4)
-                    echo -e "\n${CYAN}=== [4/6]：配置 TTS (语音合成) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [4/7]：配置 TTS (语音合成) 服务 ===${RESET}"
                     config_tts_advanced
                     local tts_result=$?
                     if [ $tts_result -eq 2 ]; then
@@ -3749,7 +3749,7 @@ config_keys() {
                     fi
                     ;;
                 5)
-                    echo -e "\n${CYAN}=== [5/6]：配置 Memory (记忆) 服务 ===${RESET}"
+                    echo -e "\n${CYAN}=== [5/7]：配置 Memory (记忆) 服务 ===${RESET}"
                     config_memory
                     local memory_result=$?
                     if [ $memory_result -eq 2 ]; then
@@ -8891,141 +8891,47 @@ configure_asr_service() {
     
     case $asr_choice in
         1)
-            # 本地ASR
+            # 本地ASR - 使用现有的config_asr函数进行选择
             echo -e "${CYAN}配置本地ASR服务...${RESET}"
-            echo "选择本地ASR模型："
-            echo "1) FunASR (推荐中文)"
-            echo "2) Sherpa-ONNX (轻量级)"
-            echo "3) Vosk (完全离线)"
-            read -r -p "请选择本地ASR模型 (1-3): " local_asr_choice
-            
-            [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-            
-            case $local_asr_choice in
-                1)
-                    sed -i 's/type:.*/type: "local"/' "$CONFIG_FILE"
-                    echo -e "${GREEN}✅ FunASR本地ASR配置完成${RESET}"
-                    ;;
-                2)
-                    sed -i 's/type:.*/type: "local"/' "$CONFIG_FILE"
-                    echo -e "${GREEN}✅ Sherpa-ONNX本地ASR配置完成${RESET}"
-                    ;;
-                3)
-                    sed -i 's/type:.*/type: "local"/' "$CONFIG_FILE"
-                    echo -e "${GREEN}✅ Vosk本地ASR配置完成${RESET}"
-                    ;;
-                *)
-                    echo -e "${RED}❌ 无效选择${RESET}"
-                    return 1
-                    ;;
-            esac
+            config_asr
             ;;
         2)
-            # 阿里云ASR
-            echo -e "${CYAN}配置阿里云ASR服务...${RESET}"
-            read -r -p "请输入阿里云AccessKeyId: " ali_asr_access_key_id
-            read -r -p "请输入阿里云AccessKeySecret: " ali_asr_access_key_secret
-            read -r -p "请输入阿里云AppKey: " ali_asr_appkey
-            
-            if [ -n "$ali_asr_access_key_id" ] && [ -n "$ali_asr_access_key_secret" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "aliyun"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 阿里云ASR配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供完整的阿里云认证信息${RESET}"
-                return 1
-            fi
+            # 阿里云ASR - 调用现有的详细配置函数
+            config_aliyun_asr
             ;;
         3)
-            # 腾讯云ASR
+            # 腾讯云ASR - 暂时使用config_asr进行配置
             echo -e "${CYAN}配置腾讯云ASR服务...${RESET}"
-            read -r -p "请输入腾讯云SecretId: " tx_asr_secret_id
-            read -r -p "请输入腾讯云SecretKey: " tx_asr_secret_key
-            read -r -p "请输入腾讯云AppId: " tx_asr_appid
-            
-            if [ -n "$tx_asr_secret_id" ] && [ -n "$tx_asr_secret_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "tencent"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 腾讯云ASR配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供完整的腾讯云认证信息${RESET}"
-                return 1
-            fi
+            echo "正在调用详细配置..."
+            config_asr
             ;;
         4)
-            # 火山引擎ASR
+            # 火山引擎ASR - 暂时使用config_asr进行配置
             echo -e "${CYAN}配置火山引擎ASR服务...${RESET}"
-            read -r -p "请输入火山引擎AppId: " huoshan_asr_appid
-            read -r -p "请输入火山引擎AccessToken: " huoshan_asr_access_token
-            
-            if [ -n "$huoshan_asr_appid" ] && [ -n "$huoshan_asr_access_token" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "doubao"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 火山引擎ASR配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供完整的火山引擎认证信息${RESET}"
-                return 1
-            fi
+            echo "正在调用详细配置..."
+            config_asr
             ;;
         5)
-            # OpenAI Whisper
+            # OpenAI Whisper - 暂时使用config_asr进行配置
             echo -e "${CYAN}配置OpenAI Whisper服务...${RESET}"
-            read -r -p "请输入OpenAI API Key: " openai_whisper_api_key
-            
-            if [ -n "$openai_whisper_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "openai"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ OpenAI Whisper配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供OpenAI API Key${RESET}"
-                return 1
-            fi
+            echo "正在调用详细配置..."
+            config_asr
             ;;
         6)
-            # 百度ASR
+            # 百度ASR - 暂时使用config_asr进行配置
             echo -e "${CYAN}配置百度ASR服务...${RESET}"
-            read -r -p "请输入百度AppId: " baidu_asr_app_id
-            read -r -p "请输入百度API Key: " baidu_asr_api_key
-            read -r -p "请输入百度Secret Key: " baidu_asr_secret_key
-            
-            if [ -n "$baidu_asr_app_id" ] && [ -n "$baidu_asr_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "baidu"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 百度ASR配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供完整的百度认证信息${RESET}"
-                return 1
-            fi
+            echo "正在调用详细配置..."
+            config_asr
             ;;
         7)
-            # 科大讯飞ASR
-            echo -e "${CYAN}配置科大讯飞ASR服务...${RESET}"
-            read -r -p "请输入讯飞APP ID: " xunfei_asr_app_id
-            read -r -p "请输入讯飞API Key: " xunfei_asr_api_key
-            read -r -p "请输入讯飞API Secret: " xunfei_asr_api_secret
-            
-            if [ -n "$xunfei_asr_app_id" ] && [ -n "$xunfei_asr_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "xunfei"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 科大讯飞ASR配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供完整的讯飞认证信息${RESET}"
-                return 1
-            fi
+            # 科大讯飞ASR - 调用现有的详细配置函数
+            config_xunfei_stream_asr
             ;;
         8)
-            # Groq Whisper
+            # Groq Whisper - 暂时使用config_asr进行配置
             echo -e "${CYAN}配置Groq Whisper服务...${RESET}"
-            read -r -p "请输入Groq API Key: " groq_api_key
-            
-            if [ -n "$groq_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "groq"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ Groq Whisper配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供Groq API Key${RESET}"
-                return 1
-            fi
+            echo "正在调用详细配置..."
+            config_asr
             ;;
         Q|q)
             return 0
