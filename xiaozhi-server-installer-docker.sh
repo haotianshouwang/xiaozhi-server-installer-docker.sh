@@ -3256,20 +3256,33 @@ config_keys() {
         echo -e "\n${PURPLE}==================================================${RESET}"
         echo -e "${CYAN}🔑 选择配置方式  🔑${RESET}"
         echo -e "${PURPLE}==================================================${RESET}"
-        echo "0) 返回上一个菜单"
-        echo "1) 现在通过脚本配置密钥和服务商"
-        echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
-        echo "3) 退出配置并退出脚本"
-        read -r -p "请选择（默认1）：" key_choice < /dev/tty
-        key_choice=${key_choice:-1}
+        echo "0) 现在通过脚本配置密钥和服务商"
+        echo "1) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
+        echo "2) 退出配置并退出脚本"
+        echo "3) 不配置所有配置，直接返回菜单"
+        echo "4) 返回上一个菜单"
+        read -r -p "请选择（默认0）：" key_choice < /dev/tty
+        key_choice=${key_choice:-0}
         
         # 处理返回上一个菜单
-        if [ "$key_choice" = "0" ]; then
+        if [ "$key_choice" = "4" ]; then
             echo -e "\n${CYAN}🔄 返回上一个菜单${RESET}"
             main_menu
             return 1
         fi
-            if [ "$confirm_skip" = "2" ]; then
+        
+        # 处理不配置所有配置
+        if [ "$key_choice" = "3" ]; then
+            echo -e "\n${YELLOW}⚠️ 确认不配置所有配置？${RESET}"
+            echo -e "${CYAN}ℹ️ 将跳过所有配置步骤${RESET}"
+            echo ""
+            echo "请选择："
+            echo "1) 确认不配置所有配置"
+            echo "2) 取消，返回配置选择菜单"
+            read -r -p "请选择（默认1）：" confirm_skip < /dev/tty
+            confirm_skip=${confirm_skip:-1}
+            
+            if [ "$confirm_skip" = "1" ]; then
                 echo -e "\n${GREEN}✅ 跳过所有配置${RESET}"
                 
                 # 使用智能内存风险处理
@@ -3291,14 +3304,14 @@ config_keys() {
             fi
         fi
         
-        # 处理详细配置选项（选项1）
-        if [ "$key_choice" = "1" ]; then
+        # 处理详细配置选项（选项0）
+        if [ "$key_choice" = "0" ]; then
             echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
             break  # 退出循环，进入详细配置
         fi
         
-        # 处理本地ASR转云服务选项（选项2）
-        if [ "$key_choice" = "2" ]; then
+        # 处理本地ASR转云服务选项（选项1）
+        if [ "$key_choice" = "1" ]; then
             echo -e "\n${YELLOW}⚠️ 已选择稍后手动填写。${RESET}"
             echo -e "${CYAN}ℹ️ 脚本将修改现有配置文件，将本地ASR模型替换为云服务ASR。${RESET}"
             echo -e "${CYAN}ℹ️ 这样可以避免服务启动失败，同时保留您的其他配置。${RESET}"
@@ -9578,5 +9591,4 @@ convert_asr_to_cloud() {
 }
 
 # 启动脚本执行
-main "$@"
 main "$@"
