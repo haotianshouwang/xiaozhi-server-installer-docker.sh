@@ -2,7 +2,6 @@
 set -uo pipefail
 trap exit_confirm SIGINT
 
-
 # ========================================================
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
@@ -10,13 +9,12 @@ trap exit_confirm SIGINT
 # 版本：2.0.0
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
-# ========================================================
 
 # ========================= 常量定义 =========================
 readonly SCRIPT_AUTHOR="昊天兽王"
 readonly SCRIPT_NAME="xiaozhi-server-installer"
 readonly SCRIPT_VERSION="2.0.0"
-readonly SCRIPT_DESC="小智服务器增强部署脚本 - 支持智能配置管理和Docker全面管理"
+readonly SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板 "
 
 # ========================= URL和路径配置 =========================
 
@@ -1090,15 +1088,15 @@ install_docker_opencloudos() {
             
             # 添加Docker仓库
             echo -e "${BLUE}配置Docker软件仓库...${RESET}"
-            if ! sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null; then
+            if ! sudo yum-config-manager --add-repo https://gh-proxy.org/https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null; then
                 # 如果添加失败，手动创建repo文件
                 sudo mkdir -p /etc/yum.repos.d
                 echo "[docker-ce-stable]
 name=Docker CE Stable - \$basearch
-baseurl=https://download.docker.com/linux/centos/\$releasever/stable/\$basearch
+baseurl=https://gh-proxy.org/https://download.docker.com/linux/centos/\$releasever/stable/\$basearch
 enabled=1
 gpgcheck=1
-gpgkey=https://download.docker.com/linux/centos/gpg" | sudo tee /etc/yum.repos.d/docker-ce.repo > /dev/null
+gpgkey=https://gh-proxy.org/https://download.docker.com/linux/centos/gpg" | sudo tee /etc/yum.repos.d/docker-ce.repo > /dev/null
             fi
             
             # 安装Docker
@@ -1115,8 +1113,8 @@ gpgkey=https://download.docker.com/linux/centos/gpg" | sudo tee /etc/yum.repos.d
     echo -e "${CYAN}尝试使用Docker静态二进制文件安装...${RESET}"
     
     # 获取最新Docker版本
-    local docker_version=$(curl -s https://api.github.com/repos/docker/docker-ce/releases/latest 2>/dev/null | grep '"tag_name":' | cut -d'"' -f4 | sed 's/v//')
-    local docker_url="https://download.docker.com/linux/static/stable/x86_64/docker-${docker_version}.tgz"
+    local docker_version=$(curl -s https://gh-proxy.org/https://api.github.com/repos/docker/docker-ce/releases/latest 2>/dev/null | grep '"tag_name":' | cut -d'"' -f4 | sed 's/v//')
+    local docker_url="https://gh-proxy.org/https://download.docker.com/linux/static/stable/x86_64/docker-${docker_version}.tgz"
     
     if curl -fsSL "$docker_url" | sudo tar -xz -C /usr/local/bin --strip-components=1 docker/docker 2>/dev/null; then
         sudo chmod +x /usr/local/bin/docker
@@ -1437,10 +1435,10 @@ install_docker_centos7() {
         sudo tee /etc/yum.repos.d/docker-ce.repo > /dev/null <<'EOF'
 [docker-ce-stable]
 name=Docker CE Stable - $basearch
-baseurl=https://download.docker.com/linux/centos/7/stable/x86_64
+baseurl=https://gh-proxy.org/https://download.docker.com/linux/centos/7/stable/x86_64
 enabled=1
 gpgcheck=1
-gpgkey=https://download.docker.com/linux/centos/gpg
+gpgkey=https://gh-proxy.org/https://download.docker.com/linux/centos/gpg
 EOF
     fi
     
@@ -3100,7 +3098,7 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
             18)
                 tts_provider_key="PaddleSpeechTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了百度飞桨 PaddleSpeech TTS。${RESET}"
-                echo -e "${CYAN}🔧 需要部署 PaddleSpeech 服务：https://github.com/PaddlePaddle/PaddleSpeech${RESET}"
+                echo -e "${CYAN}🔧 需要部署 PaddleSpeech 服务：https://gh-proxy.org/https://github.com/PaddlePaddle/PaddleSpeech${RESET}"
                 echo -e "${CYAN}📝 默认服务地址：ws://127.0.0.1:8092/paddlespeech/tts/streaming${RESET}"
                 safe_read "请输入服务地址 (默认: ws://127.0.0.1:8092/paddlespeech/tts/streaming): " url
                 url="${url:-ws://127.0.0.1:8092/paddlespeech/tts/streaming}"
@@ -9484,6 +9482,7 @@ convert_asr_to_cloud() {
             ;;
     esac
     
+
     echo -e "${GREEN}✅ 转换完成！配置文件路径: $config_file${RESET}"
 }
 
