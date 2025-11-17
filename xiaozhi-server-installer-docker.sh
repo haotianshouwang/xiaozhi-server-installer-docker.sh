@@ -6,12 +6,12 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.71
+# 版本：1.2.72
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板"
-Version="1.2.71"
+Version="1.2.72"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -8902,16 +8902,22 @@ configure_persona_settings() {
     echo -e "${PURPLE}==================================================${RESET}"
     
     echo "人设配置将定义小智的性格、说话方式和交互特点"
-    echo -e "${YELLOW}💡 字符数限制：2000字以内${RESET}"
+    echo -e "${YELLOW}💡 字符数限制：4000字以内${RESET}"
+    echo -e "${YELLOW}📋 请输入完整的人设描述，包括核心特征和交互指南${RESET}"
     echo
-    read -r -p "请输入人设描述（您可以描述小智的性格、说话习惯等）: " persona_input
+    echo "示例格式："
+    echo "你是小智/小志，来自中国台湾省的00后女生。讲话超级机车，"真的假的啦"这样的中国台湾腔..."
+    echo -e "${CYAN}----------------------------------------${RESET}"
+    echo
+    
+    read -r -p "请输入完整的人设描述: " persona_input
     
     # 检查字符数
     persona_length=${#persona_input}
-    if [ $persona_length -gt 2000 ]; then
-        echo -e "${RED}❌ 人设描述超过2000字符限制（当前：$persona_length字符）${RESET}"
-        read -r -p "按回车键重新输入..." < /dev/tty
-        configure_persona_settings
+    if [ $persona_length -gt 4000 ]; then
+        echo -e "${RED}❌ 人设描述超过4000字符限制（当前：$persona_length字符）${RESET}"
+        echo -e "${YELLOW}按回车键返回主菜单...${RESET}"
+        sleep 2
         return 1
     fi
     
@@ -8924,22 +8930,53 @@ configure_persona_settings() {
     if [[ "$confirm_persona" =~ ^[Yy]$ ]]; then
         [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
         
-        # 添加或更新personality字段
-        if grep -q "^personality:" "$CONFIG_FILE"; then
-            sed -i "s|^personality:.*|personality: \"$persona_input\"|" "$CONFIG_FILE"
+        # 创建临时文件处理多行文本
+        temp_file="/tmp/persona_config_$$"
+        
+        # 检查是否存在角色模型配置区域
+        if grep -q "以下是角色模型配置" "$CONFIG_FILE"; then
+            echo "找到角色模型配置区域，正在更新..."
+            
+            # 移除旧的prompt字段
+            if grep -q "^prompt:" "$CONFIG_FILE"; then
+                sed -i '/^prompt:/,/^$/d' "$CONFIG_FILE"
+            fi
+            
+            # 在角色模型配置区域后添加新的prompt字段
+            sed -i '/以下是角色模型配置/a\    prompt: |' "$CONFIG_FILE"
+            
+            # 添加人设描述的每一行
+            printf '%s\n' "$persona_input" | while IFS= read -r line; do
+                sed -i '/^    prompt: |/a\      '"$line" "$CONFIG_FILE"
+            done
+            
+            # 添加空行
+            echo "" >> "$CONFIG_FILE"
         else
+            echo "未找到角色模型配置区域，创建新配置..."
+            # 在配置文件末尾添加完整的角色配置
             cat >> "$CONFIG_FILE" << EOF
 
-# 角色人设配置
-personality: "$persona_input"
+# #####################################################################################
+# ################################以下是角色模型配置######################################
+prompt: |
+  $persona_input
+
 EOF
         fi
         
+        # 移除旧的personality字段（如果存在）
+        if grep -q "^personality:" "$CONFIG_FILE"; then
+            sed -i "/^personality:/d" "$CONFIG_FILE"
+        fi
+        
         echo -e "${GREEN}✅ 人设配置保存成功！配置文件已更新${RESET}"
-        echo -e "${CYAN}💡 这个人设将在小智的对话中使用${RESET}"
+        echo -e "${CYAN}💡 完整的角色配置已添加到"prompt"字段${RESET}"
         echo -e "${CYAN}📝 配置文件位置: $CONFIG_FILE${RESET}"
     else
         echo -e "${YELLOW}⚠️ 人设配置已取消${RESET}"
+        echo -e "${YELLOW}按回车键返回主菜单...${RESET}"
+        sleep 2
         return 1
     fi
 }
@@ -9669,5 +9706,4 @@ convert_asr_to_cloud() {
 }
 
 # 启动脚本执行
-main "$@"
 main "$@"
