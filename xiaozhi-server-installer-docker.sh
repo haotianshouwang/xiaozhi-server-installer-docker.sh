@@ -289,12 +289,13 @@ main_menu() {
         echo "1) 重新开始部署 (删除现有并重新部署)"
         echo "2) 更新服务器 (保留配置，更新到最新版本)"
         echo "3) 仅修改配置文件 (不下载服务器文件)"
-        echo "4) 测试服务器连接"
-        echo "5) 测试服务器端口 (详细端口测试)"
-        echo "6) Docker操作工具 (服务管理/镜像清理/系统维护)"
-        echo "7) 系统监控工具 (实时系统状态监控)"
-        echo "8) 查看Docker日志"
-        echo "9) 删除服务器 (完全删除所有数据)"
+        echo "4) 配置文件管理 (配置TTS/ASR/LLM/人设等)"
+        echo "5) 测试服务器连接"
+        echo "6) 测试服务器端口 (详细端口测试)"
+        echo "7) Docker操作工具 (服务管理/镜像清理/系统维护)"
+        echo "8) 系统监控工具 (实时系统状态监控)"
+        echo "9) 查看Docker日志"
+        echo "10) 删除服务器 (完全删除所有数据)"
         echo "Q) 退出脚本"
     else
         echo -e "${GREEN}欢迎使用小智服务器部署脚本${RESET}"
@@ -356,9 +357,9 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
             break
             ;;
         4)
-            # 测试服务器连接
+            # 配置文件管理
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
-                test_server
+                config_management_menu
                 break  
             else
                 echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
@@ -367,7 +368,7 @@ read -r -p "按回车键继续..." </dev/tty
                 break 
             fi
             ;;
-        5)
+        6)
             # 测试服务器端口
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 test_ports
@@ -379,12 +380,12 @@ read -r -p "按回车键继续..." </dev/tty
                 break
             fi
             ;;
-        6)
+        7)
             # Docker操作工具
             docker_operation_tool_menu
             break
             ;;
-        7)
+        8)
             # 系统监控工具（仅已部署状态可用）
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
                 system_monitor_tool
@@ -396,12 +397,12 @@ read -r -p "按回车键继续..." </dev/tty
                 break
             fi
             ;;
-        8)
+        9)
             # 查看Docker日志
             docker_logs
             break  
             ;;
-        9)
+        10)
             # 删除服务器
             if [ "$SERVER_DIR_EXISTS" = true ] || [ "$CONTAINER_EXISTS" = true ]; then
                 delete_server
@@ -3498,13 +3499,26 @@ config_keys() {
                         continue
                     fi
                     ;;
+                6)
+                    echo -e "\n${CYAN}=== [6/7]：配置人设 (角色人格设定) ===${RESET}"
+                    configure_persona_settings
+                    local persona_result=$?
+                    if [ $persona_result -eq 2 ]; then
+                        echo -e "\n${YELLOW}⚠️ 用户取消配置${RESET}"
+                        return 1
+                    elif [ $persona_result -eq 1 ]; then
+                        config_step=5  # 返回上一步
+                        echo -e "\n${CYAN}🔄 返回上一步${RESET}"
+                        continue
+                    fi
+                    ;;
             esac
             config_step=$((config_step + 1))
         done
         
         echo -e "\n${GREEN}🎉 所有服务配置完成！${RESET}"
         
-        echo -e "\n${CYAN}=== [6/6]：配置服务器地址 (自动生成) ===${RESET}"
+        echo -e "\n${CYAN}=== [7/7]：配置服务器地址 (自动生成) ===${RESET}"
         config_server
         if [ $? -eq 1 ]; then
             echo -e "\n${CYAN}=== 配置 Memory (记忆) 服务 ===${RESET}"
@@ -5407,11 +5421,57 @@ read -r -p "按回车键返回主菜单..." < /dev/tty
     SKIP_DETAILED_CONFIG=false
     
     echo -e "${CYAN}⚙️ 开始修改配置...${RESET}"
-    config_keys
-    if [ $? -eq 1 ]; then
-        echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
-        return 1
-    fi
+    
+    # 进入配置选择循环
+    while true; do
+        echo ""
+        echo -e "${YELLOW}选择配置方式：${RESET}"
+        echo "1) 快速配置向导 (推荐新手使用)"
+        echo "2) 配置文件管理 (配置TTS/ASR/LLM/人设等)"
+        echo "3) 退出"
+        echo -e "${PURPLE}==================================================${RESET}"
+        read -r -p "请选择 (1-3，默认1): " choice < /dev/tty
+        choice=${choice:-1}
+        
+        case $choice in
+            1)
+                # 快速配置向导 - 保持原config_keys流程
+                config_keys
+                if [ $? -eq 1 ]; then
+                    echo -e "${CYAN}🔄 用户取消配置，返回主菜单${RESET}"
+                    return 1
+                fi
+                echo -e "${GREEN}✅ 快速配置完成！${RESET}"
+                break
+                ;;
+            2)
+                # 配置文件管理菜单
+                while true; do
+                    config_management_menu
+                    if [ $? -eq 0 ]; then
+                        echo -e "${GREEN}✅ 配置完成！${RESET}"
+                        break
+                    else
+                        echo -e "${YELLOW}⚠️ 配置被取消或失败${RESET}"
+                        read -r -p "是否重新进入配置菜单？(y/n，默认y): " retry < /dev/tty
+                        retry=${retry:-y}
+                        if [[ "$retry" != "y" && "$retry" != "Y" ]]; then
+                            break
+                        fi
+                    fi
+                done
+                break
+                ;;
+            3)
+                echo -e "${CYAN}🔄 已退出配置，返回主菜单${RESET}"
+                return 1
+                ;;
+            *)
+                echo -e "${RED}❌ 无效选择，请重新输入${RESET}"
+                continue
+                ;;
+        esac
+    done
     
     # 重启服务
     echo -e "${CYAN}🔄 重启服务以应用新配置...${RESET}"
