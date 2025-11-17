@@ -6611,9 +6611,9 @@ docker_installation_management() {
                     echo -e "${YELLOW}这将强制删除所有Docker相关的文件、命令和服务！${RESET}"
                     echo -e "${YELLOW}适合解决Docker卸载不彻底的问题${RESET}"
                     echo -e "${YELLOW}包括所有镜像、容器、数据卷等！${RESET}"
-                    read -r -p "确认强制卸载Docker? 输入 'UNINSTALL' 确认: " confirm_uninstall < /dev/tty
-                    if [ "$confirm_funinstall" = "UNINSTALL" ]; then
-                        uninstall_docker
+                    read -r -p "确认强制卸载Docker? 输入 'FORCE_UNINSTALL' 确认: " confirm_force_uninstall < /dev/tty
+                    if [ "$confirm_force_uninstall" = "FORCE_UNINSTALL" ]; then
+                        force_uninstall_docker
                     else
                         echo -e "${CYAN}🚫 强制卸载操作已取消${RESET}"
                         sleep 2
@@ -6974,7 +6974,7 @@ uninstall_docker() {
 }
 
 # Docker强制完全卸载函数
-uninstall_docker() {
+force_uninstall_docker() {
     echo -e "\n${RED}🔥 Docker强制完全卸载工具${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     echo -e "${YELLOW}⚠️ 这将强制删除所有Docker相关的文件、命令和服务！${RESET}"
