@@ -2109,7 +2109,6 @@ config_asr_advanced() {
             echo -e "${GREEN}✅ VoskASR本地ASR配置完成${RESET}"
             return 0
             ;;
-            ;;
         6)
             config_aliyun_asr
             ;;
@@ -9951,4 +9950,5 @@ convert_asr_to_cloud() {
 }
 
 # 启动脚本执行
+main "$@"
 main "$@"
