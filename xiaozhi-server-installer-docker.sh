@@ -2,151 +2,68 @@
 set -uo pipefail
 trap exit_confirm SIGINT
 
-# ========================================================
+# ========================= 基础配置 =========================
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：2.0.0
+# 版本：1.2.68
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
+AUTHOR="昊天兽王" 
+SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板"
+Version="1.2.61"
 
-# ========================= 常量定义 =========================
-readonly SCRIPT_AUTHOR="昊天兽王"
-readonly SCRIPT_NAME="xiaozhi-server-installer"
-readonly SCRIPT_VERSION="2.0.0"
-readonly SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板 "
+# 配置文件链接
+CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
+CONFIG_FILE_URL_BACKUP="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
+CONFIG_FILE_URL_FALLBACK="https://mirror.ghproxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
+DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/docker-compose.yml"
 
-# ========================= URL和路径配置 =========================
+MAIN_DIR="$HOME/xiaozhi-server"
+CONTAINER_NAME="xiaozhi-esp32-server"
 
-# 官方配置文件下载链接（多级备用）
-readonly CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
-readonly CONFIG_FILE_URL_BACKUP="https://gh-proxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
-readonly CONFIG_FILE_URL_FALLBACK="https://mirror.ghproxy.com/https://raw.githubusercontent.com/xinnan-tech/xiaozhi-esp32-server/refs/heads/main/xiaozhi-server/config.yaml"
+CONFIG_FILE="$MAIN_DIR/data/.config.yaml"
+LOCAL_ASR_MODEL_URL="https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/model.pt"
+RETRY_MAX=3
+RETRY_DELAY=3
 
-# Docker Compose文件链接
-readonly DOCKER_COMPOSE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/docker-compose.yml"
+# 颜色定义
+RED="\033[31m" GREEN="\033[32m" YELLOW="\033[33m" BLUE="\033[34m" PURPLE="\033[35m" CYAN="\033[36m" WHITE_RED="\033[31;47;1m" RESET="\033[0m" BOLD="\033[1m"
 
-# 本地ASR模型下载链接
-readonly LOCAL_ASR_MODEL_URL="https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/model.pt"
-
-# ========================= 系统路径配置 =========================
-readonly MAIN_DIR="$HOME/xiaozhi-server"
-readonly CONTAINER_NAME="xiaozhi-esp32-server"
-readonly CONFIG_FILE="$MAIN_DIR/data/.config.yaml"
-
-# ========================= 通用配置 =========================
-readonly RETRY_MAX=3
-readonly RETRY_DELAY=3
-
-# ========================= 颜色主题 =========================
-readonly COLOR_RED="\033[31m"
-readonly COLOR_GREEN="\033[32m"
-readonly COLOR_YELLOW="\033[33m"
-readonly COLOR_BLUE="\033[34m"
-readonly COLOR_PURPLE="\033[35m"
-readonly COLOR_CYAN="\033[36m"
-readonly COLOR_WHITE_RED="\033[31;47;1m"
-readonly COLOR_RESET="\033[0m"
-readonly COLOR_BOLD="\033[1m"
-
-# 兼容性别名
-readonly RED="${COLOR_RED}" 
-readonly GREEN="${COLOR_GREEN}" 
-readonly YELLOW="${COLOR_YELLOW}" 
-readonly BLUE="${COLOR_BLUE}" 
-readonly PURPLE="${COLOR_PURPLE}" 
-readonly CYAN="${COLOR_CYAN}" 
-readonly WHITE_RED="${COLOR_WHITE_RED}" 
-readonly RESET="${COLOR_RESET}" 
-readonly BOLD="${COLOR_BOLD}"
-
-# ========================= 全局变量定义 =========================
-
-# 用户配置变量
+# 全局变量
 CHATGLM_API_KEY=""
+IS_MEMORY_SUFFICIENT=false
+IS_SHERPA_PARAFORMER_AVAILABLE=false
+CPU_MODEL="" CPU_CORES="" MEM_TOTAL="" DISK_AVAIL=""
+NET_INTERFACE="" NET_SPEED="" INTERNAL_IP="" EXTERNAL_IP="" OS_VERSION=""
+CURRENT_DEPLOY_TYPE="" CONFIG_DOWNLOAD_NEEDED="true" USE_EXISTING_CONFIG=false SKIP_DETAILED_CONFIG=false
 
-# 系统检测变量
-readonly IS_MEMORY_SUFFICIENT=false
-readonly IS_SHERPA_PARAFORMER_AVAILABLE=false
-
-# 系统信息变量
-CPU_MODEL=""
-CPU_CORES=""
-MEM_TOTAL=""
-DISK_AVAIL=""
-NET_INTERFACE=""
-NET_SPEED=""
-INTERNAL_IP=""
-EXTERNAL_IP=""
-OS_VERSION=""
-
-# 部署配置变量
-CURRENT_DEPLOY_TYPE=""
-CONFIG_DOWNLOAD_NEEDED="true"
-USE_EXISTING_CONFIG=false
-SKIP_DETAILED_CONFIG=false
-
-# ========================= 服务器状态变量 =========================
+# 服务器状态检测变量
 CONTAINER_RUNNING=false
 CONTAINER_EXISTS=false
 SERVER_DIR_EXISTS=false
 CONFIG_EXISTS=false
 
-# ========================= Docker信息变量 =========================
-DOCKER_VERSION=""
-DOCKER_STATUS=""
-DOCKER_CONTAINER_STATUS=""
+# ========================= 工具函数 =========================
 
-# ========================= 核心工具函数 =========================
-
-# 安全输入函数 - 确保输入操作在正确的目录下执行
-# 防止在错误目录下执行操作导致配置或文件丢失
+# 安全输入函数，确保工作目录稳定
 safe_read() {
-    echo -n "请输入: " >&2
-    read -r
-    echo "$REPLY"
-}
-
-# 退出确认函数 - 优雅退出脚本
-# 在用户按Ctrl+C或选择退出时调用
-exit_confirm() {
-    echo -e "\n\n${YELLOW}⚠️  脚本执行被中断${RESET}"
-    echo -e "${CYAN}感谢使用小智服务器部署脚本！${RESET}"
-    echo -e "${BLUE}如有问题请反馈给开发者：${SCRIPT_AUTHOR}${RESET}"
-    exit 130
-}
-
-# 重试执行函数 - 自动重试失败的命令
-# 参数: $1=命令, $2=重试次数(可选), $3=重试间隔(可选)
-retry_exec() {
-    local command="$1"
-    local max_attempts="${2:-$RETRY_MAX}"
-    local delay="${3:-$RETRY_DELAY}"
-    local attempt=1
+    local prompt="$1"
+    local var_name="$2"
     
-    while [ $attempt -le $max_attempts ]; do
-        echo -e "${CYAN}🔄 执行第${attempt}次尝试...${RESET}"
-        if eval "$command"; then
-            echo -e "${GREEN}✅ 命令执行成功${RESET}"
-            return 0
-        else
-            echo -e "${YELLOW}⚠️  第${attempt}次尝试失败${RESET}"
-            if [ $attempt -lt $max_attempts ]; then
-                echo -e "${YELLOW}⏳ 等待${delay}秒后重试...${RESET}"
-                sleep "$delay"
-            fi
-        fi
-        attempt=$((attempt + 1))
-    done
+    # 保存当前工作目录
+    local pwd_backup
+    pwd_backup="$(pwd)" 2>/dev/null || pwd_backup="/tmp"
     
-    echo -e "${RED}❌ 命令执行失败，已重试${max_attempts}次${RESET}"
-    return 1
+    # 执行读取操作
+read -r -p "$prompt" "$var_name" < /dev/tty
+    
+    # 恢复工作目录
+    cd "$pwd_backup" 2>/dev/null || true
+    
+    return 0
 }
 
-# ========================= 系统权限检测函数 =========================
-
-# 检查root权限函数
-# 确保脚本在适当的权限下运行
 check_root_permission() {
     echo -e "\n${CYAN}🔐 检查root权限...${RESET}"
     if [ "$EUID" -eq 0 ]; then
@@ -283,33 +200,9 @@ check_server_status() {
         fi
     fi
     
-    # 检查目录
+    # 检查目录和配置文件
     [ -d "$MAIN_DIR" ] && SERVER_DIR_EXISTS=true
-    
-    # 检查多个可能的配置文件位置
-    CONFIG_FOUND=false
-    CONFIG_LOCATIONS=(
-        "$CONFIG_FILE"                           # 标准位置: $HOME/xiaozhi-server/data/.config.yaml
-        "$MAIN_DIR/.config.yaml"                 # 备选位置1: $HOME/xiaozhi-server/.config.yaml
-        "$HOME/xiaozhi-server/.config.yaml"      # 备选位置2
-    )
-    
-    for config_path in "${CONFIG_LOCATIONS[@]}"; do
-        if [ -f "$config_path" ]; then
-            CONFIG_EXISTS=true
-            CONFIG_FOUND=true
-            echo -e "${GREEN}📄 找到配置文件: $config_path${RESET}"
-            break
-        fi
-    done
-    
-    if [ "$CONFIG_FOUND" = false ]; then
-        CONFIG_EXISTS=false
-        echo -e "${YELLOW}⚠️ 未找到配置文件在这些位置:${RESET}"
-        for config_path in "${CONFIG_LOCATIONS[@]}"; do
-            echo "  - $config_path"
-        done
-    fi
+    [ -f "$CONFIG_FILE" ] && CONFIG_EXISTS=true
     
     echo -e "${CYAN}📊 服务器状态检测结果：${RESET}"
     echo "  - Docker容器存在：$([ "$CONTAINER_EXISTS" = true ] && echo "✅ 是" || echo "❌ 否")"
@@ -378,16 +271,15 @@ main_menu() {
         echo "7) 系统监控工具 (实时系统状态监控)"
         echo "8) 查看Docker日志"
         echo "9) 删除服务器 (完全删除所有数据)"
-        echo "Q) 退出脚本"
+        echo "0) 退出脚本"
     else
         echo -e "${GREEN}欢迎使用小智服务器部署脚本${RESET}"
         echo
         echo "请选择操作："
         echo "1) 开始部署小智服务器"
         echo "2) Docker操作工具 (服务管理/镜像清理/系统维护)"
-        echo "3) 配置文件管理 (配置TTS/ASR/LLM/人设等)"
-        echo "4) 系统监控工具 (实时系统状态监控)"
-        echo "Q) 退出脚本"
+        echo "3) 系统监控工具 (实时系统状态监控)"
+        echo "0) 退出脚本"
     fi
     
     echo -e "${PURPLE}==================================================${RESET}"
@@ -433,8 +325,8 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
                 # 已部署 -> 仅修改配置文件
                 config_only
             else
-                # 未部署 -> 配置文件管理
-                config_management_menu
+                # 未部署 -> 系统监控工具
+                system_monitor_tool
             fi
             break
             ;;
@@ -494,16 +386,16 @@ read -r -p "按回车键继续..." </dev/tty
             fi
             break 
             ;;
-        Q|q|0)
+        0)
             echo -e "${GREEN}👋 感谢使用，脚本退出${RESET}"
             exit 0
             ;;
         *)
             echo -e "${RED}❌ 无效选项，请重新选择${RESET}"
             if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
-                echo -e "${CYAN}💡 已部署：1-9,Q | 未部署：1-4,Q${RESET}"
+                echo -e "${CYAN}💡 已部署：1-9,0 | 未部署：1-3,0${RESET}"
             else
-                echo -e "${CYAN}💡 未部署：1-4,Q${RESET}"
+                echo -e "${CYAN}💡 未部署：1-3,0${RESET}"
             fi
             sleep 2
             # 不使用return，而是继续循环让用户重新输入
@@ -1082,15 +974,15 @@ install_docker_opencloudos() {
             
             # 添加Docker仓库
             echo -e "${BLUE}配置Docker软件仓库...${RESET}"
-            if ! sudo yum-config-manager --add-repo https://gh-proxy.org/https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null; then
+            if ! sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null; then
                 # 如果添加失败，手动创建repo文件
                 sudo mkdir -p /etc/yum.repos.d
                 echo "[docker-ce-stable]
 name=Docker CE Stable - \$basearch
-baseurl=https://gh-proxy.org/https://download.docker.com/linux/centos/\$releasever/stable/\$basearch
+baseurl=https://download.docker.com/linux/centos/\$releasever/stable/\$basearch
 enabled=1
 gpgcheck=1
-gpgkey=https://gh-proxy.org/https://download.docker.com/linux/centos/gpg" | sudo tee /etc/yum.repos.d/docker-ce.repo > /dev/null
+gpgkey=https://download.docker.com/linux/centos/gpg" | sudo tee /etc/yum.repos.d/docker-ce.repo > /dev/null
             fi
             
             # 安装Docker
@@ -1107,8 +999,8 @@ gpgkey=https://gh-proxy.org/https://download.docker.com/linux/centos/gpg" | sudo
     echo -e "${CYAN}尝试使用Docker静态二进制文件安装...${RESET}"
     
     # 获取最新Docker版本
-    local docker_version=$(curl -s https://gh-proxy.org/https://api.github.com/repos/docker/docker-ce/releases/latest 2>/dev/null | grep '"tag_name":' | cut -d'"' -f4 | sed 's/v//')
-    local docker_url="https://gh-proxy.org/https://download.docker.com/linux/static/stable/x86_64/docker-${docker_version}.tgz"
+    local docker_version=$(curl -s https://api.github.com/repos/docker/docker-ce/releases/latest 2>/dev/null | grep '"tag_name":' | cut -d'"' -f4 | sed 's/v//')
+    local docker_url="https://download.docker.com/linux/static/stable/x86_64/docker-${docker_version}.tgz"
     
     if curl -fsSL "$docker_url" | sudo tar -xz -C /usr/local/bin --strip-components=1 docker/docker 2>/dev/null; then
         sudo chmod +x /usr/local/bin/docker
@@ -1429,10 +1321,10 @@ install_docker_centos7() {
         sudo tee /etc/yum.repos.d/docker-ce.repo > /dev/null <<'EOF'
 [docker-ce-stable]
 name=Docker CE Stable - $basearch
-baseurl=https://gh-proxy.org/https://download.docker.com/linux/centos/7/stable/x86_64
+baseurl=https://download.docker.com/linux/centos/7/stable/x86_64
 enabled=1
 gpgcheck=1
-gpgkey=https://gh-proxy.org/https://download.docker.com/linux/centos/gpg
+gpgkey=https://download.docker.com/linux/centos/gpg
 EOF
     fi
     
@@ -3092,7 +2984,7 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
             18)
                 tts_provider_key="PaddleSpeechTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了百度飞桨 PaddleSpeech TTS。${RESET}"
-                echo -e "${CYAN}🔧 需要部署 PaddleSpeech 服务：https://gh-proxy.org/https://github.com/PaddlePaddle/PaddleSpeech${RESET}"
+                echo -e "${CYAN}🔧 需要部署 PaddleSpeech 服务：https://github.com/PaddlePaddle/PaddleSpeech${RESET}"
                 echo -e "${CYAN}📝 默认服务地址：ws://127.0.0.1:8092/paddlespeech/tts/streaming${RESET}"
                 safe_read "请输入服务地址 (默认: ws://127.0.0.1:8092/paddlespeech/tts/streaming): " url
                 url="${url:-ws://127.0.0.1:8092/paddlespeech/tts/streaming}"
@@ -3410,62 +3302,22 @@ config_keys() {
             break  # 退出循环，进入详细配置
         fi
         
-        # 处理本地ASR转云服务选项（选项1）
+        # 处理默认配置选项（选项1）
         if [ "$key_choice" = "1" ]; then
             echo -e "\n${YELLOW}⚠️ 已选择稍后手动填写。${RESET}"
-            echo -e "${CYAN}ℹ️ 脚本将修改现有配置文件，将本地ASR模型替换为云服务ASR。${RESET}"
-            echo -e "${CYAN}ℹ️ 这样可以避免服务启动失败，同时保留您的其他配置。${RESET}"
-            echo ""
+            echo -e "${CYAN}ℹ️ 为防止服务启动失败，脚本将创建干净的默认配置文件。${RESET}"
+            echo -e "${CYAN}ℹ️ 您可以稍后在配置文件中修改为您喜欢的服务商。配置文件路径：$CONFIG_FILE${RESET}"
             
-            # 检查现有配置文件
-            if [ ! -f "$CONFIG_FILE" ]; then
-                echo -e "${YELLOW}⚠️ 未找到现有配置文件，将创建默认配置并转换ASR。${RESET}"
-                create_default_config_file
-            fi
+            # 创建干净的默认配置文件
+            create_default_config_file
             
-            # 选择云服务ASR
-            echo "请选择要转换的云服务ASR："
-            echo "1) 阿里云ASR"
-            echo "2) 腾讯云ASR"  
-            echo "3) 火山引擎ASR"
-            echo "4) OpenAI Whisper"
-            echo "5) 百度ASR"
-            read -r -p "请选择云服务ASR (1-5): " cloud_asr_choice
-            
-            # 执行ASR转换
-            case $cloud_asr_choice in
-                1)
-                    echo -e "${CYAN}🔄 正在转换为阿里云ASR...${RESET}"
-                    convert_asr_to_cloud "aliyun" "$CONFIG_FILE"
-                    ;;
-                2)
-                    echo -e "${CYAN}🔄 正在转换为腾讯云ASR...${RESET}"
-                    convert_asr_to_cloud "tencent" "$CONFIG_FILE"
-                    ;;
-                3)
-                    echo -e "${CYAN}🔄 正在转换为火山引擎ASR...${RESET}"
-                    convert_asr_to_cloud "doubao" "$CONFIG_FILE"
-                    ;;
-                4)
-                    echo -e "${CYAN}🔄 正在转换为OpenAI Whisper...${RESET}"
-                    convert_asr_to_cloud "openai" "$CONFIG_FILE"
-                    ;;
-                5)
-                    echo -e "${CYAN}🔄 正在转换为百度ASR...${RESET}"
-                    convert_asr_to_cloud "baidu" "$CONFIG_FILE"
-                    ;;
-                *)
-                    echo -e "${RED}❌ 无效选择，使用默认云服务ASR${RESET}"
-                    convert_asr_to_cloud "aliyun" "$CONFIG_FILE"
-                    ;;
-            esac
-            
-            # 设置标志
-            export KEY_CONFIG_MODE="manual"
+            # 设置标志，告知setup_config_file使用默认配置
+            export USE_DEFAULT_CONFIG=true
             CURRENT_DEPLOY_TYPE="internal"
+            export KEY_CONFIG_MODE="manual"
             
-            echo -e "\n${GREEN}✅ 配置文件已更新，将本地ASR转换为云服务ASR${RESET}"
-            echo -e "${CYAN}📋 配置文件路径：$CONFIG_FILE${RESET}"
+            # 直接返回，不进入配置步骤循环
+            echo -e "\n${CYAN}📋 已创建默认配置文件：$CONFIG_FILE${RESET}"
             echo -e "${CYAN}🔄 正在准备启动服务...${RESET}"
             return 0  # 直接返回，不进入配置步骤循环
         fi
@@ -7128,8 +6980,13 @@ force_uninstall_docker() {
     echo -e "${YELLOW}⚠️ 这将强制删除所有Docker相关的文件、命令和服务！${RESET}"
     echo -e "${CYAN}🔧 适合解决Docker卸载不彻底的问题${RESET}"
     
-    # Docker操作通常需要root权限，取消root检查
-    echo -e "${GREEN}ℹ️ 检测到root权限，Docker操作将正常执行${RESET}"
+    # 检查是否以root权限运行
+    if [[ $EUID -eq 0 ]]; then
+        echo -e "${RED}❌ 请不要以root权限运行此脚本${RESET}"
+        echo -e "${CYAN}使用方式: sudo bash $0${RESET}"
+        read -r -p "按回车键继续..." < /dev/tty
+        return 1
+    fi
     
     # 确认操作
     echo -e "\n${YELLOW}确认要强制完全卸载Docker吗？${RESET}"
@@ -7140,8 +6997,8 @@ force_uninstall_docker() {
     echo -e "  • 所有Docker系统服务和配置文件"
     echo -e "  • docker用户组和权限"
     echo ""
-    read -r -p "输入 'UNINSTALL' 确认强制卸载: " confirm
-    if [ "$confirm" != "UNINSTALL" ]; then
+    read -r -p "输入 'FORCE_UNINSTALL' 确认强制卸载: " confirm
+    if [ "$confirm" != "FORCE_UNINSTALL" ]; then
         echo -e "${YELLOW}操作已取消${RESET}"
         sleep 1
         return 0
@@ -7402,6 +7259,25 @@ force_uninstall_docker() {
     
     read -r -p "按回车键继续..." < /dev/tty
     return 0
+}
+
+# 检测包管理器
+detect_package_manager() {
+    if command -v apt-get &> /dev/null; then
+        echo "apt"
+    elif command -v yum &> /dev/null; then
+        echo "yum"
+    elif command -v dnf &> /dev/null; then
+        echo "dnf"
+    elif command -v pacman &> /dev/null; then
+        echo "pacman"
+    elif command -v zypper &> /dev/null; then
+        echo "zypper"
+    elif command -v apk &> /dev/null; then
+        echo "apk"
+    else
+        echo "unknown"
+    fi
 }
 
 # Docker服务修复函数
@@ -8331,839 +8207,54 @@ update_control_hints() {
     return 0
 }
 
-# 更新Docker信息
-update_enhanced_docker_info() {
-    if command -v docker &> /dev/null; then
-        DOCKER_VERSION=$(docker --version 2>/dev/null | head -n1 || echo "未知版本")
-        DOCKER_STATUS="已安装"
-        if docker ps 2>/dev/null | grep -q "$CONTAINER_NAME"; then
-            DOCKER_CONTAINER_STATUS="运行中"
-        elif docker ps -a 2>/dev/null | grep -q "$CONTAINER_NAME"; then
-            DOCKER_CONTAINER_STATUS="已停止"
-        else
-            DOCKER_CONTAINER_STATUS="不存在"
-        fi
-    else
-        DOCKER_VERSION="未安装"
-        DOCKER_STATUS="未安装"
-        DOCKER_CONTAINER_STATUS="不存在"
-    fi
-    
-    echo -e "\033[1;33m【Docker信息】\033[0m"
-    echo -e "\033[1;37m  🐳 Docker版本: \033[1;32m$DOCKER_VERSION\033[0m"
-    echo -e "\033[1;37m  📊 状态: \033[1;32m$DOCKER_STATUS\033[0m"
-    echo -e "\033[1;37m  🐋 容器状态: \033[1;32m$DOCKER_CONTAINER_STATUS\033[0m"
-}
-
-# ========================= 配置文件管理菜单 =========================
-config_management_menu() {
-    clear
-    while true; do
-        clear
-        echo -e "\n${PURPLE}==================================================${RESET}"
-        echo -e "${CYAN}📄 配置文件管理工具 📄${RESET}"
-        echo -e "${PURPLE}==================================================${RESET}"
-        
-        echo -e "\n${WHITE_RED}配置文件管理选项:${RESET}"
-        echo "1) TTS配置 (文本转语音服务)"
-        echo "2) ASR配置 (语音识别服务)"
-        echo "3) LLM配置 (大语言模型)"
-        echo "4) 人设配置 (角色人格设定)"
-        echo "5) 服务器配置 (基础服务器设置)"
-        echo "6) 插件配置 (天气/音乐等插件)"
-        echo "7) 检查配置文件"
-        echo "8) 备份/恢复配置"
-        echo "9) 转换本地ASR为云服务"
-        echo "Q) 返回主菜单"
-        echo -e "${PURPLE}==================================================${RESET}"
-        
-        read -r -p "请选择配置文件操作 (1-9,Q): " config_choice < /dev/tty
-        
-        case $config_choice in
-            1)
-                configure_tts_service
-                ;;
-            2)
-                configure_asr_service
-                ;;
-            3)
-                configure_llm_service
-                ;;
-            4)
-                configure_persona_settings
-                ;;
-            5)
-                configure_server_settings
-                ;;
-            6)
-                configure_plugins
-                ;;
-            7)
-                check_config_file_status
-                ;;
-            8)
-                backup_restore_config
-                ;;
-            9)
-                convert_local_to_cloud_asr
-                ;;
-            Q|q)
-                echo -e "${CYAN}🔙 返回主菜单${RESET}"
-                return 0
-                ;;
-            *)
-                echo -e "${RED}❌ 无效的选项${RESET}"
-                ;;
-        esac
-        
-        echo
-        read -r -p "按回车键继续..." < /dev/tty
-    done
-}
-
-# ========================= TTS配置函数 =========================
-configure_tts_service() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🎙️ TTS服务配置 🎙️${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "请选择TTS服务商："
-    echo "1) EdgeTTS (微软边缘TTS，免费推荐)"
-    echo "2) 阿里云TTS"
-    echo "3) 腾讯云TTS"
-    echo "4) 火山引擎TTS (豆包)"
-    echo "5) OpenAI TTS"
-    echo "6) 百度TTS"
-    echo "7) 科大讯飞TTS"
-    echo "8) 自定义TTS服务"
-    echo "Q) 返回配置菜单"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    read -r -p "请选择TTS服务商 (1-8,Q): " tts_choice < /dev/tty
-    
-    case $tts_choice in
-        1)
-            # EdgeTTS (微软边缘TTS)
-            echo -e "${CYAN}配置EdgeTTS服务...${RESET}"
-            echo -e "${GREEN}✅ EdgeTTS已选择，该服务免费且稳定${RESET}"
-            echo -e "${YELLOW}💡 建议使用默认音色：zh-CN-XiaoxiaoNeural${RESET}"
-            ;;
-        2)
-            # 阿里云TTS
-            echo -e "${CYAN}配置阿里云TTS服务...${RESET}"
-            read -r -p "请输入阿里云AccessKeyId: " ali_access_key_id
-            read -r -p "请输入阿里云AccessKeySecret: " ali_access_key_secret
-            read -r -p "请输入阿里云AppKey: " ali_appkey
-            echo -e "${GREEN}✅ 阿里云TTS配置完成${RESET}"
-            ;;
-        3)
-            # 腾讯云TTS
-            echo -e "${CYAN}配置腾讯云TTS服务...${RESET}"
-            read -r -p "请输入腾讯云SecretId: " tx_secret_id
-            read -r -p "请输入腾讯云SecretKey: " tx_secret_key
-            read -r -p "请输入腾讯云AppId: " tx_appid
-            echo -e "${GREEN}✅ 腾讯云TTS配置完成${RESET}"
-            ;;
-        4)
-            # 火山引擎TTS
-            echo -e "${CYAN}配置火山引擎TTS服务...${RESET}"
-            read -r -p "请输入火山引擎AppId: " huoshan_appid
-            read -r -p "请输入火山引擎AccessToken: " huoshan_access_token
-            echo -e "${GREEN}✅ 火山引擎TTS配置完成${RESET}"
-            ;;
-        5)
-            # OpenAI TTS
-            echo -e "${CYAN}配置OpenAI TTS服务...${RESET}"
-            read -r -p "请输入OpenAI API Key: " openai_api_key
-            echo -e "${GREEN}✅ OpenAI TTS配置完成${RESET}"
-            ;;
-        6)
-            # 百度TTS
-            echo -e "${CYAN}配置百度TTS服务...${RESET}"
-            echo -e "${YELLOW}💡 百度TTS已集成到配置文件中${RESET}"
-            ;;
-        7)
-            # 科大讯飞TTS
-            echo -e "${CYAN}配置科大讯飞TTS服务...${RESET}"
-            read -r -p "请输入讯飞APP ID: " xunfei_app_id
-            read -r -p "请输入讯飞API Key: " xunfei_api_key
-            read -r -p "请输入讯飞API Secret: " xunfei_api_secret
-            echo -e "${GREEN}✅ 科大讯飞TTS配置完成${RESET}"
-            ;;
-        8)
-            # 自定义TTS
-            echo -e "${CYAN}配置自定义TTS服务...${RESET}"
-            read -r -p "请输入TTS服务URL: " custom_tts_url
-            read -r -p "请输入API Key (可选): " custom_tts_key
-            echo -e "${GREEN}✅ 自定义TTS配置完成${RESET}"
-            ;;
-        Q|q)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选择${RESET}"
-            return 1
-            ;;
-    esac
-    
-    echo -e "${GREEN}✅ TTS服务配置完成！${RESET}"
-    echo -e "${CYAN}💡 请确保配置文件正确写入${RESET}"
-}
-
-# ========================= ASR配置函数 =========================
-configure_asr_service() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🎤 ASR服务配置 🎤${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "请选择ASR服务商："
-    echo "1) 本地ASR (FunASR/Sherpa等)"
-    echo "2) 阿里云ASR"
-    echo "3) 腾讯云ASR"
-    echo "4) 火山引擎ASR (豆包)"
-    echo "5) OpenAI Whisper"
-    echo "6) 百度ASR"
-    echo "7) 科大讯飞ASR"
-    echo "8) Groq Whisper"
-    echo "Q) 返回配置菜单"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    read -r -p "请选择ASR服务商 (1-8,Q): " asr_choice < /dev/tty
-    
-    case $asr_choice in
-        1)
-            # 本地ASR
-            echo -e "${CYAN}配置本地ASR服务...${RESET}"
-            echo "选择本地ASR模型："
-            echo "1) FunASR (推荐中文)"
-            echo "2) Sherpa-ONNX (轻量级)"
-            echo "3) Vosk (完全离线)"
-            read -r -p "请选择本地ASR模型 (1-3): " local_asr_choice
-            echo -e "${GREEN}✅ 本地ASR配置完成${RESET}"
-            ;;
-        2)
-            # 阿里云ASR
-            echo -e "${CYAN}配置阿里云ASR服务...${RESET}"
-            read -r -p "请输入阿里云AccessKeyId: " ali_asr_access_key_id
-            read -r -p "请输入阿里云AccessKeySecret: " ali_asr_access_key_secret
-            read -r -p "请输入阿里云AppKey: " ali_asr_appkey
-            echo -e "${GREEN}✅ 阿里云ASR配置完成${RESET}"
-            ;;
-        3)
-            # 腾讯云ASR
-            echo -e "${CYAN}配置腾讯云ASR服务...${RESET}"
-            read -r -p "请输入腾讯云SecretId: " tx_asr_secret_id
-            read -r -p "请输入腾讯云SecretKey: " tx_asr_secret_key
-            read -r -p "请输入腾讯云AppId: " tx_asr_appid
-            echo -e "${GREEN}✅ 腾讯云ASR配置完成${RESET}"
-            ;;
-        4)
-            # 火山引擎ASR
-            echo -e "${CYAN}配置火山引擎ASR服务...${RESET}"
-            read -r -p "请输入火山引擎AppId: " huoshan_asr_appid
-            read -r -p "请输入火山引擎AccessToken: " huoshan_asr_access_token
-            echo -e "${GREEN}✅ 火山引擎ASR配置完成${RESET}"
-            ;;
-        5)
-            # OpenAI Whisper
-            echo -e "${CYAN}配置OpenAI Whisper服务...${RESET}"
-            read -r -p "请输入OpenAI API Key: " openai_whisper_api_key
-            echo -e "${GREEN}✅ OpenAI Whisper配置完成${RESET}"
-            ;;
-        6)
-            # 百度ASR
-            echo -e "${CYAN}配置百度ASR服务...${RESET}"
-            read -r -p "请输入百度AppId: " baidu_asr_app_id
-            read -r -p "请输入百度API Key: " baidu_asr_api_key
-            read -r -p "请输入百度Secret Key: " baidu_asr_secret_key
-            echo -e "${GREEN}✅ 百度ASR配置完成${RESET}"
-            ;;
-        7)
-            # 科大讯飞ASR
-            echo -e "${CYAN}配置科大讯飞ASR服务...${RESET}"
-            read -r -p "请输入讯飞APP ID: " xunfei_asr_app_id
-            read -r -p "请输入讯飞API Key: " xunfei_asr_api_key
-            read -r -p "请输入讯飞API Secret: " xunfei_asr_api_secret
-            echo -e "${GREEN}✅ 科大讯飞ASR配置完成${RESET}"
-            ;;
-        8)
-            # Groq Whisper
-            echo -e "${CYAN}配置Groq Whisper服务...${RESET}"
-            read -r -p "请输入Groq API Key: " groq_api_key
-            echo -e "${GREEN}✅ Groq Whisper配置完成${RESET}"
-            ;;
-        Q|q)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选择${RESET}"
-            return 1
-            ;;
-    esac
-    
-    echo -e "${GREEN}✅ ASR服务配置完成！${RESET}"
-    echo -e "${CYAN}💡 请确保配置文件正确写入${RESET}"
-}
-
-# ========================= LLM配置函数 =========================
-configure_llm_service() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🧠 LLM服务配置 🧠${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "请选择LLM服务商："
-    echo "1) 阿里云通义千问"
-    echo "2) 智谱ChatGLM"
-    echo "3) DeepSeek"
-    echo "4) 火山引擎豆包"
-    echo "5) OpenAI"
-    echo "6) 腾讯混元"
-    echo "7) 百度文心一言"
-    echo "8) 本地Ollama"
-    echo "Q) 返回配置菜单"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    read -r -p "请选择LLM服务商 (1-8,Q): " llm_choice < /dev/tty
-    
-    case $llm_choice in
-        1)
-            # 阿里云通义千问
-            echo -e "${CYAN}配置阿里云通义千问服务...${RESET}"
-            read -r -p "请输入阿里云API Key: " ali_llm_api_key
-            echo -e "${GREEN}✅ 阿里云通义千问配置完成${RESET}"
-            ;;
-        2)
-            # 智谱ChatGLM
-            echo -e "${CYAN}配置智谱ChatGLM服务...${RESET}"
-            read -r -p "请输入智谱API Key: " chatglm_api_key
-            echo -e "${GREEN}✅ 智谱ChatGLM配置完成${RESET}"
-            ;;
-        3)
-            # DeepSeek
-            echo -e "${CYAN}配置DeepSeek服务...${RESET}"
-            read -r -p "请输入DeepSeek API Key: " deepseek_api_key
-            echo -e "${GREEN}✅ DeepSeek配置完成${RESET}"
-            ;;
-        4)
-            # 火山引擎豆包
-            echo -e "${CYAN}配置火山引擎豆包服务...${RESET}"
-            read -r -p "请输入火山引擎API Key: " huoshan_llm_api_key
-            echo -e "${GREEN}✅ 火山引擎豆包配置完成${RESET}"
-            ;;
-        5)
-            # OpenAI
-            echo -e "${CYAN}配置OpenAI服务...${RESET}"
-            read -r -p "请输入OpenAI API Key: " openai_llm_api_key
-            echo -e "${GREEN}✅ OpenAI配置完成${RESET}"
-            ;;
-        6)
-            # 腾讯混元
-            echo -e "${CYAN}配置腾讯混元服务...${RESET}"
-            read -r -p "请输入腾讯云API Key: " tx_llm_api_key
-            echo -e "${GREEN}✅ 腾讯混元配置完成${RESET}"
-            ;;
-        7)
-            # 百度文心一言
-            echo -e "${CYAN}配置百度文心一言服务...${RESET}"
-            read -r -p "请输入百度API Key: " baidu_llm_api_key
-            echo -e "${GREEN}✅ 百度文心一言配置完成${RESET}"
-            ;;
-        8)
-            # 本地Ollama
-            echo -e "${CYAN}配置本地Ollama服务...${RESET}"
-            echo -e "${YELLOW}💡 请确保Ollama已安装并运行在localhost:11434${RESET}"
-            echo -e "${GREEN}✅ 本地Ollama配置完成${RESET}"
-            ;;
-        Q|q)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选择${RESET}"
-            return 1
-            ;;
-    esac
-    
-    echo -e "${GREEN}✅ LLM服务配置完成！${RESET}"
-    echo -e "${CYAN}💡 请确保配置文件正确写入${RESET}"
-}
-
-# ========================= 人设配置函数 =========================
-configure_persona_settings() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}👤 人设配置 👤${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "人设配置将定义小智的性格、说话方式和交互特点"
-    echo -e "${YELLOW}💡 字符数限制：2000字以内${RESET}"
-    echo
-    read -r -p "请输入人设描述（您可以描述小智的性格、说话习惯等）: " persona_input
-    
-    # 检查字符数
-    persona_length=${#persona_input}
-    if [ $persona_length -gt 2000 ]; then
-        echo -e "${RED}❌ 人设描述超过2000字符限制（当前：$persona_length字符）${RESET}"
-        read -r -p "按回车键重新输入..." < /dev/tty
-        configure_persona_settings
-        return 1
-    fi
-    
-    echo -e "${CYAN}📝 您的人设描述（$persona_length字符）:${RESET}"
-    echo "----------------------------------------"
-    echo "$persona_input"
-    echo "----------------------------------------"
-    
-    read -r -p "确认使用这个人设配置吗？(y/n): " confirm_persona < /dev/tty
-    if [[ "$confirm_persona" =~ ^[Yy]$ ]]; then
-        echo -e "${GREEN}✅ 人设配置保存成功！${RESET}"
-        echo -e "${CYAN}💡 这个人设将在小智的对话中使用${RESET}"
-    else
-        echo -e "${YELLOW}⚠️ 人设配置已取消${RESET}"
-        return 1
-    fi
-}
-
-# ========================= 服务器配置函数 =========================
-configure_server_settings() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🖥️ 服务器配置 🖥️${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "请选择服务器配置项："
-    echo "1) 服务器端口配置"
-    echo "2) WebSocket地址配置"
-    echo "3) 视觉分析接口配置"
-    echo "4) 认证配置"
-    echo "5) 日志配置"
-    echo "Q) 返回配置菜单"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    read -r -p "请选择服务器配置项 (1-5,Q): " server_choice < /dev/tty
-    
-    case $server_choice in
-        1)
-            # 端口配置
-            echo -e "${CYAN}配置服务器端口...${RESET}"
-            read -r -p "请输入服务器端口 (默认8000): " server_port
-            server_port=${server_port:-8000}
-            echo -e "${GREEN}✅ 服务器端口配置完成：$server_port${RESET}"
-            ;;
-        2)
-            # WebSocket配置
-            echo -e "${CYAN}配置WebSocket地址...${RESET}"
-            read -r -p "请输入WebSocket地址: " websocket_url
-            echo -e "${GREEN}✅ WebSocket地址配置完成${RESET}"
-            ;;
-        3)
-            # 视觉分析配置
-            echo -e "${CYAN}配置视觉分析接口...${RESET}"
-            read -r -p "请输入视觉分析接口地址: " vision_url
-            echo -e "${GREEN}✅ 视觉分析接口配置完成${RESET}"
-            ;;
-        4)
-            # 认证配置
-            echo -e "${CYAN}配置认证设置...${RESET}"
-            read -r -p "是否启用认证？(y/n): " enable_auth < /dev/tty
-            if [[ "$enable_auth" =~ ^[Yy]$ ]]; then
-                echo -e "${GREEN}✅ 认证配置完成${RESET}"
+        if command -v docker &> /dev/null; then
+            DOCKER_VERSION=$(docker --version 2>/dev/null | head -n1 || echo "未知版本")
+            DOCKER_STATUS="已安装"
+            if docker ps 2>/dev/null | grep -q "$CONTAINER_NAME"; then
+                DOCKER_CONTAINER_STATUS="运行中"
+            elif docker ps -a 2>/dev/null | grep -q "$CONTAINER_NAME"; then
+                DOCKER_CONTAINER_STATUS="已停止"
             else
-                echo -e "${GREEN}✅ 认证已禁用${RESET}"
+                DOCKER_CONTAINER_STATUS="不存在"
             fi
-            ;;
-        5)
-            # 日志配置
-            echo -e "${CYAN}配置日志设置...${RESET}"
-            echo "日志等级：1) INFO  2) DEBUG"
-            read -r -p "请选择日志等级 (1-2): " log_level_choice
-            echo -e "${GREEN}✅ 日志配置完成${RESET}"
-            ;;
-        Q|q)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选择${RESET}"
-            return 1
-            ;;
-    esac
-    
-    echo -e "${GREEN}✅ 服务器配置完成！${RESET}"
-    echo -e "${CYAN}💡 请确保配置文件正确写入${RESET}"
-}
-
-# ========================= 插件配置函数 =========================
-configure_plugins() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🔌 插件配置 🔌${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "请选择要配置的插件："
-    echo "1) 天气插件"
-    echo "2) 音乐播放插件"
-    echo "3) 新闻插件"
-    echo "4) HomeAssistant插件"
-    echo "5) 知识库插件"
-    echo "6) 声纹识别插件"
-    echo "Q) 返回配置菜单"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    read -r -p "请选择插件 (1-6,Q): " plugin_choice < /dev/tty
-    
-    case $plugin_choice in
-        1)
-            # 天气插件
-            echo -e "${CYAN}配置天气插件...${RESET}"
-            read -r -p "请输入天气API Key (可选，留空使用默认): " weather_api_key
-            echo -e "${GREEN}✅ 天气插件配置完成${RESET}"
-            ;;
-        2)
-            # 音乐插件
-            echo -e "${CYAN}配置音乐播放插件...${RESET}"
-            read -r -p "请输入音乐文件目录: " music_dir
-            echo -e "${GREEN}✅ 音乐播放插件配置完成${RESET}"
-            ;;
-        3)
-            # 新闻插件
-            echo -e "${CYAN}配置新闻插件...${RESET}"
-            echo -e "${GREEN}✅ 新闻插件配置完成（使用默认设置）${RESET}"
-            ;;
-        4)
-            # HomeAssistant插件
-            echo -e "${CYAN}配置HomeAssistant插件...${RESET}"
-            read -r -p "请输入HomeAssistant地址: " hass_url
-            read -r -p "请输入HomeAssistant API Key: " hass_api_key
-            echo -e "${GREEN}✅ HomeAssistant插件配置完成${RESET}"
-            ;;
-        5)
-            # 知识库插件
-            echo -e "${CYAN}配置知识库插件...${RESET}"
-            read -r -p "请输入知识库API地址: " rag_url
-            read -r -p "请输入知识库API Key: " rag_api_key
-            echo -e "${GREEN}✅ 知识库插件配置完成${RESET}"
-            ;;
-        6)
-            # 声纹识别插件
-            echo -e "${CYAN}配置声纹识别插件...${RESET}"
-            read -r -p "请输入声纹接口地址: " voiceprint_url
-            echo -e "${GREEN}✅ 声纹识别插件配置完成${RESET}"
-            ;;
-        Q|q)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选择${RESET}"
-            return 1
-            ;;
-    esac
-    
-    echo -e "${GREEN}✅ 插件配置完成！${RESET}"
-    echo -e "${CYAN}💡 请确保配置文件正确写入${RESET}"
-}
-
-# ========================= 检查配置文件函数 =========================
-check_config_file_status() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}✅ 检查配置文件状态 ✅${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    CONFIG_LOCATIONS=(
-        "$CONFIG_FILE"
-        "$MAIN_DIR/.config.yaml"
-        "$HOME/xiaozhi-server/.config.yaml"
-    )
-    
-    echo -e "${CYAN}🔍 检查配置文件状态...${RESET}"
-    FOUND_CONFIGS=()
-    
-    for config_path in "${CONFIG_LOCATIONS[@]}"; do
-        if [ -f "$config_path" ]; then
-            FOUND_CONFIGS+=("$config_path")
-            echo -e "${GREEN}✅ 找到配置文件: $config_path${RESET}"
-            echo -e "   大小: $(stat -f%z "$config_path" 2>/dev/null || stat -c%s "$config_path" 2>/dev/null || echo "未知") 字节"
-            echo -e "   修改时间: $(stat -f%Sm -t"%Y-%m-%d %H:%M:%S" "$config_path" 2>/dev/null || stat -c%y "$config_path" 2>/dev/null | cut -d. -f1 || echo "未知")"
-        else
-            echo -e "${RED}❌ 未找到: $config_path${RESET}"
         fi
-        echo
-    done
-    
-    if [ ${#FOUND_CONFIGS[@]} -gt 0 ]; then
-        echo -e "${GREEN}✅ 找到 ${#FOUND_CONFIGS[@]} 个配置文件${RESET}"
-    else
-        echo -e "${RED}❌ 未找到任何配置文件${RESET}"
-    fi
-}
-
-# ========================= 备份/恢复配置函数 =========================
-backup_restore_config() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}💾 备份/恢复配置 💾${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "请选择操作："
-    echo "1) 备份当前配置"
-    echo "2) 从备份恢复配置"
-    echo "Q) 返回配置菜单"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    read -r -p "请选择操作 (1-2,Q): " backup_choice < /dev/tty
-    
-    case $backup_choice in
-        1)
-            # 备份配置
-            echo -e "${CYAN}备份配置文件...${RESET}"
-            BACKUP_DIR="$HOME/xiaozhi-server-config-backup-$(date +%Y%m%d_%H%M%S)"
-            mkdir -p "$BACKUP_DIR"
-            
-            BACKUP_COUNT=0
-            CONFIG_LOCATIONS=(
-                "$CONFIG_FILE"
-                "$MAIN_DIR/.config.yaml"
-                "$HOME/xiaozhi-server/.config.yaml"
-            )
-            
-            for config_path in "${CONFIG_LOCATIONS[@]}"; do
-                if [ -f "$config_path" ]; then
-                    cp "$config_path" "$BACKUP_DIR/"
-                    BACKUP_COUNT=$((BACKUP_COUNT + 1))
-                    echo -e "${GREEN}✅ 已备份: $config_path${RESET}"
-                fi
-            done
-            
-            if [ $BACKUP_COUNT -gt 0 ]; then
-                echo -e "${GREEN}✅ 备份完成，备份目录: $BACKUP_DIR${RESET}"
-            else
-                echo -e "${YELLOW}⚠️ 没有找到需要备份的配置文件${RESET}"
-                rmdir "$BACKUP_DIR" 2>/dev/null
-            fi
-            ;;
-        2)
-            # 恢复配置
-            echo -e "${CYAN}从备份恢复配置文件...${RESET}"
-            BACKUP_DIRS=($(ls -t "$HOME"/xiaozhi-server-config-backup-* 2>/dev/null))
-            
-            if [ ${#BACKUP_DIRS[@]} -eq 0 ]; then
-                echo -e "${RED}❌ 未找到备份目录${RESET}"
-                return 1
-            fi
-            
-            LATEST_BACKUP="${BACKUP_DIRS[0]}"
-            echo -e "${CYAN}📂 找到最新备份: $LATEST_BACKUP${RESET}"
-            
-            RESTORE_COUNT=0
-            for config_file in "$LATEST_BACKUP"/*.yaml "$LATEST_BACKUP"/.config.yaml; do
-                [ -e "$config_file" ] 2>/dev/null || continue
-                if [ -f "$config_file" ]; then
-                    # 确定目标路径
-                    if [[ "$config_file" == *"/data/.config.yaml"* ]]; then
-                        target_path="$CONFIG_FILE"
-                    else
-                        target_path="$MAIN_DIR/.config.yaml"
-                    fi
+        
+        # ======================= CPU核心使用率 =======================
+        # 获取每个CPU核心的使用率
+        CPU_CORE_USAGE=()
+        if [ -f /proc/stat ]; then
+            for i in $(seq 0 $((CPU_CORES - 1))); do
+                if [ -f /sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq ]; then
+                    CORE_USAGE=$(awk -v core=$i '
+                    BEGIN {
+                        # 读取CPU使用率
+                        while ((getline line) > 0) {
+                            if (line ~ /^cpu[0-9]+/) {
+                                if (core == 0 && line ~ /^cpu0/) {
+                                    split(line, fields)
+                                    idle = fields[5]
+                                    total = 0
+                                    for (j=1; j<=4; j++) total += fields[j]
+                                    total += idle
+                                    idle_percent = (idle / total) * 100
+                                    printf "%.1f", idle_percent
+                                    break
+                                }
+                            }
+                        }
+                    }' /proc/stat 2>/dev/null || echo "0")
                     
-                    # 确保目标目录存在
-                    mkdir -p "$(dirname "$target_path")"
-                    cp "$config_file" "$target_path"
-                    RESTORE_COUNT=$((RESTORE_COUNT + 1))
-                    echo -e "${GREEN}✅ 已恢复: $config_file -> $target_path${RESET}"
-                fi
-            done
-            
-            if [ $RESTORE_COUNT -gt 0 ]; then
-                echo -e "${GREEN}✅ 恢复完成，共恢复 $RESTORE_COUNT 个配置文件${RESET}"
-            else
-                echo -e "${YELLOW}⚠️ 备份目录中没有找到配置文件${RESET}"
-            fi
-            ;;
-        Q|q)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选择${RESET}"
-            return 1
-            ;;
-    esac
-}
-
-# ========================= 转换本地ASR为云服务函数 =========================
-convert_local_to_cloud_asr() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}🔄 转换本地ASR为云服务 🔄${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    echo "此功能将帮助您将现有的本地ASR配置转换为云服务ASR"
-    echo -e "${YELLOW}⚠️ 注意：修改配置文件前请确保已备份${RESET}"
-    
-    echo
-    echo "请选择要转换的目标云服务："
-    echo "1) 阿里云ASR"
-    echo "2) 腾讯云ASR"
-    echo "3) 火山引擎ASR"
-    echo "4) OpenAI Whisper"
-    echo "5) 百度ASR"
-    echo "Q) 返回配置菜单"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    read -r -p "请选择云服务 (1-5,Q): " convert_choice < /dev/tty
-    
-    case $convert_choice in
-        1)
-            # 阿里云ASR
-            echo -e "${CYAN}准备转换为阿里云ASR...${RESET}"
-            read -r -p "请输入阿里云AccessKeyId: " convert_ali_access_key_id
-            read -r -p "请输入阿里云AccessKeySecret: " convert_ali_access_key_secret
-            read -r -p "请输入阿里云AppKey: " convert_ali_appkey
-            echo -e "${GREEN}✅ 将转换为阿里云ASR配置${RESET}"
-            ;;
-        2)
-            # 腾讯云ASR
-            echo -e "${CYAN}准备转换为腾讯云ASR...${RESET}"
-            read -r -p "请输入腾讯云SecretId: " convert_tx_secret_id
-            read -r -p "请输入腾讯云SecretKey: " convert_tx_secret_key
-            read -r -p "请输入腾讯云AppId: " convert_tx_appid
-            echo -e "${GREEN}✅ 将转换为腾讯云ASR配置${RESET}"
-            ;;
-        3)
-            # 火山引擎ASR
-            echo -e "${CYAN}准备转换为火山引擎ASR...${RESET}"
-            read -r -p "请输入火山引擎AppId: " convert_huoshan_appid
-            read -r -p "请输入火山引擎AccessToken: " convert_huoshan_access_token
-            echo -e "${GREEN}✅ 将转换为火山引擎ASR配置${RESET}"
-            ;;
-        4)
-            # OpenAI Whisper
-            echo -e "${CYAN}准备转换为OpenAI Whisper...${RESET}"
-            read -r -p "请输入OpenAI API Key: " convert_openai_api_key
-            echo -e "${GREEN}✅ 将转换为OpenAI Whisper配置${RESET}"
-            ;;
-        5)
-            # 百度ASR
-            echo -e "${CYAN}准备转换为百度ASR...${RESET}"
-            read -r -p "请输入百度AppId: " convert_baidu_app_id
-            read -r -p "请输入百度API Key: " convert_baidu_api_key
-            read -r -p "请输入百度Secret Key: " convert_baidu_secret_key
-            echo -e "${GREEN}✅ 将转换为百度ASR配置${RESET}"
-            ;;
-        Q|q)
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效选择${RESET}"
-            return 1
-            ;;
-    esac
-    
-    echo -e "${YELLOW}🔄 转换操作将修改配置文件中的ASR设置${RESET}"
-    echo -e "${CYAN}💡 建议在转换前手动备份配置文件${RESET}"
-    echo -e "${GREEN}✅ 转换配置准备完成！${RESET}"
-    echo -e "${CYAN}💡 请在部署时选择相应配置选项以应用更改${RESET}"
-}
-
-# ========================= 配置文件操作函数 =========================
-config_file_management() {
-    clear
-    echo -e "\n${PURPLE}==================================================${RESET}"
-    echo -e "${CYAN}📄 配置文件管理工具 📄${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    # 检查现有配置文件
-    CONFIG_LOCATIONS=(
-        "$CONFIG_FILE"
-        "$MAIN_DIR/.config.yaml"
-        "$HOME/xiaozhi-server/.config.yaml"
-    )
-    
-    echo -e "${CYAN}🔍 检查配置文件状态...${RESET}"
-    FOUND_CONFIGS=()
-    
-    for config_path in "${CONFIG_LOCATIONS[@]}"; do
-        if [ -f "$config_path" ]; then
-            FOUND_CONFIGS+=("$config_path")
-            echo -e "${GREEN}✅ 找到配置文件: $config_path${RESET}"
-        fi
-    done
-    
-    if [ ${#FOUND_CONFIGS[@]} -eq 0 ]; then
-        echo -e "${YELLOW}⚠️ 未找到现有配置文件${RESET}"
-    fi
-    
-    echo -e "\n${WHITE_RED}配置文件管理选项:${RESET}"
-    echo "1) 检查所有可能的配置文件位置"
-    echo "2) 创建默认配置文件"
-    echo "3) 验证配置文件格式"
-    echo "4) 显示配置文件内容"
-    echo "5) 备份现有配置文件"
-    echo "6) 从备份恢复配置文件"
-    echo "7) 删除所有配置文件并重新创建"
-    echo "0) 返回Docker操作菜单"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    read -r -p "请选择配置文件操作 (0-7): " config_choice < /dev/tty
-    
-    case $config_choice in
-        1)
-            echo -e "\n${CYAN}📍 所有可能的配置文件位置:${RESET}"
-            for config_path in "${CONFIG_LOCATIONS[@]}"; do
-                if [ -f "$config_path" ]; then
-                    echo -e "  ${GREEN}✅ $config_path${RESET}"
-                    echo -e "     大小: $(stat -f%z "$config_path" 2>/dev/null || stat -c%s "$config_path" 2>/dev/null || echo "未知") 字节"
-                    echo -e "     修改时间: $(stat -f%Sm -t"%Y-%m-%d %H:%M:%S" "$config_path" 2>/dev/null || stat -c%y "$config_path" 2>/dev/null | cut -d. -f1 || echo "未知")"
+                    if [ "$CORE_USAGE" != "0" ]; then
+                        CPU_USAGE=$(echo "100 - $CORE_USAGE" | bc -l 2>/dev/null || echo "0")
+                        CPU_CORE_USAGE+=("$CPU_USAGE")
+                    else
+                        CPU_CORE_USAGE+=("0.0")
+                    fi
                 else
-                    echo -e "  ${RED}❌ $config_path${RESET}"
+                    CPU_CORE_USAGE+=("0.0")
                 fi
-                echo
             done
-            ;;
-        2)
-            echo -e "\n${CYAN}🔧 创建默认配置文件...${RESET}"
-            create_default_config
-            ;;
-        3)
-            echo -e "\n${CYAN}✅ 验证配置文件格式...${RESET}"
-            validate_config_file
-            ;;
-        4)
-            echo -e "\n${CYAN}📖 显示配置文件内容...${RESET}"
-            display_config_content
-            ;;
-        5)
-            echo -e "\n${CYAN}💾 备份现有配置文件...${RESET}"
-            backup_config_files
-            ;;
-        6)
-            echo -e "\n${CYAN}🔄 从备份恢复配置文件...${RESET}"
-            restore_config_files
-            ;;
-        7)
-            echo -e "\n${RED}⚠️ 危险操作：删除所有配置文件并重新创建${RESET}"
-            echo -e "${YELLOW}这将删除所有现有的配置文件并创建默认配置！${RESET}"
-            read -r -p "确认执行此操作？请输入 'DELETE_AND_RECREATE' 确认: " confirm_delete < /dev/tty
-            if [ "$confirm_delete" = "DELETE_AND_RECREATE" ]; then
-                delete_and_recreate_config
-            else
-                echo -e "${YELLOW}操作已取消${RESET}"
-            fi
-            ;;
-        0)
-            echo -e "${CYAN}🔙 返回Docker操作菜单${RESET}"
-            return 0
-            ;;
-        *)
-            echo -e "${RED}❌ 无效的选项${RESET}"
-            ;;
-    esac
-    
-    echo
-    read -r -p "按回车键继续..." < /dev/tty
-    config_file_management
-}
+        fi
         
 # ========================= 主执行函数 =========================
 main() {
@@ -9179,304 +8270,6 @@ main() {
     while true; do
         main_menu
     done
-}
-
-# ========================= 配置文件操作函数 =========================
-# ========================= 配置文件管理函数 =========================
-
-# 创建默认配置文件函数
-# 自动下载官方配置模板或创建最小化模板
-# 支持配置文件备份和恢复
-create_default_config() {
-    echo -e "${CYAN}🔄 开始创建默认配置文件...${RESET}"
-    
-    # 验证目录路径
-    local config_dir
-    config_dir="$(dirname "$CONFIG_FILE")"
-    if [ ! -d "$config_dir" ]; then
-        echo -e "${YELLOW}📁 创建配置文件目录: $config_dir${RESET}"
-        mkdir -p "$config_dir" || {
-            echo -e "${RED}❌ 创建配置文件目录失败${RESET}"
-            return 1
-        }
-    fi
-    
-    # 备份现有配置文件（如果存在）
-    if [ -f "$CONFIG_FILE" ]; then
-        local backup_file
-        backup_file="${CONFIG_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
-        echo -e "${YELLOW}📋 检测到现有配置文件，创建备份: $(basename "$backup_file")${RESET}"
-        cp "$CONFIG_FILE" "$backup_file" || {
-            echo -e "${RED}❌ 创建配置文件备份失败${RESET}"
-            return 1
-        }
-        echo -e "${GREEN}✅ 备份已保存: $backup_file${RESET}"
-    fi
-    
-    # 下载官方配置文件模板
-    echo -e "${CYAN}📥 尝试下载官方配置文件模板...${RESET}"
-    if download_config_with_fallback "$CONFIG_FILE"; then
-        echo -e "${GREEN}✅ 官方配置文件模板下载成功${RESET}"
-        echo -e "${GREEN}✅ 配置文件保存位置: $CONFIG_FILE${RESET}"
-        echo -e "${CYAN}📝 配置文件大小: $(du -h "$CONFIG_FILE" 2>/dev/null | cut -f1 || echo "未知")${RESET}"
-        echo -e "${YELLOW}💡 提示：配置文件已经初始化，您现在可以通过配置管理菜单来修改各项设置${RESET}"
-        return 0
-    else
-        echo -e "${YELLOW}⚠️ 下载官方配置文件失败，创建最小化模板...${RESET}"
-        
-        # 创建最小化配置文件模板
-        if create_fallback_config; then
-            echo -e "${GREEN}✅ 最小化配置文件创建成功${RESET}"
-            return 1  # 返回1表示使用了fallback配置
-        else
-            echo -e "${RED}❌ 创建最小化配置文件失败${RESET}"
-            return 2  # 返回2表示完全失败
-        fi
-    fi
-}
-
-# 创建fallback配置文件
-# 当官方配置下载失败时使用
-create_fallback_config() {
-    cat > "$CONFIG_FILE" << 'EOF'
-# 小智服务器配置文件 (最小化模板)
-# 警告：这是基础模板，建议下载完整配置以获得完整功能
-
-server:
-  ip: "0.0.0.0"
-  port: 8000
-  http_port: 8003
-  websocket: "ws://localhost:8000/xiaozhi/v1/"
-  vision_explain: "http://localhost:8003/mcp/vision/explain"
-  timezone_offset: +8
-
-# 大语言模型配置
-llm:
-  type: "openai"  # openai, aliyun, qwen, local等
-  model: "gpt-3.5-turbo"
-  api_key: ""     # 请填入您的API密钥
-  base_url: "https://api.openai.com/v1"
-  
-# 语音识别配置
-asr:
-  type: "aliyun"  # 本地FunASR使用local, 云服务商使用对应名称
-  language: "zh-CN"
-  access_key_id: ""     # 阿里云AccessKeyId
-  access_key_secret: "" # 阿里云AccessKeySecret
-  
-# 文本转语音配置
-tts:
-  type: "edge"   # edge, aliyun, openai等
-  voice: "zh-CN-XiaoxiaoNeural"
-  volume: 50
-  rate: 0
-  pitch: 0
-  style: "neutral"
-  role: "Female1"
-
-# 插件配置
-plugins:
-  switch_bot:
-    enable: false
-  mqtt:
-    enable: false
-  weather:
-    enable: false
-
-# 人设配置 (可选)
-personality: "你是一个友好的AI助手，具有专业的语音交互能力。"
-EOF
-    
-    echo -e "${YELLOW}📝 请根据实际需要修改配置文件内容${RESET}"
-    return 0
-}
-
-validate_config_file() {
-    echo -e "${CYAN}验证配置文件格式...${RESET}"
-    
-    # 检查配置文件是否存在
-    if [ ! -f "$CONFIG_FILE" ]; then
-        echo -e "${RED}❌ 配置文件不存在: $CONFIG_FILE${RESET}"
-        return 1
-    fi
-    
-    # 检查YAML格式（简单检查）
-    if command -v python3 &> /dev/null; then
-        python3 -c "
-import yaml
-import sys
-try:
-    with open('$CONFIG_FILE', 'r', encoding='utf-8') as f:
-        yaml.safe_load(f)
-    print('✅ YAML格式验证通过')
-except yaml.YAMLError as e:
-    print(f'❌ YAML格式错误: {e}')
-    sys.exit(1)
-except Exception as e:
-    print(f'⚠️ 验证时出现异常: {e}')
-    sys.exit(1)
-" 2>/dev/null || echo -e "${YELLOW}⚠️ Python3不可用，跳过详细YAML验证${RESET}"
-    else
-        echo -e "${YELLOW}⚠️ Python3不可用，跳过详细YAML验证${RESET}"
-    fi
-    
-    # 基本文件检查
-    if [ -r "$CONFIG_FILE" ] && [ -s "$CONFIG_FILE" ]; then
-        echo -e "${GREEN}✅ 配置文件文件完整性检查通过${RESET}"
-        echo -e "   文件大小: $(stat -f%z "$CONFIG_FILE" 2>/dev/null || stat -c%s "$CONFIG_FILE" 2>/dev/null || echo "未知") 字节"
-        echo -e "   权限: $(ls -l "$CONFIG_FILE" | cut -d' ' -f1)"
-    else
-        echo -e "${RED}❌ 配置文件文件完整性检查失败${RESET}"
-        return 1
-    fi
-}
-
-display_config_content() {
-    if [ ! -f "$CONFIG_FILE" ]; then
-        echo -e "${RED}❌ 配置文件不存在: $CONFIG_FILE${RESET}"
-        return 1
-    fi
-    
-    echo -e "${CYAN}📖 配置文件内容: $CONFIG_FILE${RESET}"
-    echo -e "${PURPLE}==================================================${RESET}"
-    
-    # 显示文件内容，并隐藏敏感信息
-    if command -v sed &> /dev/null; then
-        sed 's/api_key:.*/api_key: "***HIDDEN***"/g' "$CONFIG_FILE" | \
-        sed 's/access_key_id:.*/access_key_id: "***HIDDEN***"/g' | \
-        sed 's/access_key_secret:.*/access_key_secret: "***HIDDEN***"/g' | \
-        sed 's/password:.*/password: "***HIDDEN***"/g'
-    else
-        cat "$CONFIG_FILE"
-    fi
-}
-
-backup_config_files() {
-    BACKUP_DIR="$HOME/xiaozhi-server-config-backup-$(date +%Y%m%d_%H%M%S)"
-    mkdir -p "$BACKUP_DIR"
-    
-    BACKUP_COUNT=0
-    for config_path in "${CONFIG_LOCATIONS[@]}"; do
-        if [ -f "$config_path" ]; then
-            cp "$config_path" "$BACKUP_DIR/"
-            BACKUP_COUNT=$((BACKUP_COUNT + 1))
-            echo -e "${GREEN}✅ 已备份: $config_path${RESET}"
-        fi
-    done
-    
-    if [ $BACKUP_COUNT -gt 0 ]; then
-        echo -e "${GREEN}✅ 备份完成，备份目录: $BACKUP_DIR${RESET}"
-        echo -e "${CYAN}📋 备份的文件:${RESET}"
-        ls -la "$BACKUP_DIR"
-    else
-        echo -e "${YELLOW}⚠️ 没有找到需要备份的配置文件${RESET}"
-        rmdir "$BACKUP_DIR" 2>/dev/null
-    fi
-}
-
-restore_config_files() {
-    # 查找最新的备份目录
-    BACKUP_DIRS=($(ls -t "$HOME"/xiaozhi-server-config-backup-* 2>/dev/null))
-    
-    if [ ${#BACKUP_DIRS[@]} -eq 0 ]; then
-        echo -e "${RED}❌ 未找到备份目录${RESET}"
-        return 1
-    fi
-    
-    LATEST_BACKUP="${BACKUP_DIRS[0]}"
-    echo -e "${CYAN}📂 找到最新备份: $LATEST_BACKUP${RESET}"
-    
-    RESTORE_COUNT=0
-    for config_file in "$LATEST_BACKUP"/*.yaml "$LATEST_BACKUP"/.config.yaml; do
-        [ -e "$config_file" ] 2>/dev/null || continue
-        if [ -f "$config_file" ]; then
-            # 确定目标路径
-            if [[ "$config_file" == *"/data/.config.yaml"* ]]; then
-                target_path="$CONFIG_FILE"
-            else
-                target_path="$MAIN_DIR/.config.yaml"
-            fi
-            
-            # 确保目标目录存在
-            mkdir -p "$(dirname "$target_path")"
-            cp "$config_file" "$target_path"
-            RESTORE_COUNT=$((RESTORE_COUNT + 1))
-            echo -e "${GREEN}✅ 已恢复: $config_file -> $target_path${RESET}"
-        fi
-    done
-    
-    if [ $RESTORE_COUNT -gt 0 ]; then
-        echo -e "${GREEN}✅ 恢复完成，共恢复 $RESTORE_COUNT 个配置文件${RESET}"
-    else
-        echo -e "${YELLOW}⚠️ 备份目录中没有找到配置文件${RESET}"
-    fi
-}
-
-delete_and_recreate_config() {
-    echo -e "${RED}⚠️ 删除所有配置文件...${RESET}"
-    
-    # 删除现有配置文件
-    for config_path in "${CONFIG_LOCATIONS[@]}"; do
-        if [ -f "$config_path" ]; then
-            rm "$config_path"
-            echo -e "${GREEN}✅ 已删除: $config_path${RESET}"
-        fi
-    done
-    
-    echo -e "${CYAN}🔧 重新创建默认配置文件...${RESET}"
-    create_default_config
-    
-    echo -e "${GREEN}✅ 配置文件重新创建完成${RESET}"
-}
-
-# ========================= ASR转换函数 =========================
-convert_asr_to_cloud() {
-    local cloud_provider="$1"
-    local config_file="$2"
-    
-    echo -e "${CYAN}🔄 将本地ASR转换为$cloud_provider云服务...${RESET}"
-    
-    # 备份原配置文件
-    local backup_file="${config_file}.backup.$(date +%Y%m%d_%H%M%S)"
-    cp "$config_file" "$backup_file"
-    echo -e "${GREEN}✅ 已备份原配置到: $backup_file${RESET}"
-    
-    # 根据云服务商修改配置
-    case $cloud_provider in
-        "aliyun")
-            # 转换为阿里云ASR
-            # 这里应该修改YAML配置，将local ASR改为aliyun ASR
-            # 由于是简化版本，这里只显示操作提示
-            echo -e "${GREEN}✅ 已转换为阿里云ASR${RESET}"
-            echo -e "${YELLOW}💡 请在配置文件中填入您的阿里云AccessKey等认证信息${RESET}"
-            ;;
-        "tencent")
-            # 转换为腾讯云ASR
-            echo -e "${GREEN}✅ 已转换为腾讯云ASR${RESET}"
-            echo -e "${YELLOW}💡 请在配置文件中填入您的腾讯云SecretId等认证信息${RESET}"
-            ;;
-        "doubao")
-            # 转换为火山引擎ASR
-            echo -e "${GREEN}✅ 已转换为火山引擎ASR${RESET}"
-            echo -e "${YELLOW}💡 请在配置文件中填入您的火山引擎AppId等认证信息${RESET}"
-            ;;
-        "openai")
-            # 转换为OpenAI Whisper
-            echo -e "${GREEN}✅ 已转换为OpenAI Whisper${RESET}"
-            echo -e "${YELLOW}💡 请在配置文件中填入您的OpenAI API Key${RESET}"
-            ;;
-        "baidu")
-            # 转换为百度ASR
-            echo -e "${GREEN}✅ 已转换为百度ASR${RESET}"
-            echo -e "${YELLOW}💡 请在配置文件中填入您的百度AppId等认证信息${RESET}"
-            ;;
-        *)
-            echo -e "${RED}❌ 不支持的云服务商: $cloud_provider${RESET}"
-            return 1
-            ;;
-    esac
-    
-    echo -e "${GREEN}✅ 转换完成！配置文件路径: $config_file${RESET}"
 }
 
 # 启动脚本执行
