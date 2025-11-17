@@ -2,6 +2,7 @@
 set -uo pipefail
 trap exit_confirm SIGINT
 
+
 # ========================================================
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
@@ -9,12 +10,13 @@ trap exit_confirm SIGINT
 # 版本：2.0.0
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
+# ========================================================
 
 # ========================= 常量定义 =========================
 readonly SCRIPT_AUTHOR="昊天兽王"
 readonly SCRIPT_NAME="xiaozhi-server-installer"
 readonly SCRIPT_VERSION="2.0.0"
-readonly SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板 "
+readonly SCRIPT_DESC="小智服务器增强部署脚本 - 支持智能配置管理和Docker全面管理"
 
 # ========================= URL和路径配置 =========================
 
