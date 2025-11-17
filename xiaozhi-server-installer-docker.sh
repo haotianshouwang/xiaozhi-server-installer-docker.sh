@@ -6,12 +6,12 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.68
+# 版本：1.2.69
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板"
-Version="1.2.68"
+Version="1.2.69"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -366,6 +366,18 @@ read -r -p "请输入选项: " menu_choice < /dev/tty
                 echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
 read -r -p "按回车键继续..." </dev/tty
                 break 
+            fi
+            ;;
+        5)
+            # 测试服务器连接
+            if [ "$SERVER_DIR_EXISTS" = true ] && [ "$CONFIG_EXISTS" = true ]; then
+                test_server
+                break
+            else
+                echo -e "${RED}❌ 未检测到现有服务器配置${RESET}"
+                echo -e "${CYAN}💡 请先选择选项1进行首次部署${RESET}"
+read -r -p "按回车键继续..." </dev/tty>
+                break
             fi
             ;;
         6)
@@ -8353,10 +8365,10 @@ config_management_menu() {
         echo "7) 检查配置文件"
         echo "8) 备份/恢复配置"
         echo "9) 转换本地ASR为云服务"
-        echo "Q) 返回主菜单"
+        echo "0) 返回主菜单"
         echo -e "${PURPLE}==================================================${RESET}"
         
-        read -r -p "请选择配置文件操作 (1-9,Q): " config_choice < /dev/tty
+        read -r -p "请选择配置文件操作 (0-9): " config_choice < /dev/tty
         
         case $config_choice in
             1)
@@ -8386,7 +8398,7 @@ config_management_menu() {
             9)
                 convert_local_to_cloud_asr
                 ;;
-            Q|q)
+            0)
                 echo -e "${CYAN}🔙 返回主菜单${RESET}"
                 return 0
                 ;;
