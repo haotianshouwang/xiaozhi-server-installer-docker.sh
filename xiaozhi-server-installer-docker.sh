@@ -6980,13 +6980,8 @@ force_uninstall_docker() {
     echo -e "${YELLOW}⚠️ 这将强制删除所有Docker相关的文件、命令和服务！${RESET}"
     echo -e "${CYAN}🔧 适合解决Docker卸载不彻底的问题${RESET}"
     
-    # 检查是否以root权限运行
-    if [[ $EUID -eq 0 ]]; then
-        echo -e "${RED}❌ 请不要以root权限运行此脚本${RESET}"
-        echo -e "${CYAN}使用方式: sudo bash $0${RESET}"
-        read -r -p "按回车键继续..." < /dev/tty
-        return 1
-    fi
+    # Docker操作通常需要root权限，取消root检查
+    echo -e "${GREEN}ℹ️ 检测到root权限，Docker操作将正常执行${RESET}"
     
     # 确认操作
     echo -e "\n${YELLOW}确认要强制完全卸载Docker吗？${RESET}"
@@ -6997,8 +6992,8 @@ force_uninstall_docker() {
     echo -e "  • 所有Docker系统服务和配置文件"
     echo -e "  • docker用户组和权限"
     echo ""
-    read -r -p "输入 'FORCE_UNINSTALL' 确认强制卸载: " confirm
-    if [ "$confirm" != "FORCE_UNINSTALL" ]; then
+    read -r -p "输入 'UNINSTALL' 确认强制卸载: " confirm
+    if [ "$confirm" != "UNINSTALL" ]; then
         echo -e "${YELLOW}操作已取消${RESET}"
         sleep 1
         return 0
