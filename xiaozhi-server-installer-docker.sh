@@ -6517,56 +6517,270 @@ install_or_update_docker() {
 
 # 卸载Docker
 uninstall_docker() {
-    echo -e "\n${RED}🚨 Docker卸载向导${RESET}"
-    echo -e "${RED}=============================${RESET}"
+    echo -e "\n🔧 Docker卸载向导"
+    echo -e "================================\n"
     
-    # 停止所有容器
-    echo -e "${CYAN}🛑 停止所有运行中的容器...${RESET}"
-    docker stop $(docker ps -aq) 2>/dev/null || true
-    
-    # 删除所有容器
-    echo -e "${CYAN}🗑️ 删除所有容器...${RESET}"
-    docker rm $(docker ps -aq) 2>/dev/null || true
-    
-    # 删除所有镜像
-    echo -e "${CYAN}🗑️ 删除所有镜像...${RESET}"
-    docker rmi $(docker images -q) 2>/dev/null || true
-    
-    # 删除所有数据卷
-    echo -e "${CYAN}🗑️ 删除所有数据卷...${RESET}"
-    docker volume prune -f 2>/dev/null || true
-    
-    # 删除所有网络
-    echo -e "${CYAN}🗑️ 删除所有网络...${RESET}"
-    docker network prune -f 2>/dev/null || true
-    
-    # 卸载Docker包
-    echo -e "${CYAN}📦 卸载Docker包...${RESET}"
-    
-    # 检测并卸载不同包管理器中的Docker
-    if command -v apt &> /dev/null; then
-        sudo apt remove --purge -y docker docker-engine docker.io containerd runc 2>/dev/null || true
-        sudo apt autoremove -y 2>/dev/null || true
-    elif command -v yum &> /dev/null; then
-        sudo yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine 2>/dev/null || true
-    elif command -v dnf &> /dev/null; then
-        sudo dnf remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine 2>/dev/null || true
+    # 检查Docker是否安装
+    if ! command -v docker &> /dev/null; then
+        echo -e "${YELLOW}⚠️ Docker未安装，无需卸载${RESET}"
+        read -r -p "按回车键继续..." < /dev/tty
+        return 0
     fi
     
-    # 删除Docker相关文件和目录
-    echo -e "${CYAN}🧹 清理Docker配置文件...${RESET}"
+    # 显示当前Docker信息
+    echo -e "${CYAN}📋 当前Docker信息:${RESET}"
+    local docker_version=$(docker --version 2>/dev/null || echo "未知版本")
+    echo -e "版本: $docker_version"
+    
+    # 1. 停止Docker服务（重要！）
+    echo -e "\n${CYAN}🔄 步骤1: 停止Docker服务...${RESET}"
+    if systemctl is-active --quiet docker 2>/dev/null; then
+        echo -e "${YELLOW}正在停止Docker服务...${RESET}"
+        sudo systemctl stop docker 2>/dev/null
+        sudo systemctl disable docker 2>/dev/null
+        echo -e "${GREEN}✅ Docker服务已停止${RESET}"
+    else
+        echo -e "${GREEN}✅ Docker服务未运行${RESET}"
+    fi
+    
+    # 2. 停止所有运行中的容器
+    echo -e "\n${CYAN}🔄 步骤2: 停止所有容器...${RESET}"
+    if command -v docker &> /dev/null && docker ps 2>/dev/null | grep -v "Cannot connect"; then
+        running_containers=$(docker ps -q 2>/dev/null)
+        if [ -n "$running_containers" ]; then
+            docker stop $running_containers 2>/dev/null || true
+            echo -e "${GREEN}✅ 已停止运行中的容器${RESET}"
+        else
+            echo -e "${GREEN}✅ 无运行中的容器${RESET}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️ 无法访问Docker daemon${RESET}"
+    fi
+    
+    # 3. 删除所有容器
+    echo -e "\n${CYAN}🔄 步骤3: 删除所有容器...${RESET}"
+    if command -v docker &> /dev/null && docker ps -a 2>/dev/null | grep -v "Cannot connect"; then
+        all_containers=$(docker ps -aq 2>/dev/null)
+        if [ -n "$all_containers" ]; then
+            docker rm $all_containers 2>/dev/null || true
+            echo -e "${GREEN}✅ 已删除所有容器${RESET}"
+        else
+            echo -e "${GREEN}✅ 无容器需要删除${RESET}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️ 无法访问Docker daemon${RESET}"
+    fi
+    
+    # 4. 删除所有镜像
+    echo -e "\n${CYAN}🔄 步骤4: 删除所有镜像...${RESET}"
+    if command -v docker &> /dev/null && docker images 2>/dev/null | grep -v "Cannot connect"; then
+        all_images=$(docker images -q 2>/dev/null)
+        if [ -n "$all_images" ]; then
+            docker rmi -f $all_images 2>/dev/null || true
+            echo -e "${GREEN}✅ 已删除所有镜像${RESET}"
+        else
+            echo -e "${GREEN}✅ 无镜像需要删除${RESET}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️ 无法访问Docker daemon${RESET}"
+    fi
+    
+    # 5. 删除数据卷和网络
+    echo -e "\n${CYAN}🔄 步骤5: 清理数据卷和网络...${RESET}"
+    docker volume prune -f 2>/dev/null || true
+    docker network prune -f 2>/dev/null || true
+    echo -e "${GREEN}✅ 数据卷和网络已清理${RESET}"
+    
+    # 6. 停止Docker守护进程进程
+    echo -e "\n${CYAN}🔄 步骤6: 停止Docker守护进程...${RESET}"
+    local docker_pids=$(pgrep -f "dockerd" 2>/dev/null || echo "")
+    if [ -n "$docker_pids" ]; then
+        sudo kill $docker_pids 2>/dev/null || true
+        sleep 2
+        # 强制杀死仍在运行的进程
+        sudo kill -9 $docker_pids 2>/dev/null || true
+        echo -e "${GREEN}✅ Docker守护进程已停止${RESET}"
+    else
+        echo -e "${GREEN}✅ 无Docker守护进程需要停止${RESET}"
+    fi
+    
+    # 7. 卸载Docker包（改进的包管理器检测）
+    echo -e "\n${CYAN}🔄 步骤7: 卸载Docker包...${RESET}"
+    
+    # 重新检测包管理器并卸载
+    local pkg_manager=""
+    if command -v apt-get &> /dev/null; then
+        pkg_manager="apt"
+        echo -e "${CYAN}检测到APT包管理器${RESET}"
+        echo -e "${BLUE}卸载Docker相关包...${RESET}"
+        
+        # 尝试多种包名组合
+        sudo apt-get remove --purge -y \
+            docker \
+            docker-engine \
+            docker.io \
+            containerd \
+            containerd.io \
+            runc \
+            docker-ce \
+            docker-ce-cli \
+            docker-compose-plugin \
+            docker-compose \
+            docker-virtualization \
+            docker-client \
+            docker-client-latest \
+            docker-common \
+            docker-latest \
+            docker-latest-logrotate \
+            docker-logrotate \
+            docker-engine \
+            docker-rootless-extras \
+            2>/dev/null || true
+            
+        sudo apt-get autoremove -y 2>/dev/null || true
+        
+    elif command -v yum &> /dev/null; then
+        pkg_manager="yum"
+        echo -e "${CYAN}检测到YUM包管理器${RESET}"
+        echo -e "${BLUE}卸载Docker相关包...${RESET}"
+        
+        sudo yum remove -y \
+            docker \
+            docker-client \
+            docker-client-latest \
+            docker-common \
+            docker-latest \
+            docker-latest-logrotate \
+            docker-logrotate \
+            docker-engine \
+            docker-ee \
+            containerd \
+            containerd.io \
+            runc \
+            docker-ce \
+            docker-ce-cli \
+            docker-compose-plugin \
+            docker-compose \
+            2>/dev/null || true
+            
+    elif command -v dnf &> /dev/null; then
+        pkg_manager="dnf"
+        echo -e "${CYAN}检测到DNF包管理器${RESET}"
+        echo -e "${BLUE}卸载Docker相关包...${RESET}"
+        
+        sudo dnf remove -y \
+            docker \
+            docker-client \
+            docker-client-latest \
+            docker-common \
+            docker-latest \
+            docker-latest-logrotate \
+            docker-logrotate \
+            docker-engine \
+            docker-ee \
+            containerd \
+            containerd.io \
+            runc \
+            docker-ce \
+            docker-ce-cli \
+            docker-compose-plugin \
+            docker-compose \
+            2>/dev/null || true
+            
+    else
+        echo -e "${YELLOW}⚠️ 未识别包管理器，跳过包卸载${RESET}"
+    fi
+    
+    # 8. 手动删除Docker安装（补充包管理器卸载）
+    echo -e "\n${CYAN}🔄 步骤8: 手动清理Docker残留文件...${RESET}"
+    
+    # 尝试删除常见的Docker包文件
+    if [ "$pkg_manager" = "apt" ]; then
+        sudo dpkg -r docker docker-ce docker-ce-cli containerd.io docker-compose-plugin 2>/dev/null || true
+    elif [ "$pkg_manager" = "yum" ] || [ "$pkg_manager" = "dnf" ]; then
+        sudo rpm -e --nodeps docker docker-ce docker-ce-cli containerd.io 2>/dev/null || true
+    fi
+    
+    # 9. 删除Docker相关文件和目录
+    echo -e "\n${CYAN}🔄 步骤9: 清理配置文件和数据...${RESET}"
+    
+    # 删除Docker数据目录
     sudo rm -rf /var/lib/docker 2>/dev/null || true
     sudo rm -rf /var/run/docker 2>/dev/null || true
+    sudo rm -rf /var/run/docker.sock 2>/dev/null || true
+    sudo rm -rf /run/docker.sock 2>/dev/null || true
+    
+    # 删除Docker配置目录
     sudo rm -rf /etc/docker 2>/dev/null || true
+    sudo rm -rf /etc/default/docker 2>/dev/null || true
     sudo rm -rf ~/.docker 2>/dev/null || true
     
-    # 删除Docker用户组
-    sudo groupdel docker 2>/dev/null || true
+    # 删除Docker相关服务文件
+    sudo rm -f /etc/systemd/system/docker.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/docker.socket 2>/dev/null || true
+    sudo rm -f /lib/systemd/system/docker.service 2>/dev/null || true
+    sudo rm -f /lib/systemd/system/docker.socket 2>/dev/null || true
+    sudo rm -f /usr/lib/systemd/system/docker.service 2>/dev/null || true
+    sudo rm -f /usr/lib/systemd/system/docker.socket 2>/dev/null || true
     
-    echo -e "\n${GREEN}✅ Docker卸载完成！${RESET}"
+    # 删除Docker可执行文件
+    sudo rm -f /usr/bin/docker 2>/dev/null || true
+    sudo rm -f /usr/bin/dockerd 2>/dev/null || true
+    sudo rm -f /usr/bin/docker-compose 2>/dev/null || true
+    sudo rm -f /usr/bin/docker-compose-plugin 2>/dev/null || true
+    
+    # 删除Docker用户组（在包卸载之后）
+    echo -e "\n${CYAN}🔄 步骤10: 删除Docker用户组...${RESET}"
+    sudo groupdel docker 2>/dev/null || true
+    sudo usermod -aG docker $USER 2>/dev/null || true  # 移除用户从docker组
+    
+    # 10. 重新加载systemd配置
+    echo -e "\n${CYAN}🔄 步骤11: 重新加载systemd配置...${RESET}"
+    sudo systemctl daemon-reload 2>/dev/null || true
+    sudo systemctl reset-failed 2>/dev/null || true
+    
+    echo -e "\n${GREEN}==================================================${RESET}"
+    echo -e "${GREEN}✅ Docker卸载完成！${RESET}"
     echo -e "${YELLOW}⚠️ 注意：已删除所有Docker相关数据，谨慎操作！${RESET}"
     
+    # 验证卸载结果
+    echo -e "\n${CYAN}🔍 验证卸载结果...${RESET}"
+    sleep 2
+    
+    local uninstall_success=true
+    
+    if command -v docker &> /dev/null; then
+        echo -e "${RED}❌ Docker可执行文件仍然存在${RESET}"
+        uninstall_success=false
+    fi
+    
+    if systemctl is-enabled --quiet docker 2>/dev/null; then
+        echo -e "${RED}❌ Docker服务仍然启用${RESET}"
+        uninstall_success=false
+    fi
+    
+    if [ -d "/var/lib/docker" ]; then
+        echo -e "${RED}❌ Docker数据目录仍然存在${RESET}"
+        uninstall_success=false
+    fi
+    
+    if [ -S "/var/run/docker.sock" ]; then
+        echo -e "${RED}❌ Docker socket文件仍然存在${RESET}"
+        uninstall_success=false
+    fi
+    
+    if [ "$uninstall_success" = true ]; then
+        echo -e "${GREEN}✅ Docker已完全卸载${RESET}"
+        echo -e "${GREEN}🎉 卸载成功验证通过！${RESET}"
+    else
+        echo -e "${YELLOW}⚠️ Docker卸载可能不完整，建议手动检查${RESET}"
+        echo -e "${CYAN}💡 提示：可能需要重启系统以完全清理残留文件${RESET}"
+    fi
+    
+    echo -e "\n${GREEN}==================================================${RESET}"
+    
     read -r -p "按回车键继续..." < /dev/tty
+    return 0
 }
 
 # Docker详细信息显示
