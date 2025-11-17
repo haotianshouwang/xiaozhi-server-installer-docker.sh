@@ -6,12 +6,12 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.72
+# 版本：1.2.73
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板"
-Version="1.2.72"
+Version="1.2.73"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -8902,7 +8902,7 @@ configure_persona_settings() {
     echo -e "${PURPLE}==================================================${RESET}"
     
     echo "人设配置将定义小智的性格、说话方式和交互特点"
-    echo -e "${YELLOW}💡 字符数限制：4000字以内${RESET}"
+    echo -e "${YELLOW}💡 字符数限制：2000字以内${RESET}"
     echo -e "${YELLOW}📋 请输入完整的人设描述，包括核心特征和交互指南${RESET}"
     echo
     echo "示例格式："
@@ -8914,8 +8914,8 @@ configure_persona_settings() {
     
     # 检查字符数
     persona_length=${#persona_input}
-    if [ $persona_length -gt 4000 ]; then
-        echo -e "${RED}❌ 人设描述超过4000字符限制（当前：$persona_length字符）${RESET}"
+    if [ $persona_length -gt 2000 ]; then
+        echo -e "${RED}❌ 人设描述超过2000字符限制（当前：$persona_length字符）${RESET}"
         echo -e "${YELLOW}按回车键返回主菜单...${RESET}"
         sleep 2
         return 1
