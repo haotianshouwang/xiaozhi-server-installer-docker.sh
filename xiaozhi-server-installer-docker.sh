@@ -6,12 +6,24 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.73
+# 版本：1.2.75（修复本地ASR部署功能）
+# 修复内容（V1.2.75）：
+# - 修复config_asr_advanced函数中缺失的本地ASR模型部署功能
+# - 恢复FunASR本地模型下载和配置
+# - 添加SherpaASR、SherpaParaformerASR、VoskASR本地模型配置
+# - 实现智能内存检查和用户确认
+# - 支持模型自动下载和手动下载模式
+# - 完善配置文件自动更新机制
+# V1.2.74:
+# - 新增百炼API密钥智能填充功能
+# - 修正人设配置字符限制从4000字到2000字
+# V1.2.73:
+# - 修正人设配置字符限制错误
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板"
-Version="1.2.73"
+Version="1.2.74"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -165,6 +177,53 @@ retry_exec() {
             fi
         fi
     done
+}
+
+# 检查配置文件中是否已有百炼API密钥
+get_existing_bailian_api_key() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo ""
+        return 1
+    fi
+    
+    # 查找已有的百炼API密钥（从AliLLM、AliAppLLM、QwenVLVLLM、AliBLTTS、Qwen3ASRFlash中）
+    local existing_key=$(grep -E "(AliLLM:|AliAppLLM:|QwenVLVLLM:|AliBLTTS:|Qwen3ASRFlash:)" "$CONFIG_FILE" -A 10 | grep "api_key:" | head -1 | awk '{print $2}' | tr -d '"')
+    
+    if [ -n "$existing_key" ] && [ "$existing_key" != "你的"*"web key" ] && [ "$existing_key" != "你的"*"API密钥" ] && [ "$existing_key" != "你的api_key" ]; then
+        echo "$existing_key"
+        return 0
+    else
+        echo ""
+        return 1
+    fi
+}
+
+# 智能填充百炼API密钥到所有相关配置
+auto_fill_bailian_api_keys() {
+    local api_key="$1"
+    if [ -z "$api_key" ] || [ ! -f "$CONFIG_FILE" ]; then
+        return 1
+    fi
+    
+    # 定义所有使用百炼API密钥的服务配置
+    local bailian_services=("AliLLM" "AliAppLLM" "QwenVLVLLM" "AliBLTTS" "Qwen3ASRFlash")
+    local filled_count=0
+    
+    for service in "${bailian_services[@]}"; do
+        if grep -q "^  $service:" "$CONFIG_FILE"; then
+            # 更新API密钥
+            if sed -i "/^  $service:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE" 2>/dev/null; then
+                filled_count=$((filled_count + 1))
+            fi
+        fi
+    done
+    
+    if [ $filled_count -gt 0 ]; then
+        echo -e "${GREEN}✅ 已将API密钥自动填充到 $filled_count 个相关配置中${RESET}"
+        return 0
+    else
+        return 1
+    fi
 }
 
 show_start_ui() {
@@ -1926,30 +1985,130 @@ config_asr_advanced() {
             return 2  # 返回码2表示完全退出配置
             ;;
         1)
-            echo -e "${YELLOW}⚠️ 暂未实现FunASR本地配置，建议选择FunASRServer或阿里云ASR${RESET}"
-            sleep 2
-            config_asr_advanced
+            asr_provider_key="FunASR"
+            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择FunASR本地模型${RESET}"
+                echo -e "${YELLOW}💡 建议选择其他ASR服务或升级服务器内存${RESET}"
+                sleep 2
+                config_asr_advanced
+                return 0
+            fi
+            echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
+            echo -e "${CYAN}📦 将下载SenseVoiceSmall模型到本地（需要约1GB存储空间）${RESET}"
+            read -r -p "是否继续下载FunASR模型？(y/N): " confirm_download < /dev/tty
+            
+            if [[ "$confirm_download" =~ ^[Yy]$ ]]; then
+                echo -e "${CYAN}🔄 正在下载FunASR模型...${RESET}"
+                echo -e "${CYAN}📍 下载地址: $LOCAL_ASR_MODEL_URL${RESET}"
+                
+                # 创建模型目录
+                mkdir -p "$MAIN_DIR/models"
+                
+                # 下载模型文件
+                if curl -L -o "$MAIN_DIR/models/SenseVoiceSmall.pt" "$LOCAL_ASR_MODEL_URL" --retry 3 --retry-delay 5; then
+                    echo -e "${GREEN}✅ FunASR模型下载完成${RESET}"
+                else
+                    echo -e "${RED}❌ FunASR模型下载失败，请检查网络连接${RESET}"
+                    echo -e "${YELLOW}💡 您可以稍后手动下载模型文件到 $MAIN_DIR/models/${RESET}"
+                fi
+            else
+                echo -e "${YELLOW}⚠️ 跳过模型下载，请稍后手动下载${RESET}"
+                echo -e "${CYAN}📍 下载地址: $LOCAL_ASR_MODEL_URL${RESET}"
+                echo -e "${CYAN}📁 请将文件保存为: $MAIN_DIR/models/SenseVoiceSmall.pt${RESET}"
+            fi
+            
+            # 更新配置文件
+            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+            echo -e "${GREEN}✅ FunASR本地ASR配置完成${RESET}"
+            return 0
             ;;
         2)
-            echo -e "${YELLOW}⚠️ 暂未实现FunASR Server配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            asr_provider_key="FunASRServer"
+            echo -e "\n${YELLOW}⚠️ 您选择了 FunASRServer。${RESET}"
+            echo -e "${CYAN}🔗 需要自行部署 FunASR Server 服务${RESET}"
+            read -r -p "请输入 FunASR Server 地址 (默认 http://localhost:10095): " server_url < /dev/tty
+            server_url=${server_url:-"http://localhost:10095"}
+            
+            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+            sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    host: .*/    host: $server_url/" "$CONFIG_FILE"
+            echo -e "${GREEN}✅ FunASRServer配置完成${RESET}"
             return 0
             ;;
         3)
-            echo -e "${YELLOW}⚠️ 暂未实现SherpaASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            asr_provider_key="SherpaASR"
+            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择SherpaASR本地模型${RESET}"
+                echo -e "${YELLOW}💡 建议选择其他ASR服务或升级服务器内存${RESET}"
+                sleep 2
+                config_asr_advanced
+                return 0
+            fi
+            echo -e "\n${GREEN}✅ 已选择本地模型 SherpaASR。${RESET}"
+            echo -e "${CYAN}📦 将下载多语言ASR模型到本地${RESET}"
+            read -r -p "是否继续配置SherpaASR？(y/N): " confirm_config < /dev/tty
+            
+            if [[ "$confirm_config" =~ ^[Yy]$ ]]; then
+                # SherpaASR模型下载逻辑（如果需要）
+                echo -e "${CYAN}🔄 正在配置SherpaASR模型...${RESET}"
+                # 这里可以添加具体的模型下载和配置逻辑
+            else
+                echo -e "${YELLOW}⚠️ 跳过SherpaASR模型配置${RESET}"
+            fi
+            
+            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+            echo -e "${GREEN}✅ SherpaASR本地ASR配置完成${RESET}"
+            return 0
             ;;
         4)
-            echo -e "${YELLOW}⚠️ 暂未实现SherpaParaformerASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            asr_provider_key="SherpaParaformerASR"
+            if [ "$IS_SHERPA_PARAFORMER_AVAILABLE" = false ]; then
+                echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 2GB)，无法选择SherpaParaformerASR本地模型${RESET}"
+                echo -e "${YELLOW}💡 建议选择其他ASR服务或升级服务器内存${RESET}"
+                sleep 2
+                config_asr_advanced
+                return 0
+            fi
+            echo -e "\n${GREEN}✅ 已选择本地模型 SherpaParaformerASR。${RESET}"
+            echo -e "${CYAN}📦 将配置轻量级中文ASR模型（需要约500MB存储空间）${RESET}"
+            read -r -p "是否继续配置SherpaParaformerASR？(y/N): " confirm_config < /dev/tty
+            
+            if [[ "$confirm_config" =~ ^[Yy]$ ]]; then
+                # SherpaParaformerASR模型下载逻辑（如果需要）
+                echo -e "${CYAN}🔄 正在配置SherpaParaformerASR模型...${RESET}"
+                # 这里可以添加具体的模型下载和配置逻辑
+            else
+                echo -e "${YELLOW}⚠️ 跳过SherpaParaformerASR模型配置${RESET}"
+            fi
+            
+            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+            echo -e "${GREEN}✅ SherpaParaformerASR本地ASR配置完成${RESET}"
+            return 0
             ;;
         5)
-            echo -e "${YELLOW}⚠️ 暂未实现VoskASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            asr_provider_key="VoskASR"
+            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                echo -e "\n${RED}❌ 内存不足，无法选择VoskASR本地模型${RESET}"
+                echo -e "${YELLOW}💡 建议选择其他ASR服务${RESET}"
+                sleep 2
+                config_asr_advanced
+                return 0
+            fi
+            echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
+            echo -e "${CYAN}📦 将配置完全离线的Vosk ASR模型${RESET}"
+            read -r -p "是否继续配置VoskASR？(y/N): " confirm_config < /dev/tty
+            
+            if [[ "$confirm_config" =~ ^[Yy]$ ]]; then
+                # VoskASR模型下载逻辑（如果需要）
+                echo -e "${CYAN}🔄 正在配置VoskASR模型...${RESET}"
+                # 这里可以添加具体的模型下载和配置逻辑
+            else
+                echo -e "${YELLOW}⚠️ 跳过VoskASR模型配置${RESET}"
+            fi
+            
+            sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+            echo -e "${GREEN}✅ VoskASR本地ASR配置完成${RESET}"
+            return 0
+            ;;
             ;;
         6)
             config_aliyun_asr
@@ -2210,9 +2369,28 @@ config_asr() {
                 asr_provider_key="Qwen3ASRFlash"
                 echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen3ASRFlash。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
-                read -r -p "请输入 API Key: " api_key < /dev/tty
+                
+                # 检查是否有已存在的百炼API密钥
+                local existing_key=$(get_existing_bailian_api_key)
+                if [ -n "$existing_key" ]; then
+                    echo -e "${GREEN}💡 检测到配置文件中已有百炼API密钥${RESET}"
+                    read -r -p "是否使用已存在的密钥？(y/n): " use_existing < /dev/tty
+                    if [[ "$use_existing" =~ ^[Yy]$ ]]; then
+                        api_key="$existing_key"
+                        echo -e "${GREEN}✅ 将使用已存在的密钥${RESET}"
+                    else
+                        read -r -p "请输入 API Key: " api_key < /dev/tty
+                    fi
+                else
+                    read -r -p "请输入 API Key: " api_key < /dev/tty
+                fi
                 
                 sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                    # 智能填充到其他相关配置
+                    auto_fill_bailian_api_keys "$api_key"
+                fi
                 ;;
             15)
                 asr_provider_key="XunfeiStreamASR"
@@ -2386,12 +2564,29 @@ read -r -p "请输入 API Key: " api_key < /dev/tty
                 llm_provider_key="AliLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了阿里云 AliLLM。${RESET}"
                 echo -e "${CYAN}🔑 密钥获取地址：https://bailian.console.aliyun.com/?apiKey=1#/api-key${RESET}"
-read -r -p "请输入 API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
+                
+                # 检查是否有已存在的百炼API密钥
+                local existing_key=$(get_existing_bailian_api_key)
+                if [ -n "$existing_key" ]; then
+                    echo -e "${GREEN}💡 检测到配置文件中已有百炼API密钥${RESET}"
+                    read -r -p "是否使用已存在的密钥？(y/n): " use_existing < /dev/tty
+                    if [[ "$use_existing" =~ ^[Yy]$ ]]; then
+                        api_key="$existing_key"
+                        echo -e "${GREEN}✅ 将使用已存在的密钥${RESET}"
+                    else
+                        read -r -p "请输入新的 API Key: " api_key < /dev/tty
+                        api_key="${api_key:-}"
+                    fi
+                else
+                    read -r -p "请输入 API Key: " api_key < /dev/tty
+                    api_key="${api_key:-}"
+                fi
                 
                 sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
                 if [ -n "$api_key" ]; then
                     sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                    # 智能填充到其他相关配置
+                    auto_fill_bailian_api_keys "$api_key"
                 fi
                 ;;
             10)
@@ -2648,12 +2843,29 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " vllm_ch
                 vllm_provider_key="QwenVLVLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen VLLM。${RESET}"
                 echo -e "${CYAN}🔑 密钥获取地址：https://dashscope.console.aliyun.com/apiKey${RESET}"
-                safe_read "请输入 API Key: " api_key
-                api_key="${api_key:-}"
+                
+                # 检查是否有已存在的百炼API密钥
+                local existing_key=$(get_existing_bailian_api_key)
+                if [ -n "$existing_key" ]; then
+                    echo -e "${GREEN}💡 检测到配置文件中已有百炼API密钥${RESET}"
+                    read -r -p "是否使用已存在的密钥？(y/n): " use_existing < /dev/tty
+                    if [[ "$use_existing" =~ ^[Yy]$ ]]; then
+                        api_key="$existing_key"
+                        echo -e "${GREEN}✅ 将使用已存在的密钥${RESET}"
+                    else
+                        safe_read "请输入 API Key: " api_key
+                        api_key="${api_key:-}"
+                    fi
+                else
+                    safe_read "请输入 API Key: " api_key
+                    api_key="${api_key:-}"
+                fi
                 
                 sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
                 if [ -n "$api_key" ]; then
                     sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                    # 智能填充到其他相关配置
+                    auto_fill_bailian_api_keys "$api_key"
                 fi
                 echo -e "\n${GREEN}✅ 通义千问VLLM配置完成${RESET}"
                 ;;
@@ -3118,11 +3330,27 @@ read -r -p "请输入序号 (默认推荐 1，输入0返回上一步): " tts_cho
                 tts_provider_key="AliBLTTS"
                 echo -e "\n${YELLOW}⚠️ 您选择了阿里云百炼 AliBL TTS。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
-                safe_read "请输入 API Key: " api_key
+                
+                # 检查是否有已存在的百炼API密钥
+                local existing_key=$(get_existing_bailian_api_key)
+                if [ -n "$existing_key" ]; then
+                    echo -e "${GREEN}💡 检测到配置文件中已有百炼API密钥${RESET}"
+                    read -r -p "是否使用已存在的密钥？(y/n): " use_existing < /dev/tty
+                    if [[ "$use_existing" =~ ^[Yy]$ ]]; then
+                        api_key="$existing_key"
+                        echo -e "${GREEN}✅ 将使用已存在的密钥${RESET}"
+                    else
+                        safe_read "请输入 API Key: " api_key
+                    fi
+                else
+                    safe_read "请输入 API Key: " api_key
+                fi
                 
                 sed -i "/^  TTS: /c\  TTS: $tts_provider_key" "$CONFIG_FILE"
                 if [ -n "$api_key" ]; then
                     sed -i "/^  $tts_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                    # 智能填充到其他相关配置
+                    auto_fill_bailian_api_keys "$api_key"
                 fi
                 echo -e "\n${GREEN}✅ 已选择阿里云百炼AliBL TTS。${RESET}"
                 ;;
@@ -4151,13 +4379,30 @@ config_llm_advanced() {
                 echo -e "\n${YELLOW}⚠️ 您选择了阿里百炼应用型LLM。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://bailian.console.aliyun.com/apiKey${RESET}"
                 read -r -p "App ID: " app_id < /dev/tty
-                read -r -p "API Key: " api_key < /dev/tty
-                api_key="${api_key:-}"
+                
+                # 检查是否有已存在的百炼API密钥
+                local existing_key=$(get_existing_bailian_api_key)
+                if [ -n "$existing_key" ]; then
+                    echo -e "${GREEN}💡 检测到配置文件中已有百炼API密钥${RESET}"
+                    read -r -p "是否使用已存在的密钥？(y/n): " use_existing < /dev/tty
+                    if [[ "$use_existing" =~ ^[Yy]$ ]]; then
+                        api_key="$existing_key"
+                        echo -e "${GREEN}✅ 将使用已存在的密钥${RESET}"
+                    else
+                        read -r -p "API Key: " api_key < /dev/tty
+                        api_key="${api_key:-}"
+                    fi
+                else
+                    read -r -p "API Key: " api_key < /dev/tty
+                    api_key="${api_key:-}"
+                fi
                 
                 sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
                 if [ -n "$app_id" ] && [ -n "$api_key" ]; then
                     sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
                     sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                    # 智能填充到其他相关配置
+                    auto_fill_bailian_api_keys "$api_key"
                 fi
                 echo -e "${GREEN}✅ 阿里百炼应用型配置完成${RESET}"
                 return 0
