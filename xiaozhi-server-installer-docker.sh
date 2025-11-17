@@ -6,8 +6,14 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.75（修复本地ASR部署功能）
-# 修复内容（V1.2.75）：
+# 版本：1.2.76（修复人设配置和阿里云配置共享功能）
+# 修复内容（V1.2.76）：
+# - 修复人设配置函数返回语句缺失问题
+# - 新增阿里云配置智能共享功能
+# - 实现Access Key ID和Access Key Secret在阿里云服务间共享
+# - 优化阿里云ASR和TTS配置流程，避免重复输入
+# - 添加配置检测和复用机制
+# V1.2.75:
 # - 修复config_asr_advanced函数中缺失的本地ASR模型部署功能
 # - 恢复FunASR本地模型下载和配置
 # - 添加SherpaASR、SherpaParaformerASR、VoskASR本地模型配置
@@ -1907,10 +1913,22 @@ config_aliyun_asr() {
     safe_read "请输入 Appkey: " appkey
     safe_read "请输入 Token: " token
     
-    echo -e "\n${YELLOW}💡 是否要配置长期使用的Access Key？${RESET}"
-    echo "如需长期使用（避免Token过期），建议配置Access Key:"
-    read -r -p "请输入 Access Key ID (留空跳过): " access_key_id < /dev/tty
-    read -r -p "请输入 Access Key Secret (留空跳过): " access_key_secret < /dev/tty
+    echo -e "\n${YELLOW}💡 检查现有阿里云配置...${RESET}"
+    
+    # 使用共享配置函数
+    local access_key_id=""
+    local access_key_secret=""
+    if ! check_and_share_aliyun_credentials "ASR"; then
+        echo -e "${YELLOW}💡 请配置长期使用的Access Key：${RESET}"
+        read -r -p "请输入 Access Key ID (留空跳过): " access_key_id < /dev/tty
+        read -r -p "请输入 Access Key Secret (留空跳过): " access_key_secret < /dev/tty
+    else
+        # 从check_and_share_aliyun_credentials函数获取已存在的配置
+        if [ -f "$CONFIG_FILE" ]; then
+            access_key_id=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_id:" | sed 's/.*access_key_id: *"\?\([^"]*\)".*/\1/' | head -1)
+            access_key_secret=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_secret:" | sed 's/.*access_key_secret: *"\?\([^"]*\)".*/\1/' | head -1)
+        fi
+    fi
     
     local asr_provider_key="AliyunStreamASR"
     sed -i "/^  ASR: /c\  ASR: $asr_provider_key" "$CONFIG_FILE"
@@ -1921,10 +1939,10 @@ config_aliyun_asr() {
     if [ -n "$token" ]; then
         sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    token: .*/    token: \"$token\"/" "$CONFIG_FILE"
     fi
-    if [ -n "$access_key_id" ]; then
+    if [ -n "$access_key_id" ] && [ "$access_key_id" != "null" ]; then
         sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$access_key_id\"/" "$CONFIG_FILE"
     fi
-    if [ -n "$access_key_secret" ]; then
+    if [ -n "$access_key_secret" ] && [ "$access_key_secret" != "null" ]; then
         sed -i "/^  $asr_provider_key:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: \"$access_key_secret\"/" "$CONFIG_FILE"
     fi
     
@@ -4567,8 +4585,21 @@ EOF
 config_aliyun_tts() {
     echo -e "\n${CYAN}☁️ 配置阿里云TTS${RESET}"
     read -r -p "AppKey: " aliyun_appkey < /dev/tty
-    read -r -p "Access Key ID: " aliyun_id < /dev/tty
-    read -r -p "Access Key Secret: " aliyun_secret < /dev/tty
+    
+    # 使用共享配置函数检查Access Key
+    local access_key_id=""
+    local access_key_secret=""
+    if ! check_and_share_aliyun_credentials "TTS"; then
+        echo -e "${YELLOW}💡 请配置长期使用的Access Key：${RESET}"
+        read -r -p "Access Key ID: " access_key_id < /dev/tty
+        read -r -p "Access Key Secret: " access_key_secret < /dev/tty
+    else
+        # 从配置文件获取已存在的配置
+        if [ -f "$CONFIG_FILE" ]; then
+            access_key_id=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_id:" | sed 's/.*access_key_id: *"\?\([^"]*\)".*/\1/' | head -1)
+            access_key_secret=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_secret:" | sed 's/.*access_key_secret: *"\?\([^"]*\)".*/\1/' | head -1)
+        fi
+    fi
     
     sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: AliyunTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
     
@@ -4580,8 +4611,8 @@ TTS:
     output_dir: tmp/
     appkey: $aliyun_appkey
     voice: xiaoyun
-    access_key_id: $aliyun_id
-    access_key_secret: $aliyun_secret
+    access_key_id: $access_key_id
+    access_key_secret: $access_key_secret
 EOF
     echo -e "${GREEN}✅ 阿里云TTS配置完成${RESET}"
 }
@@ -8715,11 +8746,24 @@ EOF
         2)
             # 阿里云TTS
             echo -e "${CYAN}配置阿里云TTS服务...${RESET}"
-            read -r -p "请输入阿里云AccessKeyId: " ali_access_key_id
-            read -r -p "请输入阿里云AccessKeySecret: " ali_access_key_secret
             read -r -p "请输入阿里云AppKey: " ali_appkey
             
-            if [ -n "$ali_access_key_id" ] && [ -n "$ali_access_key_secret" ]; then
+            # 使用共享配置函数检查Access Key
+            local access_key_id=""
+            local access_key_secret=""
+            if ! check_and_share_aliyun_credentials "TTS"; then
+                echo -e "${YELLOW}💡 请配置长期使用的Access Key：${RESET}"
+                read -r -p "请输入阿里云AccessKeyId: " access_key_id
+                read -r -p "请输入阿里云AccessKeySecret: " access_key_secret
+            else
+                # 从配置文件获取已存在的配置
+                if [ -f "$CONFIG_FILE" ]; then
+                    access_key_id=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_id:" | sed 's/.*access_key_id: *"\?\([^"]*\)".*/\1/' | head -1)
+                    access_key_secret=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_secret:" | sed 's/.*access_key_secret: *"\?\([^"]*\)".*/\1/' | head -1)
+                fi
+            fi
+            
+            if [ -n "$access_key_id" ] && [ -n "$access_key_secret" ]; then
                 [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
                 sed -i 's/type:.*/type: "aliyun"/' "$CONFIG_FILE"
                 echo -e "${GREEN}✅ 阿里云TTS配置完成${RESET}"
@@ -9138,6 +9182,61 @@ configure_llm_service() {
     echo -e "${CYAN}📝 配置文件位置: $CONFIG_FILE${RESET}"
 }
 
+# ========================= 阿里云配置共享检测函数 =========================
+check_and_share_aliyun_credentials() {
+    local service_type="$1"  # ASR, TTS, LLM
+    
+    echo -e "${CYAN}🔍 检测现有阿里云配置...${RESET}"
+    
+    # 检查是否已有阿里云Access Key配置
+    local existing_access_key_id=""
+    local existing_access_key_secret=""
+    
+    # 从ASR配置中查找
+    if [ -f "$CONFIG_FILE" ]; then
+        existing_access_key_id=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_id:" | sed 's/.*access_key_id: *"\?\([^"]*\)".*/\1/' | head -1)
+        existing_access_key_secret=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_secret:" | sed 's/.*access_key_secret: *"\?\([^"]*\)".*/\1/' | head -1)
+    fi
+    
+    # 如果在ASR中没找到，尝试从TTS中查找
+    if [ -z "$existing_access_key_id" ] && [ -f "$CONFIG_FILE" ]; then
+        existing_access_key_id=$(grep -A 5 "AliyunTTS:" "$CONFIG_FILE" | grep "access_key_id:" | sed 's/.*access_key_id: *"\?\([^"]*\)".*/\1/' | head -1)
+        existing_access_key_secret=$(grep -A 5 "AliyunTTS:" "$CONFIG_FILE" | grep "access_key_secret:" | sed 's/.*access_key_secret: *"\?\([^"]*\)".*/\1/' | head -1)
+    fi
+    
+    if [ -n "$existing_access_key_id" ] && [ -n "$existing_access_key_secret" ] && [ "$existing_access_key_id" != "null" ] && [ "$existing_access_key_secret" != "null" ]; then
+        echo -e "${GREEN}✅ 检测到现有阿里云Access Key配置${RESET}"
+        echo -e "${CYAN}💡 是否复用现有的Access Key配置？${RESET}"
+        read -r -p "Access Key ID: ${existing_access_key_id:0:8}****，是否使用？(y/n): " use_existing < /dev/tty
+        
+        if [[ "$use_existing" =~ ^[Yy]$ ]]; then
+            echo -e "${GREEN}✅ 将复用现有阿里云配置${RESET}"
+            
+            # 将现有的Access Key配置应用到当前服务
+            case "$service_type" in
+                "ASR")
+                    sed -i "/^  AliyunStreamASR:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$existing_access_key_id\"/" "$CONFIG_FILE"
+                    sed -i "/^  AliyunStreamASR:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: \"$existing_access_key_secret\"/" "$CONFIG_FILE"
+                    ;;
+                "TTS")
+                    if grep -q "  AliyunTTS:" "$CONFIG_FILE"; then
+                        sed -i "/^  AliyunTTS:/,/^  [A-Za-z]/ s/^    access_key_id: .*/    access_key_id: \"$existing_access_key_id\"/" "$CONFIG_FILE"
+                        sed -i "/^  AliyunTTS:/,/^  [A-Za-z]/ s/^    access_key_secret: .*/    access_key_secret: \"$existing_access_key_secret\"/" "$CONFIG_FILE"
+                    elif grep -q "  AliyunStreamTTS:" "$CONFIG_FILE"; then
+                        # AliyunStreamTTS 使用不同的配置方式（token），但我们仍可以记录Access Key
+                        echo "  access_key_id: \"$existing_access_key_id\"" >> "$CONFIG_FILE"
+                        echo "  access_key_secret: \"$existing_access_key_secret\"" >> "$CONFIG_FILE"
+                    fi
+                    ;;
+            esac
+            
+            return 0  # 使用现有配置
+        fi
+    fi
+    
+    return 1  # 需要重新配置
+}
+
 # ========================= 人设配置函数 =========================
 configure_persona_settings() {
     clear
@@ -9223,6 +9322,9 @@ EOF
         sleep 2
         return 1
     fi
+    
+    echo -e "${GREEN}✅ 人设配置完成${RESET}"
+    return 0
 }
 
 # ========================= 服务器配置函数 =========================
@@ -9950,5 +10052,4 @@ convert_asr_to_cloud() {
 }
 
 # 启动脚本执行
-main "$@"
 main "$@"
