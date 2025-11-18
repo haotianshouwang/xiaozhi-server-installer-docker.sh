@@ -4326,6 +4326,26 @@ config_llm_advanced() {
                 return 0
                 ;;
             4)
+                llm_provider_key="AliAppLLM"
+                echo -e "\n${YELLOW}⚠️ 您选择了阿里百炼应用型 AliAppLLM。${RESET}"
+                echo -e "${CYAN}🔑 开通地址：https://bailian.console.aliyun.com/apiKey${RESET}"
+                echo -e "${CYAN}💡 AliAppLLM使用应用型模型，与AliLLM不同${RESET}"
+                
+                read -r -p "请输入 App ID: " app_id < /dev/tty
+                read -r -p "请输入 API Key: " api_key < /dev/tty
+                api_key="${api_key:-}"
+                
+                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
+                if [ -n "$app_id" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
+                fi
+                if [ -n "$api_key" ]; then
+                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                fi
+                echo -e "\n${GREEN}✅ 已选择AliAppLLM并配置完成。${RESET}"
+                return 0
+                ;;
+            5)
                 llm_provider_key="DeepSeekLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了 DeepSeek。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://platform.deepseek.com/api_keys${RESET}"
@@ -4339,7 +4359,7 @@ config_llm_advanced() {
                 echo -e "${GREEN}✅ DeepSeek配置完成${RESET}"
                 return 0
                 ;;
-            5)
+            6)
                 llm_provider_key="GeminiLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了谷歌 Gemini。${RESET}"
                 echo -e "${CYAN}🔑 开通地址：https://aistudio.google.com/app/apikey${RESET}"
@@ -4370,7 +4390,7 @@ config_llm_advanced() {
                 echo -e "${GREEN}✅ Dify配置完成${RESET}"
                 return 0
                 ;;
-            8)
+            10)
                 llm_provider_key="OllamaLLM"
                 echo -e "\n${YELLOW}⚠️ 您选择了 Ollama 本地。${RESET}"
                 echo -e "${CYAN}ℹ️ 请确保 Ollama 服务已在本地运行${RESET}"
@@ -4419,39 +4439,6 @@ config_llm_advanced() {
                     sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_url: .*/    api_url: \"$fastgpt_url\"/" "$CONFIG_FILE"
                 fi
                 echo -e "${GREEN}✅ FastGPT配置完成${RESET}"
-                return 0
-                ;;
-            4)
-                llm_provider_key="AliAppLLM"
-                echo -e "\n${YELLOW}⚠️ 您选择了阿里百炼应用型LLM。${RESET}"
-                echo -e "${CYAN}🔑 开通地址：https://bailian.console.aliyun.com/apiKey${RESET}"
-                read -r -p "App ID: " app_id < /dev/tty
-                
-                # 检查是否有已存在的百炼API密钥
-                local existing_key=$(get_existing_bailian_api_key)
-                if [ -n "$existing_key" ]; then
-                    echo -e "${GREEN}💡 检测到配置文件中已有百炼API密钥${RESET}"
-                    read -r -p "是否使用已存在的密钥？(y/n): " use_existing < /dev/tty
-                    if [[ "$use_existing" =~ ^[Yy]$ ]]; then
-                        api_key="$existing_key"
-                        echo -e "${GREEN}✅ 将使用已存在的密钥${RESET}"
-                    else
-                        read -r -p "API Key: " api_key < /dev/tty
-                        api_key="${api_key:-}"
-                    fi
-                else
-                    read -r -p "API Key: " api_key < /dev/tty
-                    api_key="${api_key:-}"
-                fi
-                
-                sed -i "/^  LLM: /c\  LLM: $llm_provider_key" "$CONFIG_FILE"
-                if [ -n "$app_id" ] && [ -n "$api_key" ]; then
-                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    app_id: .*/    app_id: \"$app_id\"/" "$CONFIG_FILE"
-                    sed -i "/^  $llm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
-                    # 智能填充到其他相关配置
-                    auto_fill_bailian_api_keys "$api_key"
-                fi
-                echo -e "${GREEN}✅ 阿里百炼应用型配置完成${RESET}"
                 return 0
                 ;;
             8)
