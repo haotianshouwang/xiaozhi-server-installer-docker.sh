@@ -1946,6 +1946,12 @@ config_aliyun_asr() {
     echo -e "${YELLOW}💡 长期使用建议设置下方Access Key（可选）：${RESET}"
     echo "  - Access Key ID: 阿里云账号访问密钥ID（可选，长期使用推荐）"
     echo "  - Access Key Secret: 阿里云账号访问密钥（可选，长期使用推荐）"
+    echo -e "${CYAN}📋 Access Key获取方法：${RESET}"
+    echo "   1. 登录阿里云控制台：https://ecs.console.aliyun.com/"
+    echo "   2. 进入'访问控制' -> '身份管理' -> '用户'"
+    echo "   3. 创建RAM用户或选择已有用户"
+    echo "   4. 在'安全凭证'中创建AccessKey"
+    echo ""
     
     safe_read "请输入 Appkey: " appkey
     safe_read "请输入 Token: " token
@@ -4032,6 +4038,12 @@ config_doubao_tts() {
     echo -e "\n${CYAN}🔥 配置DoubaoTTS (火山引擎)${RESET}"
     echo -e "${YELLOW}需要购买服务，起步价30元，100并发。免费版仅2并发${RESET}"
     
+    echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/ark${RESET}"
+    echo -e "${CYAN}📝 需要以下参数：${RESET}"
+    echo "  - AppID: 火山引擎语音合成服务AppID"
+    echo "  - Access Token: 火山引擎语音合成服务Access Token"
+    echo ""
+    
     echo -e "\n${CYAN}请输入火山引擎语音配置信息：${RESET}"
     read -r -p "AppID: " appid < /dev/tty
     read -r -p "Access Token: " access_token < /dev/tty
@@ -4587,6 +4599,12 @@ config_openai_tts() {
 # 简化的其他TTS配置函数
 config_huoshan_tts() {
     echo -e "\n${CYAN}🔥 配置火山大模型TTS${RESET}"
+    echo -e "${CYAN}🔑 开通地址：https://console.volcengine.com/ark${RESET}"
+    echo -e "${CYAN}📝 需要以下参数：${RESET}"
+    echo "  - AppID: 火山引擎语音合成服务AppID"
+    echo "  - Access Token: 火山引擎语音合成服务Access Token"
+    echo ""
+    
     read -r -p "AppID: " huoshan_appid < /dev/tty
     read -r -p "Access Token: " huoshan_token < /dev/tty
     
@@ -4621,6 +4639,18 @@ config_huoshan_tts() {
 
 config_aliyun_tts() {
     echo -e "\n${CYAN}☁️ 配置阿里云TTS${RESET}"
+    echo -e "${CYAN}🔑 开通地址：https://dashscope.console.aliyun.com${RESET}"
+    echo -e "${CYAN}📝 需要以下参数：${RESET}"
+    echo "  - AppKey: 阿里云语音应用密钥"
+    echo "  - Access Key ID: 阿里云账号访问密钥ID（可选，长期使用推荐）"
+    echo "  - Access Key Secret: 阿里云账号访问密钥（可选，长期使用推荐）"
+    echo -e "${YELLOW}💡 Access Key获取方法：${RESET}"
+    echo "   1. 登录阿里云控制台：https://ecs.console.aliyun.com/"
+    echo "   2. 进入'访问控制' -> '身份管理' -> '用户'"
+    echo "   3. 创建RAM用户或选择已有用户"
+    echo "   4. 在'安全凭证'中创建AccessKey"
+    echo ""
+    
     read -r -p "AppKey: " aliyun_appkey < /dev/tty
     
     # 使用共享配置函数检查Access Key
@@ -4824,6 +4854,13 @@ config_xunfei_stream_asr() {
 
 config_xunfei_tts() {
     echo -e "\n${CYAN}🗣️ 配置讯飞TTS${RESET}"
+    echo -e "${CYAN}🔑 开通地址：https://console.xfyun.cn/${RESET}"
+    echo -e "${CYAN}📝 需要以下参数：${RESET}"
+    echo "  - App ID: 讯飞语音应用ID"
+    echo "  - API Secret: 讯飞API Secret"
+    echo "  - API Key: 讯飞API Key"
+    echo ""
+    
     read -r -p "App ID: " xunfei_appid < /dev/tty
     read -r -p "API Secret: " xunfei_secret < /dev/tty
     read -r -p "API Key: " xunfei_key < /dev/tty
@@ -5111,7 +5148,18 @@ config_aliyun_stream_tts() {
     local default_voice=$(grep -A10 -B2 "AliyunStreamTTS:" "$CONFIG_FILE" 2>/dev/null | grep "voice:" | awk '{print $2}' || echo "longxiaochun")
     
     echo -e "${CYAN}阿里云智能语音交互服务配置：${RESET}"
-    echo -e "${YELLOW}请在阿里云控制台开通流式TTS服务${RESET}"
+    echo -e "${CYAN}🔑 开通地址：https://nls-portal.console.aliyun.com${RESET}"
+    echo -e "${CYAN}📝 需要以下参数：${RESET}"
+    echo "  - App Key: 阿里云语音应用密钥"
+    echo "  - Access Token: 临时访问令牌（24小时有效）"
+    echo "  - Access Key ID: 阿里云账号访问密钥ID（可选，长期使用推荐）"
+    echo "  - Access Key Secret: 阿里云账号访问密钥（可选，长期使用推荐）"
+    echo -e "${YELLOW}💡 Access Key获取方法：${RESET}"
+    echo "   1. 登录阿里云控制台：https://ecs.console.aliyun.com/"
+    echo "   2. 进入'访问控制' -> '身份管理' -> '用户'"
+    echo "   3. 创建RAM用户或选择已有用户"
+    echo "   4. 在'安全凭证'中创建AccessKey"
+    echo ""
     
     read -r -p "App Key ${default_appkey:+[默认: $default_appkey]}: " appkey < /dev/tty
     appkey=${appkey:-$default_appkey}
@@ -5144,7 +5192,12 @@ config_aliyun_stream_tts() {
     local access_key_id=""
     local access_key_secret=""
     if ! check_and_share_aliyun_credentials "TTS"; then
-        echo -e "${YELLOW}💡 请配置Access Key（如果需要）：${RESET}"
+        echo -e "${YELLOW}💡 请配置Access Key（可选，长期使用推荐）：${RESET}"
+        echo "Access Key获取方法："
+        echo "  1. 登录阿里云控制台：https://ecs.console.aliyun.com/"
+        echo "  2. 进入'访问控制' -> '身份管理' -> '用户'"
+        echo "  3. 创建RAM用户或选择已有用户"
+        echo "  4. 在'安全凭证'中创建AccessKey"
         read -r -p "Access Key ID (可选): " access_key_id < /dev/tty
         read -r -p "Access Key Secret (可选): " access_key_secret < /dev/tty
     else
@@ -5301,6 +5354,13 @@ config_aliyun_stream_tts() {
 # 腾讯云TTS配置
 config_tencent_tts() {
     echo -e "\n${CYAN}🐧 配置腾讯云智能语音交互服务${RESET}"
+    echo -e "${CYAN}🔑 开通地址：https://console.cloud.tencent.com/tts${RESET}"
+    echo -e "${CYAN}📝 需要以下参数：${RESET}"
+    echo "  - APPID: 腾讯云语音应用ID"
+    echo "  - SecretID: 腾讯云访问密钥ID"
+    echo "  - SecretKey: 腾讯云访问密钥"
+    echo ""
+    
     echo -e "${YELLOW}需要先在腾讯云控制台开通TTS服务${RESET}"
     
     # 使用默认配置检查
@@ -5425,7 +5485,11 @@ config_tts_302ai() {
 # 机智云TTS配置
 config_gizwits_tts() {
     echo -e "\n${CYAN}📱 配置机智云TTS服务${RESET}"
-    echo -e "${YELLOW}基于火山引擎的TTS服务${RESET}"
+    echo -e "${CYAN}🔑 开通地址：https://iot.gizwits.com/${RESET}"
+    echo -e "${CYAN}📝 基于火山引擎的TTS服务${RESET}"
+    echo -e "${CYAN}📝 需要以下参数：${RESET}"
+    echo "  - Access Token: 火山引擎访问令牌"
+    echo ""
     
     # 使用默认配置检查
     local default_token=$(grep -A5 -B1 "GizwitsTTS:" "$CONFIG_FILE" 2>/dev/null | grep "access_token:" | awk '{print $2}' || echo "")
