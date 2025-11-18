@@ -6,7 +6,7 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.78（修复ASR配置菜单函数调用问题）
+# 版本：1.2.80（修复ASR配置菜单函数调用问题）
 # 修复内容（V1.2.76）：
 # - 修复人设配置函数返回语句缺失问题
 # - 新增阿里云配置智能共享功能
@@ -20,6 +20,25 @@ trap exit_confirm SIGINT
 # - 实现智能内存检查和用户确认
 # - 支持模型自动下载和手动下载模式
 # - 完善配置文件自动更新机制
+# V1.2.80:
+# - 修正配置文件管理菜单返回逻辑，返回到配置文件管理菜单而非主菜单
+# - 区分配置文件管理菜单和脚本配置流程的不同返回逻辑
+# V1.2.79:
+# - 修复配置文件管理菜单逻辑，每个配置项完成后直接返回主菜单
+# - 修复人设配置，用户未输入时使用现有默认配置
+# - 修复Memory配置返回上一步逻辑，避免循环
+# V1.2.78:
+# - 修复ASR配置菜单函数调用，防止服务器卡死
+# - 修正配置步骤显示一致性（1/7-7/7）
+# V1.2.77:
+# - 新增阿里云配置共享功能
+# - 人设配置功能完善
+# V1.2.76:
+# - 实现智能内存检查和用户确认
+# - 支持模型自动下载和手动下载模式
+# - 完善配置文件自动更新机制
+# V1.2.75:
+# - 修复语法错误
 # V1.2.74:
 # - 新增百炼API密钥智能填充功能
 # - 修正人设配置字符限制从4000字到2000字
@@ -3756,8 +3775,8 @@ config_keys() {
                         echo -e "\n${YELLOW}⚠️ 用户取消配置${RESET}"
                         return 1
                     elif [ $memory_result -eq 1 ]; then
-                        config_step=4  # 返回上一步
-                        echo -e "\n${CYAN}🔄 返回上一步${RESET}"
+                        config_step=3  # 返回到TTS配置
+                        echo -e "\n${CYAN}🔄 返回上一步，重新配置 TTS 服务${RESET}"
                         continue
                     fi
                     ;;
@@ -8654,30 +8673,57 @@ config_management_menu() {
         case $config_choice in
             1)
                 configure_tts_service
+                echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
+                sleep 1
+                continue
                 ;;
             2)
                 configure_asr_service
+                echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
+                sleep 1
+                continue
                 ;;
             3)
                 configure_llm_service
+                echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
+                sleep 1
+                continue
                 ;;
             4)
                 configure_persona_settings
+                echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
+                sleep 1
+                continue
                 ;;
             5)
                 configure_server_settings
+                echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
+                sleep 1
+                continue
                 ;;
             6)
                 configure_plugins
+                echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
+                sleep 1
+                continue
                 ;;
             7)
                 check_config_file_status
+                echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
+                sleep 1
+                continue
                 ;;
             8)
                 backup_restore_config
+                echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
+                sleep 1
+                continue
                 ;;
             9)
                 convert_local_to_cloud_asr
+                echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
+                sleep 1
+                continue
                 ;;
             0)
                 echo -e "${CYAN}🔙 返回主菜单${RESET}"
@@ -9160,6 +9206,14 @@ configure_persona_settings() {
     echo
     
     read -r -p "请输入完整的人设描述: " persona_input
+    
+    # 检查用户是否输入了内容
+    if [ -z "$persona_input" ]; then
+        echo -e "${YELLOW}⚠️ 未输入新的人设描述${RESET}"
+        echo -e "${CYAN}💡 将使用配置文件中的现有默认人设设置${RESET}"
+        echo -e "${GREEN}✅ 人设配置保持不变${RESET}"
+        return 0
+    fi
     
     # 检查字符数
     persona_length=${#persona_input}
