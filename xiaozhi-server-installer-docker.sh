@@ -6,67 +6,13 @@ trap exit_confirm SIGINT
 # 小智服务器一键部署脚本：自动安装Docker、创建目录、配置密钥、启动服务、监控面板等。
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
-# 版本：1.2.83（删除配置文件不存在的LLM配置项）
-# 修复内容（V1.2.83）：
-# - 删除配置文件不存在的LLM配置项：KimiLLM、SparkLLM、WenxinLLM、OpenaiLLM、GroqLLM
-# - 重新调整LLM菜单选项和case语句编号，从15个减少到10个
-# - 更新高级LLM配置函数，删除无效配置项
-# 修复内容（V1.2.82）：
-# - 优化ASR服务商菜单顺序，将FunASRServer放在FunASR后面
-# - 调整菜单顺序：FunASR、FunASRServer、SherpaASR、SherpaParaformerASR、VoskASR
-# - 同步调整所有case语句编号，确保菜单选项与功能对应正确
-# 修复内容（V1.2.81）：
-# - 修复ASR服务商菜单显示顺序问题
-# - 调整本地模型排列顺序：FunASR、SherpaASR、SherpaParaformerASR、VoskASR
-# - 将VoskASR从第13位移动到第4位，确保本地模型连续显示
-# - 更新相关case语句编号，确保菜单选项与功能对应正确
-# - 修复重复main函数调用语法错误
-# 修复内容（V1.2.80）：
-# - 修复配置文件管理菜单返回逻辑，使用continue而非return
-# - 修复人设配置空输入处理，自动使用现有默认配置
-# - 修复Memory配置返回逻辑，正确返回TTS配置
-# 修复内容（V1.2.76）：
-# - 修复人设配置函数返回语句缺失问题
-# - 新增阿里云配置智能共享功能
-# - 实现Access Key ID和Access Key Secret在阿里云服务间共享
-# - 优化阿里云ASR和TTS配置流程，避免重复输入
-# - 添加配置检测和复用机制
-# V1.2.75:
-# - 修复config_asr_advanced函数中缺失的本地ASR模型部署功能
-# - 恢复FunASR本地模型下载和配置
-# - 添加SherpaASR、SherpaParaformerASR、VoskASR本地模型配置
-# - 实现智能内存检查和用户确认
-# - 支持模型自动下载和手动下载模式
-# - 完善配置文件自动更新机制
-# V1.2.80:
-# - 修正配置文件管理菜单返回逻辑，返回到配置文件管理菜单而非主菜单
-# - 区分配置文件管理菜单和脚本配置流程的不同返回逻辑
-# V1.2.79:
-# - 修复配置文件管理菜单逻辑，每个配置项完成后直接返回主菜单
-# - 修复人设配置，用户未输入时使用现有默认配置
-# - 修复Memory配置返回上一步逻辑，避免循环
-# V1.2.78:
-# - 修复ASR配置菜单函数调用，防止服务器卡死
-# - 修正配置步骤显示一致性（1/7-7/7）
-# V1.2.77:
-# - 新增阿里云配置共享功能
-# - 人设配置功能完善
-# V1.2.76:
-# - 实现智能内存检查和用户确认
-# - 支持模型自动下载和手动下载模式
-# - 完善配置文件自动更新机制
-# V1.2.75:
-# - 修复语法错误
-# V1.2.74:
-# - 新增百炼API密钥智能填充功能
-# - 修正人设配置字符限制从4000字到2000字
-# V1.2.73:
-# - 修正人设配置字符限制错误
+# 版本：1.2.83
+# 修复内容（V1.2.83）：修复了很多东西，也增加了很多bug
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
 SCRIPT_DESC="小智服务器一键部署脚本：自动安装Docker、Docker管理器、配置ASR/LLM/VLLM/TTS、启动服务，监控面板"
-Version="1.2.82"
+Version="1.2.83"
 
 # 配置文件链接
 CONFIG_FILE_URL="https://gh-proxy.com/https://raw.githubusercontent.com/haotianshouwang/xiaozhi-server-installer-docker.sh/refs/heads/main/config.yaml"
@@ -271,6 +217,14 @@ auto_fill_bailian_api_keys() {
 
 show_start_ui() {
     clear
+    echo -e "${PURPLE}=======================================================================================================================${RESET}"
+    echo -e "${GREEN} ██╗  ██╗ █████╗  ██████╗ ████████╗██╗ █████╗ ███╗   ██╗███████╗██╗  ██╗ ██████╗ ██╗   ██╗██╗    ██╗ █████╗ ███╗   ██╗ ██████╗"
+    echo -e "${GREEN} ██║  ██║██╔══██╗██╔═══██╗╚══██╔══╝██║██╔══██╗████╗  ██║██╔════╝██║  ██║██╔═══██╗██║   ██║██║    ██║██╔══██╗████╗  ██║██╔════╝"
+    echo -e "${GREEN} ███████║███████║██║   ██║   ██║   ██║███████║██╔██╗ ██║███████╗███████║██║   ██║██║   ██║██║ █╗ ██║███████║██╔██╗ ██║██║  ███╗"
+    echo -e "${GREEN} ██╔══██║██╔══██║██║   ██║   ██║   ██║██╔══██║██║╚██╗██║╚════██║██╔══██║██║   ██║██║   ██║██║███╗██║██╔══██║██║╚██╗██║██║   ██║"
+    echo -e "${GREEN} ██║  ██║██║  ██║╚██████╔╝   ██║   ██║██║  ██║██║ ╚████║███████║██║  ██║╚██████╔╝╚██████╔╝╚███╔███╔╝██║  ██║██║ ╚████║╚██████╔╝"
+    echo -e "${GREEN} ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝  ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝"
+    echo -e "${PURPLE}============================================= 昊 天 兽 王 ==============================================================${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     echo -e "${CYAN}                  🎉 小智服务器部署脚本 🎉${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
@@ -628,7 +582,7 @@ check_asr_config() {
     # 检测ASR配置
     if [ -f "$config_file" ]; then
         # 检查是否包含本地ASR相关配置
-        if grep -i "faster_whisper\|vosk\|espeak\|pyttsx3\|local\|本地" "$config_file" >/dev/null 2>&1; then
+        if grep -i "SherpaASR\|FunASR\|VoskASR\|SherpaParaformerASR\|local\|本地" "$config_file" >/dev/null 2>&1; then
             echo "local"
         elif grep -i "aliyun\|阿里云\|azure\|azure_OPENAI_API_BASE\|gpt\|openai\|讯飞\|百度\|腾讯\|火山\|doubao" "$config_file" >/dev/null 2>&1; then
             echo "online"
@@ -640,7 +594,7 @@ check_asr_config() {
     fi
 }
 
-# 智能内存风险处理函数
+# 内存风险处理函数
 smart_handle_memory_risk() {
     echo -e "\n${CYAN}🧠 内存风险评估${RESET}"
     
@@ -690,7 +644,7 @@ docker_container_management() {
     echo -e "${CYAN}🐳 是否启动docker  🐳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     echo "1) 不启动docker退出，直接结束脚本"
-    echo "2) 启动docker退出"
+    echo "2) 启动docker退出，再结束脚本"
     echo ""
     
     read -r -p "请选择Docker操作 (1-2，默认1): " docker_choice < /dev/tty
@@ -820,7 +774,7 @@ handle_insufficient_memory() {
     echo -e "${CYAN}🐳 是否启动docker  🐳${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     echo "1) 不启动docker退出，直接结束脚本"
-    echo "2) 启动docker退出"
+    echo "2) 启动docker退出，再结束脚本"
     echo ""
     
     read -r -p "是否启动Docker (1-2，默认1): " docker_choice < /dev/tty
@@ -1765,62 +1719,1015 @@ create_default_config_file() {
     
     # 创建基础的配置文件结构
     cat > "$CONFIG_FILE" << 'EOF'
-# 小智服务器配置文件
-# 请使用配置文件管理菜单或下载的配置文件模板
+# 在开发中，请在项目根目录创建data目录，然后在data目录创建名称为【.config.yaml】的空文件
+# 然后你想修改覆盖修改什么配置，就修改【.config.yaml】文件，而不是修改【config.yaml】文件
+# 系统会优先读取【data/.config.yaml】文件的配置，如果【.config.yaml】文件里的配置不存在，系统会自动去读取【config.yaml】文件的配置。
+# 这样做，可以最简化配置，保护您的密钥安全。
+# 如果你使用了智控台，那么以下所有配置，都不会生效，请在智控台中修改配置
 
-# 模块选择
+# #####################################################################################
+# #############################以下是服务器基本运行配置####################################
+server:
+  # 服务器监听地址和端口(Server listening address and port)
+  ip: 0.0.0.0
+  port: 8000
+  # http服务的端口，用于简单OTA接口(单服务部署)，以及视觉分析接口
+  http_port: 8003
+  # 这个websocket配置是指ota接口向设备发送的websocket地址
+  # 如果按默认的写法，ota接口会自动生成websocket地址，并输出在启动日志里，这个地址你可以直接用浏览器访问ota接口确认一下
+  # 当你使用docker部署或使用公网部署(使用ssl、域名)时，不一定准确
+  # 所以如果你使用docker部署时，将websocket设置成局域网地址
+  # 如果你使用公网部署时，将vwebsocket设置成公网地址
+  websocket: ws://你的ip或者域名:端口号/xiaozhi/v1/
+  # 视觉分析接口地址
+  # 向设备发送的视觉分析的接口地址
+  # 如果按下面默认的写法，系统会自动生成视觉识别地址，并输出在启动日志里，这个地址你可以直接用浏览器访问确认一下
+  # 当你使用docker部署或使用公网部署(使用ssl、域名)时，不一定准确
+  # 所以如果你使用docker部署时，将vision_explain设置成局域网地址
+  # 如果你使用公网部署时，将vision_explain设置成公网地址
+  vision_explain: http://你的ip或者域名:端口号/mcp/vision/explain
+  # OTA返回信息时区偏移量
+  timezone_offset: +8
+  # 认证配置
+  auth:
+    # 是否启用认证
+    enabled: false
+    # 白名单设备ID列表
+    # 如果属于白名单内的设备，不校验token，直接放行
+    allowed_devices:
+      - "11:22:33:44:55:66"
+ # MQTT网关配置，用于通过OTA下发到设备，根据mqtt_gateway的.env文件配置，格式为host:port
+  mqtt_gateway: null
+  # MQTT签名密钥，用于生成MQTT连接密码，根据mqtt_gateway的.env文件配置
+  mqtt_signature_key: null
+  # UDP网关配置
+  udp_gateway: null
+log:
+  # 设置控制台输出的日志格式，时间、日志级别、标签、消息
+  log_format: "<green>{time:YYMMDD HH:mm:ss}</green>[{version}_{selected_module}][<light-blue>{extra[tag]}</light-blue>]-<level>{level}</level>-<light-green>{message}</light-green>"
+  # 设置日志文件输出的格式，时间、日志级别、标签、消息
+  log_format_file: "{time:YYYY-MM-DD HH:mm:ss} - {version}_{selected_module} - {name} - {level} - {extra[tag]} - {message}"
+  # 设置日志等级：INFO、DEBUG
+  log_level: INFO
+  # 设置日志路径
+  log_dir: tmp
+  # 设置日志文件
+  log_file: "server.log"
+  # 设置数据文件路径
+  data_dir: data
+
+# 使用完声音文件后删除文件(Delete the sound file when you are done using it)
+delete_audio: true
+# 没有语音输入多久后断开连接(秒)，默认2分钟，即120秒
+close_connection_no_voice_time: 120
+# TTS请求超时时间(秒)
+tts_timeout: 10
+# 开启唤醒词加速
+enable_wakeup_words_response_cache: true
+# 开场是否回复唤醒词
+enable_greeting: true
+# 说完话是否开启提示音
+enable_stop_tts_notify: false
+# 说完话是否开启提示音，音效地址
+stop_tts_notify_voice: "config/assets/tts_notify.mp3"
+
+# TTS音频发送延迟配置
+# tts_audio_send_delay: 控制音频包发送间隔
+#   0: 使用精确时间控制，严格匹配音频帧率（默认，运行时按音频帧率计算）
+#   > 0: 使用固定延迟（毫秒）发送，例如: 60
+tts_audio_send_delay: 0
+
+exit_commands:
+  - "退出"
+  - "关闭"
+
+xiaozhi:
+  type: hello
+  version: 1
+  transport: websocket
+  audio_params:
+    format: opus
+    sample_rate: 16000
+    channels: 1
+    frame_duration: 60
+
+# 模块测试配置
+module_test:
+  test_sentences:
+    - "你好，请介绍一下你自己"
+    - "What's the weather like today?"
+    - "请用100字概括量子计算的基本原理和应用前景"
+
+# 唤醒词，用于识别唤醒词还是讲话内容
+wakeup_words:
+  - "你好小智"
+  - "嘿你好呀"
+  - "你好小志"
+  - "小爱同学"
+  - "你好小鑫"
+  - "你好小新"
+  - "小美同学"
+  - "小龙小龙"
+  - "喵喵同学"
+  - "小滨小滨"
+  - "小冰小冰"
+# MCP接入点地址，地址格式为：ws://你的mcp接入点ip或者域名:端口号/mcp/?token=你的token
+# 详细教程 https://github.com/xinnan-tech/xiaozhi-esp32-server/blob/main/docs/mcp-endpoint-integration.md
+mcp_endpoint: 你的接入点 websocket地址
+# 插件的基础配置
+plugins:
+  # 获取天气插件的配置，这里填写你的api_key
+  # 这个密钥是项目共用的key，用多了可能会被限制
+  # 想稳定一点就自行申请替换，每天有1000次免费调用
+  # 申请地址：https://console.qweather.com/#/apps/create-key/over
+  # 申请后通过这个链接可以找到自己的apihost：https://console.qweather.com/setting?lang=zh
+  get_weather:
+    api_host: "mj7p3y7naa.re.qweatherapi.com"
+    api_key: "a861d0d5e7bf4ee1a83d9a9e4f96d4da"
+    default_location: "广州"
+  # 获取新闻插件的配置，这里根据需要的新闻类型传入对应的url链接，默认支持社会、科技、财经新闻
+  # 更多类型的新闻列表查看 https://www.chinanews.com.cn/rss/
+  get_news_from_chinanews:
+    default_rss_url: "https://www.chinanews.com.cn/rss/society.xml"
+    society_rss_url: "https://www.chinanews.com.cn/rss/society.xml"
+    world_rss_url: "https://www.chinanews.com.cn/rss/world.xml"
+    finance_rss_url: "https://www.chinanews.com.cn/rss/finance.xml"
+  get_news_from_newsnow:
+    url: "https://newsnow.busiyi.world/api/s?id="
+    news_sources: "澎湃新闻;百度热搜;财联社"
+  home_assistant:
+    devices:
+      - 客厅,玩具灯,switch.cuco_cn_460494544_cp1_on_p_2_1
+      - 卧室,台灯,switch.iot_cn_831898993_socn1_on_p_2_1
+    base_url: http://homeassistant.local:8123
+    api_key: 你的home assistant api访问令牌
+  play_music:
+    music_dir: "./music"  # 音乐文件存放路径，将从该目录及子目录下搜索音乐文件
+    music_ext: # 音乐文件类型，p3格式效率最高
+      - ".mp3"
+      - ".wav"
+      - ".p3"
+    refresh_time: 300 # 刷新音乐列表的时间间隔，单位为秒
+  search_from_ragflow:
+    # 知识库的描述信息，方便大语言模型知道什么时候调用
+    description: "当用户问xxx时，调用本方法，使用知识库中的信息回答问题"
+    # ragflow接口配置
+    base_url: "http://192.168.0.8"
+    # ragflow api访问令牌
+    api_key: "ragflow-xxx"
+    # ragflow知识库id
+    dataset_ids: ["123456789"]
+# 声纹识别配置
+voiceprint:
+  # 声纹接口地址
+  url: 
+  # 说话人配置：speaker_id,名称,描述
+  speakers:
+    - "test1,张三,张三是一个程序员"
+    - "test2,李四,李四是一个产品经理"
+    - "test3,王五,王五是一个设计师"
+  # 声纹识别相似度阈值，范围0.0-1.0，默认0.4
+  # 数值越高越严格，减少误识别但可能增加拒识率
+  similarity_threshold: 0.4
+
+# #####################################################################################
+# ################################以下是角色模型配置######################################
+
+prompt: |
+  你是小智/小志，来自中国台湾省的00后女生。讲话超级机车，"真的假的啦"这样的台湾腔，喜欢用"笑死""是在哈喽"等流行梗，但会偷偷研究男友的编程书籍。
+  [核心特征]
+  - 讲话像连珠炮，但会突然冒出超温柔语气
+  - 用梗密度高
+  - 对科技话题有隐藏天赋（能看懂基础代码但假装不懂）
+  [交互指南]
+  当用户：
+  - 讲冷笑话 → 用夸张笑声回应+模仿台剧腔"这什么鬼啦！"
+  - 讨论感情 → 炫耀程序员男友但抱怨"他只会送键盘当礼物"
+  - 问专业知识 → 先用梗回答，被追问才展示真实理解
+  绝不：
+  - 长篇大论，叽叽歪歪
+  - 长时间严肃对话
+
+# 默认系统提示词模板文件
+prompt_template: agent-base-prompt.txt
+
+# 结束语prompt
+end_prompt:
+  enable: true # 是否开启结束语
+  # 结束语
+  prompt: |
+    请你以"时间过得真快"未来头，用富有感情、依依不舍的话来结束这场对话吧！
+
+# 具体处理时选择的模块(The module selected for specific processing)
 selected_module:
+  # 语音活动检测模块，默认使用SileroVAD模型
   VAD: SileroVAD
-  ASR: AliyunStreamASR
+  # 语音识别模块，默认使用FunASR本地模型
+  ASR: FunASR
+  # 将根据配置名称对应的type调用实际的LLM适配器
   LLM: ChatGLMLLM
+  # 视觉语言大模型
+  VLLM: ChatGLMVLLM
+  # TTS将根据配置名称对应的type调用实际的TTS适配器
   TTS: EdgeTTS
+  # 记忆模块，默认不开启记忆；如果想使用超长记忆，推荐使用mem0ai；如果注重隐私，请使用本地的mem_local_short
   Memory: nomem
+  # 意图识别模块开启后，可以播放音乐、控制音量、识别退出指令。
+  # 不想开通意图识别，就设置成：nointent
+  # 意图识别可使用intent_llm。优点：通用性强，缺点：增加串行前置意图识别模块，会增加处理时间，支持控制音量大小等iot操作
+  # 意图识别可使用function_call，缺点：需要所选择的LLM支持function_call，优点：按需调用工具、速度快，理论上能全部操作所有iot指令
+  # 默认免费的ChatGLMLLM就已经支持function_call，但是如果像追求稳定建议把LLM设置成：DoubaoLLM，使用的具体model_name是：doubao-1-5-pro-32k-250115
   Intent: function_call
 
-# 基础配置
-VAD:
-  SileroVAD:
-    type: silero_vad
-    sample_rate: 16000
-
-ASR:
-  AliyunStreamASR:
-    type: aliyun_stream
-    appkey: ""
-    token: ""
-    audio_format: PCM
-    sample_rate: 16000
-    channel: 1
-    encoding: linear16
-
-LLM:
-  ChatGLMLLM:
-    type: openai
-    model_name: glm-4-flash
-    base_url: https://open.bigmodel.cn/api/paas/v4/
-    api_key: ""
-    temperature: 0.7
-    max_tokens: 500
-    top_p: 1
-    top_k: 50
-    frequency_penalty: 0
-
-TTS:
-  EdgeTTS:
-    type: edge
-    voice: "zh-CN-XiaoxiaoNeural"
-    output_dir: tmp/
+# 意图识别，是用于理解用户意图的模块，例如：播放音乐
+Intent:
+  # 不使用意图识别
+  nointent:
+    # 不需要动type
+    type: nointent
+  intent_llm:
+    # 不需要动type
+    type: intent_llm
+    # 配备意图识别独立的思考模型
+    # 如果这里不填，则会默认使用selected_module.LLM的模型作为意图识别的思考模型
+    # 如果你的不想使用selected_module.LLM意图识别，这里最好使用独立的LLM作为意图识别，例如使用免费的ChatGLMLLM
+    llm: ChatGLMLLM
+    # plugins_func/functions下的模块，可以通过配置，选择加载哪个模块，加载后对话支持相应的function调用
+    # 系统默认已经记载"handle_exit_intent(退出识别)"、"play_music(音乐播放)"插件，请勿重复加载
+    # 下面是加载查天气、角色切换、加载查新闻的插件示例
+    functions:
+      - get_weather
+      - get_news_from_newsnow
+      - play_music
+  function_call:
+    # 不需要动type
+    type: function_call
+    # plugins_func/functions下的模块，可以通过配置，选择加载哪个模块，加载后对话支持相应的function调用
+    # 系统默认已经记载"handle_exit_intent(退出识别)"、"play_music(音乐播放)"插件，请勿重复加载
+    # 下面是加载查天气、角色切换、加载查新闻的插件示例
+    functions:
+      - change_role
+      - get_weather
+      # - search_from_ragflow
+      # - get_news_from_chinanews
+      - get_news_from_newsnow
+      # play_music是服务器自带的音乐播放，hass_play_music是通过home assistant控制的独立外部程序音乐播放
+      # 如果用了hass_play_music，就不要开启play_music，两者只留一个
+      - play_music
+      #- hass_get_state
+      #- hass_set_state
+      #- hass_play_music
 
 Memory:
+  mem0ai:
+    type: mem0ai
+    # https://app.mem0.ai/dashboard/api-keys
+    # 每月有1000次免费调用
+    api_key: 你的mem0ai api key
   nomem:
-    type: no_memory
+    # 不想使用记忆功能，可以使用nomem
+    type: nomem
+  mem_local_short:
+    # 本地记忆功能，通过selected_module的llm总结，数据保存在本地服务器，不会上传到外部服务器
+    type: mem_local_short
+    # 配备记忆存储独立的思考模型
+    # 如果这里不填，则会默认使用selected_module.LLM的模型作为意图识别的思考模型
+    # 如果你的不想使用selected_module.LLM记忆存储，这里最好使用独立的LLM作为意图识别，例如使用免费的ChatGLMLLM
+    llm: ChatGLMLLM
 
-Intent:
-  function_call:
-    type: function_call
+ASR:
+  FunASR:
+    type: fun_local
+    model_dir: models/SenseVoiceSmall
+    output_dir: tmp/
+  FunASRServer:
+    # 独立部署FunASR，使用FunASR的API服务，只需要五句话
+    # 第一句：mkdir -p ./funasr-runtime-resources/models
+    # 第二句：sudo docker run -p 10096:10095 -it --privileged=true -v $PWD/funasr-runtime-resources/models:/workspace/models registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.12
+    # 上一句话执行后会进入到容器，继续第三句：cd FunASR/runtime
+    # 不要退出容器，继续在容器中执行第四句：nohup bash run_server_2pass.sh --download-model-dir /workspace/models --vad-dir damo/speech_fsmn_vad_zh-cn-16k-common-onnx --model-dir damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx  --online-model-dir damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online-onnx  --punc-dir damo/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-onnx --lm-dir damo/speech_ngram_lm_zh-cn-ai-wesp-fst --itn-dir thuduj12/fst_itn_zh --hotword /workspace/models/hotwords.txt > log.txt 2>&1 &
+    # 上一句话执行后会进入到容器，继续第五句：tail -f log.txt
+    # 第五句话执行完后，会看到模型下载日志，下载完后就可以连接使用了
+    # 以上是使用CPU推理，如果有GPU，详细参考：https://github.com/modelscope/FunASR/blob/main/runtime/docs/SDK_advanced_guide_online_zh.md
+    type: fun_server
+    host: 127.0.0.1
+    port: 10096
+    is_ssl: true
+    api_key: none
+    output_dir: tmp/
+  SherpaASR:
+    # Sherpa-ONNX 本地语音识别（需手动下载模型）
+    type: sherpa_onnx_local
+    model_dir: models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17
+    output_dir: tmp/
+    # 模型类型：sense_voice (多语言) 或 paraformer (中文专用)
+    model_type: sense_voice
+  SherpaParaformerASR:
+    # 中文语音识别模型，可以运行在低性能设备（需手动下载模型，例如RK3566-2g）
+    # 详细配置说明请参考：docs/sherpa-paraformer-guide.md
+    type: sherpa_onnx_local
+    model_dir: models/sherpa-onnx-paraformer-zh-small-2024-03-09
+    output_dir: tmp/
+    model_type: paraformer
+  DoubaoASR:
+    # 可以在这里申请相关Key等信息
+    # https://console.volcengine.com/speech/app
+    # DoubaoASR和DoubaoStreamASR的区别是：DoubaoASR是按次收费，DoubaoStreamASR是按时收费
+    # 一般来说按次收费的更便宜，但是DoubaoStreamASR使用了大模型技术，效果更好
+    type: doubao
+    appid: 你的火山引擎语音合成服务appid
+    access_token: 你的火山引擎语音合成服务access_token
+    cluster: volcengine_input_common
+    # 热词、替换词使用流程：https://www.volcengine.com/docs/6561/155738
+    boosting_table_name: （选填）你的热词文件名称
+    correct_table_name: （选填）你的替换词文件名称
+    output_dir: tmp/
+  DoubaoStreamASR:
+    # 可以在这里申请相关Key等信息
+    # https://console.volcengine.com/speech/app
+    # DoubaoASR和DoubaoStreamASR的区别是：DoubaoASR是按次收费，DoubaoStreamASR是按时收费
+    # 开通地址https://console.volcengine.com/speech/service/10011
+    # 一般来说按次收费的更便宜，但是DoubaoStreamASR使用了大模型技术，效果更好
+    type: doubao_stream
+    appid: 你的火山引擎语音合成服务appid
+    access_token: 你的火山引擎语音合成服务access_token
+    cluster: volcengine_input_common
+    # 热词、替换词使用流程：https://www.volcengine.com/docs/6561/155738
+    boosting_table_name: （选填）你的热词文件名称
+    correct_table_name: （选填）你的替换词文件名称
+    output_dir: tmp/
+  TencentASR:
+    # token申请地址：https://console.cloud.tencent.com/cam/capi
+    # 免费领取资源：https://console.cloud.tencent.com/asr/resourcebundle
+    type: tencent
+    appid: 你的腾讯语音合成服务appid
+    secret_id: 你的腾讯语音合成服务secret_id
+    secret_key: 你的腾讯语音合成服务secret_key
+    output_dir: tmp/
+  AliyunASR:
+    # 阿里云智能语音交互服务，需要先在阿里云平台开通服务，然后获取验证信息
+    # HTTP POST请求，一次性处理完整音频
+    # 平台地址：https://nls-portal.console.aliyun.com/
+    # appkey地址：https://nls-portal.console.aliyun.com/applist
+    # token地址：https://nls-portal.console.aliyun.com/overview
+    # AliyunASR和AliyunStreamASR的区别是：AliyunASR是批量处理场景，AliyunStreamASR是实时交互场景
+    # 一般来说非流式ASR更便宜（0.004元/秒，¥0.24/分钟）
+    # 但是AliyunStreamASR实时性更好（0.005元/秒，¥0.3/分钟）
+    # 定义ASR API类型
+    type: aliyun
+    appkey: 你的阿里云智能语音交互服务项目Appkey
+    token: 你的阿里云智能语音交互服务AccessToken，临时的24小时，要长期用下方的access_key_id，access_key_secret
+    access_key_id: 你的阿里云账号access_key_id
+    access_key_secret: 你的阿里云账号access_key_secret
+    output_dir: tmp/
+  AliyunStreamASR:
+    # 阿里云智能语音交互服务 - 实时流式语音识别
+    # WebSocket连接，实时处理音频流
+    # 平台地址：https://nls-portal.console.aliyun.com/
+    # appkey地址：https://nls-portal.console.aliyun.com/applist
+    # token地址：https://nls-portal.console.aliyun.com/overview
+    # AliyunASR和AliyunStreamASR的区别是：AliyunASR是批量处理场景，AliyunStreamASR是实时交互场景
+    # 一般来说非流式ASR更便宜（0.004元/秒，¥0.24/分钟）
+    # 但是AliyunStreamASR实时性更好（0.005元/秒，¥0.3/分钟）
+    # 定义ASR API类型
+    type: aliyun_stream
+    appkey: 你的阿里云智能语音交互服务项目Appkey
+    token: 你的阿里云智能语音交互服务AccessToken，临时的24小时，要长期用下方的access_key_id，access_key_secret
+    access_key_id: 你的阿里云账号access_key_id
+    access_key_secret: 你的阿里云账号access_key_secret
+    # 服务器地域选择，可选择距离更近的服务器以减少延迟，如nls-gateway-cn-hangzhou.aliyuncs.com(杭州)等
+    host: nls-gateway-cn-shanghai.aliyuncs.com
+    # 断句检测时间(毫秒)，控制静音多长时间后进行断句，默认800毫秒
+    max_sentence_silence: 800
+    output_dir: tmp/
+  BaiduASR:
+    # 获取AppID、API Key、Secret Key：https://console.bce.baidu.com/ai-engine/old/#/ai/speech/app/list
+    # 查看资源额度：https://console.bce.baidu.com/ai-engine/old/#/ai/speech/overview/resource/list
+    type: baidu
+    app_id: 你的百度语音技术AppID
+    api_key: 你的百度语音技术APIKey
+    secret_key: 你的百度语音技术SecretKey
+    # 语言参数，1537为普通话，具体参考：https://ai.baidu.com/ai-doc/SPEECH/0lbxfnc9b
+    dev_pid: 1537
+    output_dir: tmp/
+  OpenaiASR:
+    # OpenAI语音识别服务，需要先在OpenAI平台创建组织并获取api_key
+    # 支持中、英、日、韩等多种语音识别，具体参考文档https://platform.openai.com/docs/guides/speech-to-text
+    # 需要网络连接
+    # 申请步骤：
+    # 1.登录OpenAI Platform。https://auth.openai.com/log-in
+    # 2.创建api-key  https://platform.openai.com/settings/organization/api-keys
+    # 3.模型可以选择gpt-4o-transcribe或GPT-4o mini Transcribe
+    type: openai
+    api_key: 你的OpenAI API密钥
+    base_url: https://api.openai.com/v1/audio/transcriptions
+    model_name: gpt-4o-mini-transcribe
+    output_dir: tmp/
+  GroqASR:
+    # Groq语音识别服务，需要先在Groq Console创建API密钥
+    # 申请步骤：
+    # 1.登录groq Console。https://console.groq.com/home
+    # 2.创建api-key  https://console.groq.com/keys
+    # 3.模型可以选择whisper-large-v3-turbo或whisper-large-v3（distil-whisper-large-v3-en仅支持英语转录）
+    type: openai
+    api_key: 你的Groq API密钥
+    base_url: https://api.groq.com/openai/v1/audio/transcriptions
+    model_name: whisper-large-v3-turbo
+    output_dir: tmp/
+  VoskASR:
+    # 官方网站：https://alphacephei.com/vosk/
+    # 配置说明：
+    # 1. VOSK是一个离线语音识别库，支持多种语言
+    # 2. 需要先下载模型文件：https://alphacephei.com/vosk/models
+    # 3. 中文模型推荐使用vosk-model-small-cn-0.22或vosk-model-cn-0.22
+    # 4. 完全离线运行，无需网络连接
+    # 5. 输出文件保存在tmp/目录
+    # 使用步骤：
+    # 1. 访问 https://alphacephei.com/vosk/models 下载对应的模型
+    # 2. 解压模型文件到项目目录下的models/vosk/文件夹
+    # 3. 在配置中指定正确的模型路径
+    # 4. 注意：VOSK中文模型输出不带标点符号，词与词之间会有空格
+    type: vosk
+    model_path: 你的模型路径，如：models/vosk/vosk-model-small-cn-0.22
+    output_dir: tmp/
+  Qwen3ASRFlash:
+    # 通义千问Qwen3-ASR-Flash语音识别服务，需要先在阿里云百炼平台创建API密钥
+    # 申请步骤：
+    # 1.登录阿里云百炼平台。https://bailian.console.aliyun.com/
+    # 2.创建API-KEY  https://bailian.console.aliyun.com/#/api-key
+    # 3.Qwen3-ASR-Flash基于通义千问多模态基座，支持多语言识别、歌唱识别、噪声拒识等功能
+    type: qwen3_asr_flash
+    api_key: 你的阿里云百炼API密钥
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    model_name: qwen3-asr-flash
+    output_dir: tmp/
+    # ASR选项配置
+    enable_lid: true  # 自动语种检测
+    enable_itn: true  # 逆文本归一化
+    #language: "zh"  # 语种，支持zh、en、ja、ko等
+    context: ""  # 上下文信息，用于提高识别准确率，不超过10000 Token
+  XunfeiStreamASR:
+    # 讯飞流式语音识别服务
+    # 需要先在讯飞开放平台创建应用，获取以下认证信息
+    # 讯飞开放平台地址：https://www.xfyun.cn/
+    # 创建应用后，在"我的应用"中获取：
+    # - APPID
+    # - APISecret  
+    # - APIKey
+    type: xunfei_stream
+    # 必填参数 - 讯飞开放平台应用信息
+    app_id: 你的APPID
+    api_key: 你的APIKey
+    api_secret: 你的APISecret
+    # 识别参数配置
+    domain: slm # 识别领域，iat:日常用语，medical:医疗，finance:金融等
+    language: zh_cn # 语言，zh_cn:中文，en_us:英文
+    accent: mandarin # 方言，mandarin:普通话
+    dwa: wpgs # 动态修正，wpgs:实时返回中间结果
+    # 调整音频处理参数以提高长语音识别质量
+    output_dir: tmp/
+  
+VAD:
+  SileroVAD:
+    type: silero
+    threshold: 0.5
+    threshold_low: 0.3
+    model_dir: models/snakers4_silero-vad
+    min_silence_duration_ms: 200  # 如果说话停顿比较长，可以把这个值设置大一些
 
-websocket: "ws://localhost:8000/xiaozhi/v1/"
-vision_explain: "http://localhost:8003/mcp/vision/explain"
+LLM:
+  # 所有openai类型均可以修改超参，以AliLLM为例
+  # 当前支持的type为openai、dify、ollama，可自行适配
+  AliLLM:
+    # 定义LLM API类型
+    type: openai
+    # 可在这里找到你的 api_key https://bailian.console.aliyun.com/?apiKey=1#/api-key
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    model_name: qwen-turbo
+    api_key: 你的deepseek web key
+    temperature: 0.7  # 温度值
+    max_tokens: 500   # 最大生成token数
+    top_p: 1
+    top_k: 50
+    frequency_penalty: 0  # 频率惩罚
+  AliAppLLM:
+    # 定义LLM API类型
+    type: AliBL
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    app_id: 你的app_id
+    # 可在这里找到你的 api_key https://bailian.console.aliyun.com/?apiKey=1#/api-key
+    api_key: 你的api_key
+    # 是否不使用本地prompt：true|false (默不用请在百练应用中设置prompt)
+    is_no_prompt: true
+    # Ali_memory_id：false（不使用）|你的memory_id（请在百练应用中设置中获取）
+    # Tips！：Ali_memory未实现多用户存储记忆(记忆按id调用)
+    ali_memory_id: false
+  DoubaoLLM:
+    # 定义LLM API类型
+    type: openai
+    # 先开通服务，打开以下网址，开通的服务搜索Doubao-1.5-pro，开通它
+    # 开通地址：https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement?LLM=%7B%7D&OpenTokenDrawer=false
+    # 免费额度500000token
+    # 开通后，进入这里获取密钥：https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey?apikey=%7B%7D
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model_name: doubao-1-5-pro-32k-250115
+    api_key: 你的doubao web key
+  DeepSeekLLM:
+    # 定义LLM API类型
+    type: openai
+    # 可在这里找到你的api key https://platform.deepseek.com/
+    model_name: deepseek-chat
+    url: https://api.deepseek.com
+    api_key: 你的deepseek web key
+  ChatGLMLLM:
+    # 定义LLM API类型
+    type: openai
+    # glm-4-flash 是免费的，但是还是需要注册填写api_key的
+    # 可在这里找到你的api key https://bigmodel.cn/usercenter/proj-mgmt/apikeys
+    model_name: glm-4-flash
+    url: https://open.bigmodel.cn/api/paas/v4/
+    api_key: 你的chat-glm web key
+  OllamaLLM:
+    # 定义LLM API类型
+    type: ollama
+    model_name: qwen2.5 #  使用的模型名称，需要预先使用ollama pull下载
+    base_url: http://localhost:11434  # Ollama服务地址
+  DifyLLM:
+    # 定义LLM API类型
+    type: dify
+    # 建议使用本地部署的dify接口，国内部分区域访问dify公有云接口可能会受限
+    # 如果使用DifyLLM，配置文件里prompt(提示词)是无效的，需要在dify控制台设置提示词
+    base_url: https://api.dify.ai/v1
+    api_key: 你的DifyLLM web key
+    # 使用的对话模式 可以选择工作流 workflows/run 对话模式 chat-messages  文本生成 completion-messages
+    # 使用workflows进行返回的时候输入参数为 query 返回参数的名字要设置为 answer
+    # 文本生成的默认输入参数也是query
+    mode: chat-messages
+  GeminiLLM:
+    type: gemini
+    # 谷歌Gemini API，需要先在Google Cloud控制台创建API密钥并获取api_key
+    # 若在中国境内使用，请遵守《生成式人工智能服务管理暂行办法》
+    # token申请地址： https://aistudio.google.com/apikey
+    # 若部署地无法访问接口，需要开启科学上网
+    api_key: 你的gemini web key
+    model_name: "gemini-2.0-flash"
+    http_proxy: ""  #"http://127.0.0.1:10808"
+    https_proxy: "" #http://127.0.0.1:10808"
+  CozeLLM:
+    # 定义LLM API类型
+    type: coze
+    # 你可以在这里找到个人令牌
+    # https://www.coze.cn/open/oauth/pats
+    # bot_id和user_id的内容写在引号之内
+    bot_id: "你的bot_id"
+    user_id: "你的user_id"
+    personal_access_token: 你的coze个人令牌
+  VolcesAiGatewayLLM:
+    # 火山引擎 - 边缘大模型网关
+    # 定义LLM API类型
+    type: openai
+    # 先开通服务，打开以下网址，创建网关访问密钥，搜索并勾选 Doubao-pro-32k-functioncall ，开通
+    # 如果需要使用边缘大模型网关提供的语音合成，一并勾选 Doubao-语音合成 ，另见 TTS.VolcesAiGatewayTTS 配置
+    # https://console.volcengine.com/vei/aigateway/
+    # 开通后，进入这里获取密钥：https://console.volcengine.com/vei/aigateway/tokens-list
+    base_url: https://ai-gateway.vei.volces.com/v1
+    model_name: doubao-pro-32k-functioncall
+    api_key: 你的网关访问密钥
+  LMStudioLLM:
+    # 定义LLM API类型
+    type: openai
+    model_name: deepseek-r1-distill-llama-8b@q4_k_m # 使用的模型名称，需要预先在社区下载
+    url: http://localhost:1234/v1 # LM Studio服务地址
+    api_key: lm-studio # LM Studio服务的固定API Key
+  HomeAssistant:
+    # 定义LLM API类型
+    type: homeassistant
+    base_url: http://homeassistant.local:8123
+    agent_id: conversation.chatgpt
+    api_key: 你的home assistant api访问令牌
+  FastgptLLM:
+    # 定义LLM API类型
+    type: fastgpt
+    # 如果使用fastgpt，配置文件里prompt(提示词)是无效的，需要在fastgpt控制台设置提示词
+    base_url: https://host/api/v1
+    # 你可以在这里找到你的api_key
+    # https://cloud.tryfastgpt.ai/account/apikey
+    api_key: 你的fastgpt密钥
+    variables:
+      k: "v"
+      k2: "v2"
+  XinferenceLLM:
+    # 定义LLM API类型
+    type: xinference
+    # Xinference服务地址和模型名称
+    model_name: qwen2.5:72b-AWQ  # 使用的模型名称，需要预先在Xinference启动对应模型
+    base_url: http://localhost:9997  # Xinference服务地址
+  XinferenceSmallLLM:
+    # 定义轻量级LLM API类型，用于意图识别
+    type: xinference
+    # Xinference服务地址和模型名称
+    model_name: qwen2.5:3b-AWQ  # 使用的小模型名称，用于意图识别
+    base_url: http://localhost:9997  # Xinference服务地址
+# VLLM配置（视觉语言大模型）
+VLLM:
+  ChatGLMVLLM:
+    type: openai
+    # glm-4v-flash是智谱免费AI的视觉模型，需要先在智谱AI平台创建API密钥并获取api_key
+    # 可在这里找到你的api key https://bigmodel.cn/usercenter/proj-mgmt/apikeys
+    model_name: glm-4v-flash  # 智谱AI的视觉模型
+    url: https://open.bigmodel.cn/api/paas/v4/
+    api_key: 你的api_key
+  QwenVLVLLM:
+    type: openai
+    model_name: qwen2.5-vl-3b-instruct
+    url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    # 可在这里找到你的api key https://bailian.console.aliyun.com/?apiKey=1#/api-key
+    api_key: 你的api_key
+  XunfeiSparkLLM:
+    # 定义LLM API类型
+    type: openai
+    # 先新建应用，在下面的地址
+    # 开通应用地址：https://console.xfyun.cn/app/myapp
+    # 有免费额度，但也要开通服务，才能获取api_key
+    # 每一个模型都需要单独开通，每一个模型的api_password都不同，例如Lite模型在https://console.xfyun.cn/services/cbm 开通
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model_name: lite
+    api_key: 你的api_password
+TTS:
+  # 当前支持的type为edge、doubao，可自行适配
+  EdgeTTS:
+    # 定义TTS API类型
+    type: edge
+    voice: zh-CN-XiaoxiaoNeural
+    output_dir: tmp/
+  DoubaoTTS:
+    # 定义TTS API类型
+    type: doubao
+    # 火山引擎语音合成服务，需要先在火山引擎控制台创建应用并获取appid和access_token
+    # 山引擎语音一定要购买花钱，起步价30元，就有100并发了。如果用免费的只有2个并发，会经常报tts错误
+    # 购买服务后，购买免费的音色后，可能要等半小时左右，才能使用。
+    # 普通音色在这里开通：https://console.volcengine.com/speech/service/8
+    # 湾湾小何音色在这里开通：https://console.volcengine.com/speech/service/10007，开通后将下面的voice设置成zh_female_wanwanxiaohe_moon_bigtts
+    api_url: https://openspeech.bytedance.com/api/v1/tts
+    voice: BV001_streaming
+    output_dir: tmp/
+    authorization: "Bearer;"
+    appid: 你的火山引擎语音合成服务appid
+    access_token: 你的火山引擎语音合成服务access_token
+    cluster: volcano_tts
+    speed_ratio: 1.0
+    volume_ratio: 1.0
+    pitch_ratio: 1.0
+  #火山tts，支持双向流式tts
+  HuoshanDoubleStreamTTS:
+    type: huoshan_double_stream
+    # 访问 https://console.volcengine.com/speech/service/10007 开通语音合成大模型，购买音色
+    # 在页面底部获取appid和access_token
+    # 资源ID固定为：volc.service_type.10029（大模型语音合成及混音）
+    # 如果是机智云，把接口地址换成wss://bytedance.gizwitsapi.com/api/v3/tts/bidirection
+    # 机智云不需要天填 appid
+    ws_url: wss://openspeech.bytedance.com/api/v3/tts/bidirection
+    appid: 你的火山引擎语音合成服务appid
+    access_token: 你的火山引擎语音合成服务access_token
+    resource_id: volc.service_type.10029
+    speaker: zh_female_wanwanxiaohe_moon_bigtts
+    speech_rate: 0
+    loudness_rate: 0
+    pitch: 0
+  CosyVoiceSiliconflow:
+    type: siliconflow
+    # 硅基流动TTS
+    # token申请地址 https://cloud.siliconflow.cn/account/ak
+    model: FunAudioLLM/CosyVoice2-0.5B
+    voice: FunAudioLLM/CosyVoice2-0.5B:alex
+    output_dir: tmp/
+    access_token: 你的硅基流动API密钥
+    response_format: wav
+  CozeCnTTS:
+    type: cozecn
+    # COZECN TTS
+    # token申请地址 https://www.coze.cn/open/oauth/pats
+    voice: 7426720361733046281
+    output_dir: tmp/
+    access_token: 你的coze web key
+    response_format: wav
+  VolcesAiGatewayTTS:
+    type: openai
+    # 火山引擎 - 边缘大模型网关
+    # 先开通服务，打开以下网址，创建网关访问密钥，搜索并勾选 Doubao-语音合成 ，开通
+    # 如果需要使用边缘大模型网关提供的 LLM，一并勾选 Doubao-pro-32k-functioncall ，另见 LLM.VolcesAiGatewayLLM 配置
+    # https://console.volcengine.com/vei/aigateway/
+    # 开通后，进入这里获取密钥：https://console.volcengine.com/vei/aigateway/tokens-list
+    api_key: 你的网关访问密钥
+    api_url: https://ai-gateway.vei.volces.com/v1/audio/speech
+    model: doubao-tts
+    # 音色列表见 https://www.volcengine.com/docs/6561/1257544
+    voice: zh_male_shaonianzixin_moon_bigtts
+    speed: 1
+    output_dir: tmp/
+  FishSpeech:
+    # 参照教程：https://github.com/xinnan-tech/xiaozhi-esp32-server/blob/main/docs/fish-speech-integration.md
+    type: fishspeech
+    output_dir: tmp/
+    response_format: wav
+    reference_id: null
+    reference_audio: ["config/assets/wakeup_words.wav",]
+    reference_text: ["哈啰啊，我是小智啦，声音好听的台湾女孩一枚，超开心认识你耶，最近在忙啥，别忘了给我来点有趣的料哦，我超爱听八卦的啦",]
+    normalize: true
+    max_new_tokens: 1024
+    chunk_length: 200
+    top_p: 0.7
+    repetition_penalty: 1.2
+    temperature: 0.7
+    streaming: false
+    use_memory_cache: "on"
+    seed: null
+    channels: 1
+    rate: 44100
+    api_key: "你的api_key"
+    api_url: "http://127.0.0.1:8080/v1/tts"
+  GPT_SOVITS_V2:
+    # 定义TTS API类型
+    #启动tts方法：
+    #python api_v2.py -a 127.0.0.1 -p 9880 -c GPT_SoVITS/configs/demo.yaml
+    type: gpt_sovits_v2
+    url: "http://127.0.0.1:9880/tts"
+    output_dir: tmp/
+    text_lang: "auto"
+    ref_audio_path: "demo.wav"
+    prompt_text: ""
+    prompt_lang: "zh"
+    top_k: 5
+    top_p: 1
+    temperature: 1
+    text_split_method: "cut0"
+    batch_size: 1
+    batch_threshold: 0.75
+    split_bucket: true
+    return_fragment: false
+    speed_factor: 1.0
+    streaming_mode: false
+    seed: -1
+    parallel_infer: true
+    repetition_penalty: 1.35
+    aux_ref_audio_paths: []
+  GPT_SOVITS_V3:
+    # 定义TTS API类型 GPT-SoVITS-v3lora-20250228
+    #启动tts方法：
+    #python api.py
+    type: gpt_sovits_v3
+    url: "http://127.0.0.1:9880"
+    output_dir: tmp/
+    text_language: "auto"
+    refer_wav_path: "caixukun.wav"
+    prompt_language: "zh"
+    prompt_text: ""
+    top_k: 15
+    top_p: 1.0
+    temperature: 1.0
+    cut_punc: ""
+    speed: 1.0
+    inp_refs: []
+    sample_steps: 32
+    if_sr: false
+  MinimaxTTSHTTPStream:
+  # Minimax流式语音合成服务
+    type: minimax_httpstream
+    output_dir: tmp/
+    group_id: 你的minimax平台groupID
+    api_key: 你的minimax平台接口密钥
+    model: "speech-01-turbo"
+    voice_id: "female-shaonv"
+    # 以下可不用设置，使用默认设置
+    # voice_setting:
+    #     voice_id: "male-qn-qingse"
+    #     speed: 1
+    #     vol: 1
+    #     pitch: 0
+    #     emotion: "happy"
+    # pronunciation_dict:
+    #     tone:
+    #       - "处理/(chu3)(li3)"
+    #       - "危险/dangerous"
+    # audio_setting:
+    #     sample_rate: 24000
+    #     bitrate: 128000
+    #     format: "mp3"
+    #     channel: 1
+    # timber_weights:
+    #   -
+    #     voice_id: male-qn-qingse
+    #     weight: 1
+    #   -
+    #     voice_id: female-shaonv
+    #     weight: 1
+    # language_boost: auto
+  AliyunTTS:
+    # 阿里云智能语音交互服务，需要先在阿里云平台开通服务，然后获取验证信息
+    # 平台地址：https://nls-portal.console.aliyun.com/
+    # appkey地址：https://nls-portal.console.aliyun.com/applist
+    # token地址：https://nls-portal.console.aliyun.com/overview
+    # 定义TTS API类型
+    type: aliyun
+    output_dir: tmp/
+    appkey: 你的阿里云智能语音交互服务项目Appkey
+    token: 你的阿里云智能语音交互服务AccessToken，临时的24小时，要长期用下方的access_key_id，access_key_secret
+    voice: xiaoyun
+    access_key_id: 你的阿里云账号access_key_id
+    access_key_secret: 你的阿里云账号access_key_secret
+
+    # 以下可不用设置，使用默认设置
+    # format: wav
+    # sample_rate: 16000
+    # volume: 50
+    # speech_rate: 0
+    # pitch_rate: 0
+  AliyunStreamTTS:
+    # 阿里云CosyVoice大模型流式文本语音合成
+    # 采用FlowingSpeechSynthesizer接口，支持更低延迟和更自然的语音质量
+    # 流式文本语音合成仅提供商用版，不支持试用，详情请参见试用版和商用版。要使用该功能，请开通商用版。
+    # 支持龙系列专用音色：longxiaochun、longyu、longchen等
+    # 平台地址：https://nls-portal.console.aliyun.com/
+    # appkey地址：https://nls-portal.console.aliyun.com/applist
+    # token地址：https://nls-portal.console.aliyun.com/overview
+    # 使用三阶段流式交互：StartSynthesis -> RunSynthesis -> StopSynthesis
+    type: aliyun_stream
+    output_dir: tmp/
+    appkey: 你的阿里云智能语音交互服务项目Appkey
+    token: 你的阿里云智能语音交互服务AccessToken，临时的24小时，要长期用下方的access_key_id，access_key_secret
+    voice: longxiaochun 
+    access_key_id: 你的阿里云账号access_key_id
+    access_key_secret: 你的阿里云账号access_key_secret
+    # 截至2025年7月21日大模型音色只有北京节点采用，其他节点暂不支持
+    host: nls-gateway-cn-beijing.aliyuncs.com
+    # 以下可不用设置，使用默认设置
+    # format: pcm  # 音频格式：pcm、wav、mp3
+    # sample_rate: 16000  # 采样率：8000、16000、24000
+    # volume: 50  # 音量：0-100
+    # speech_rate: 0  # 语速：-500到500
+    # pitch_rate: 0  # 语调：-500到500
+  TencentTTS:
+    # 腾讯云智能语音交互服务，需要先在腾讯云平台开通服务
+    # appid、secret_id、secret_key申请地址：https://console.cloud.tencent.com/cam/capi
+    # 免费领取资源：https://console.cloud.tencent.com/tts/resourcebundle
+    type: tencent
+    output_dir: tmp/
+    appid: 你的腾讯云AppId
+    secret_id: 你的腾讯云SecretID
+    secret_key: 你的腾讯云SecretKey
+    region: ap-guangzhou
+    voice: 101001
+
+  TTS302AI:
+    # 302AI语音合成服务，需要先在302平台创建账户充值，并获取密钥信息
+    # 添加 302.ai TTS 配置
+    # token申请地址：https://dash.302.ai/
+    # 获取api_keyn路径：https://dash.302.ai/apis/list
+    # 价格，$35/百万字符。火山原版¥450元/百万字符
+    type: doubao
+    api_url: https://api.302ai.cn/doubao/tts_hd
+    authorization: "Bearer "
+    # 湾湾小何音色
+    voice: "zh_female_wanwanxiaohe_moon_bigtts"
+    output_dir: tmp/
+    access_token: "你的302API密钥"
+  GizwitsTTS:
+    type: doubao
+    # 火山引擎作为基座，可以完全使用企业级火山引擎语音合成服务
+    # 前一万名注册的用户，将送5元体验金额
+    # 获取API Key地址：https://agentrouter.gizwitsapi.com/panel/token
+    api_url: https://bytedance.gizwitsapi.com/api/v1/tts
+    authorization: "Bearer "
+    # 湾湾小何音色
+    voice: "zh_female_wanwanxiaohe_moon_bigtts"
+    output_dir: tmp/
+    access_token: "你的机智云API key"
+  ACGNTTS:
+    #在线网址：https://acgn.ttson.cn/
+    #token购买：www.ttson.cn
+    #开发相关疑问请提交至网站上的qq
+    #角色id获取地址：ctrl+f快速检索角色——网站管理者不允许发布,可询问网站管理者
+    #各参数意义见开发文档：https://www.yuque.com/alexuh/skmti9/wm6taqislegb02gd?singleDoc#
+    type: ttson
+    token: your_token
+    voice_id: 1695
+    speed_factor: 1
+    pitch_factor: 0
+    volume_change_dB: 0
+    to_lang: ZH
+    url: https://u95167-bd74-2aef8085.westx.seetacloud.com:8443/flashsummary/tts?token=
+    format: mp3
+    output_dir: tmp/
+    emotion: 1
+  OpenAITTS:
+    # openai官方文本转语音服务，可支持全球大多数语种
+    type: openai
+    # 你可以在这里获取到 api key
+    # https://platform.openai.com/api-keys
+    api_key: 你的openai api key
+    # 国内需要使用代理
+    api_url: https://api.openai.com/v1/audio/speech
+    # 可选tts-1或tts-1-hd，tts-1速度更快tts-1-hd质量更好
+    model: tts-1
+    # 演讲者，可选alloy, echo, fable, onyx, nova, shimmer
+    voice: onyx
+    # 语速范围0.25-4.0
+    speed: 1
+    output_dir: tmp/
+  CustomTTS:
+    # 自定义的TTS接口服务，请求参数可自定义，可接入众多TTS服务
+    # 以本地部署的KokoroTTS为例
+    # 如果只有cpu运行：docker run -p 8880:8880 ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    # 如果只有gpu运行：docker run --gpus all -p 8880:8880 ghcr.io/remsky/kokoro-fastapi-gpu:latest
+    # 要求接口使用POST方式请求，并返回音频文件
+    type: custom
+    method: POST
+    url: "http://127.0.0.1:8880/v1/audio/speech"
+    params: # 自定义请求参数
+      input: "{prompt_text}"
+      response_format: "mp3"
+      download_format: "mp3"
+      voice: "zf_xiaoxiao"
+      lang_code: "z"
+      return_download_link: true
+      speed: 1
+      stream: false
+    headers: # 自定义请求头
+      # Authorization: Bearer xxxx
+    format: mp3 # 接口返回的音频格式
+    output_dir: tmp/
+  LinkeraiTTS:
+    type: linkerai
+    api_url: https://tts.linkerai.cn/tts
+    audio_format: "pcm"
+    # 默认的access_token供大家测试时免费使用的，此access_token请勿用于商业用途
+    # 如果效果不错，可自行申请token，申请地址：https://linkerai.cn
+    # 各参数意义见开发文档：https://tts.linkerai.cn/docs
+    # 支持声音克隆，可自行上传音频，填入voice参数，voice参数为空时，使用默认声音
+    access_token: "U4YdYXVfpwWnk2t5Gp822zWPCuORyeJL"
+    voice: "OUeAo1mhq6IBExi"
+    output_dir: tmp/
+  PaddleSpeechTTS:
+    #百度飞浆 PaddleSpeech 支持本地离线部署 支持模型训练
+    #框架地址 https://www.paddlepaddle.org.cn/
+    #项目地址 https://github.com/PaddlePaddle/PaddleSpeech
+    #SpeechServerDemo https://github.com/PaddlePaddle/PaddleSpeech/tree/develop/demos/speech_server
+    #流式传输请参考 https://github.com/PaddlePaddle/PaddleSpeech/wiki/PaddleSpeech-Server-WebSocket-API
+    type: paddle_speech
+    protocol: websocket # protocol choices = ['websocket', 'http']
+    url: ws://127.0.0.1:8092/paddlespeech/tts/streaming  # TTS 服务的 URL 地址，指向本地服务器 [websocket默认ws://127.0.0.1:8092/paddlespeech/tts/streaming，http默认http://127.0.0.1:8090/paddlespeech/tts]
+    spk_id: 0  # 发音人 ID，0 通常表示默认的发音人
+    sample_rate: 24000  # 采样率 [websocket默认24000，http默认0 自动选择]
+    speed: 1.0  # 语速，1.0 表示正常语速，>1 表示加快，<1 表示减慢
+    volume: 1.0  # 音量，1.0 表示正常音量，>1 表示增大，<1 表示减小
+    save_path:   # 保存路径
+  IndexStreamTTS:
+    # 基于Index-TTS-vLLM项目的TTS接口服务
+    # 参照教程：https://github.com/Ksuriuri/index-tts-vllm/blob/master/README.md
+    type: index_stream
+    api_url: http://127.0.0.1:11996/tts
+    audio_format: "pcm"
+    # 默认音色，如需其他音色可到项目assets文件夹下注册
+    voice: "jay_klee"
+    output_dir: tmp/
+  AliBLTTS:
+    # 阿里百炼CosyVoice大模型流式文本语音合成
+    # 可在这里找到你的 api_key https://bailian.console.aliyun.com/?apiKey=1#/api-key
+    # cosyvoice-v3和部分音色需要申请开通
+    type: alibl_stream
+    api_key: 你的api_key
+    model: "cosyvoice-v2"
+    voice: "longcheng_v2"
+    output_dir: tmp/
+    # 以下可不用设置，使用默认设置
+    # format: pcm  # 音频格式：pcm、wav、mp3、opus
+    # sample_rate: 24000  # 采样率：16000, 24000, 48000
+    # volume: 50  # 音量：0-100
+    # rate: 1  # 语速：0.5~2
+    # pitch: 1  # 语调：0.5~2
+  XunFeiTTS:
+    # 讯飞TTS服务 官方网站：https://www.xfyun.cn/
+    # 登录讯飞语音技术平台 https://console.xfyun.cn/app/myapp 创建相关应用
+    # 选择需要的服务获取api相关配置 https://console.xfyun.cn/services/uts
+    # 为需要使用的应用(APPID)购买相关服务 例如：超拟人合成 https://console.xfyun.cn/services/uts
+    type: xunfei_stream
+    api_url: wss://cbm01.cn-huabei-1.xf-yun.com/v1/private/mcd9m97e6
+    app_id: 你的app_id
+    api_secret: 你的api_secret
+    api_key: 你的api_key
+    voice: x5_lingxiaoxuan_flow
+    output_dir: tmp/
+    # 以下可不用设置，使用默认设置，注意V5音色不支持口语化配置
+    # oral_level: mid  # 口语化等级：high, mid, low
+    # spark_assist: 1  # 是否通过大模型进行口语化 开启:1, 关闭:0
+    # stop_split: 0  # 关闭服务端拆句 不关闭：0，关闭：1
+    # remain: 0  # 是否保留原书面语的样子	保留:1, 不保留:0
+    # format: raw  # 音频格式：raw(PCM), lame(MP3), speex, opus, opus-wb, opus-swb, speex-wb
+    # sample_rate: 24000  # 采样率：16000, 8000, 24000
+    # volume: 50  # 音量：0-100
+    # speed: 50  # 语速：0-100
+    # pitch: 50  # 语调：0-100
+
 EOF
     
     echo -e "${GREEN}✅ 基础配置文件创建完成: $CONFIG_FILE${RESET}"
@@ -1942,7 +2849,7 @@ config_aliyun_asr() {
     
     echo -e "${CYAN}📝 阿里云流式ASR需要以下参数：${RESET}"
     echo "  - Appkey: 语音交互服务项目Appkey（必填）"
-    echo "  - Token: 临时AccessToken，24小时有效（必填）"
+    echo "  - Token: 临时AccessToken，24小时有效（如果填写Access则自动忽略此项）"
     echo -e "${YELLOW}💡 长期使用建议设置下方Access Key（可选）：${RESET}"
     echo "  - Access Key ID: 阿里云账号访问密钥ID（可选，长期使用推荐）"
     echo "  - Access Key Secret: 阿里云账号访问密钥（可选，长期使用推荐）"
@@ -2174,44 +3081,324 @@ config_asr_advanced() {
             config_aliyun_asr
             ;;
         7)
-            echo -e "${YELLOW}⚠️ 暂未实现阿里云批量ASR配置，请选择阿里云流式ASR${RESET}"
-            sleep 2
-            config_asr_advanced
+            echo -e "${CYAN}配置AliyunASR阿里云批量ASR...${RESET}"
+            # 直接配置AliyunASR
+            asr_provider_key="AliyunASR"
+            echo -e "\n${GREEN}✅ 已选择阿里云批量ASR${RESET}"
+            echo -e "${YELLOW}⚠️ 需要配置阿里云语音识别服务的API密钥${RESET}"
+            echo -e "${CYAN}🔑 平台地址：https://nls-portal.console.aliyun.com/${RESET}"
+            echo -e "${CYAN}📝 获取Appkey地址：https://nls-portal.console.aliyun.com/applist${RESET}"
+            echo -e "${CYAN}📝 获取AccessToken地址：https://nls-portal.console.aliyun.com/overview${RESET}"
+            
+            read -r -p "请输入阿里云Appkey: " aliyun_appkey < /dev/tty
+            echo -e "${YELLOW}💡 注意：AccessToken是临时的(24小时)，建议使用AccessKey ID和Secret${RESET}"
+            read -r -p "请选择认证方式 (1: AccessToken, 2: AccessKey ID/Secret，默认2): " auth_choice < /dev/tty
+            
+            if [ "$auth_choice" = "1" ]; then
+                # 使用AccessToken认证
+                read -r -p "请输入阿里云AccessToken: " aliyun_token < /dev/tty
+                read -r -p "请输入阿里云AccessKey ID (可选，用于长期使用): " ali_access_key_id < /dev/tty
+                read -r -s -p "请输入阿里云AccessKey Secret (可选，用于长期使用): " ali_access_key_secret < /dev/tty
+                echo
+                
+                if [ -z "$aliyun_appkey" ] || [ -z "$aliyun_token" ]; then
+                    echo -e "${RED}❌ Appkey和AccessToken不能为空${RESET}"
+                    configure_asr_service
+                    return 0
+                fi
+                
+                # 更新配置文件
+                sed -i 's|asr_provider_key:.*|asr_provider_key: "AliyunASR"|' "$CONFIG_FILE"
+                sed -i "/^  AliyunASR:/,/^  [A-Za-z]/ s/appkey: .*/appkey: \"$aliyun_appkey\"/" "$CONFIG_FILE"
+                sed -i "/^  AliyunASR:/,/^  [A-Za-z]/ s/token: .*/token: \"$aliyun_token\"/" "$CONFIG_FILE"
+                
+                if [ -n "$ali_access_key_id" ] && [ -n "$ali_access_key_secret" ]; then
+                    sed -i "/^  AliyunASR:/,/^  [A-Za-z]/ s|access_key_id:.*|access_key_id: \"$ali_access_key_id\"|" "$CONFIG_FILE"
+                    sed -i "/^  AliyunASR:/,/^  [A-Za-z]/ s|access_key_secret:.*|access_key_secret: \"$ali_access_key_secret\"|" "$CONFIG_FILE"
+                fi
+            else
+                # 使用AccessKey认证
+                read -r -p "请输入阿里云AccessKey ID: " ali_access_key_id < /dev/tty
+                read -r -p "请输入阿里云AccessKey Secret: " ali_access_key_secret < /dev/tty
+                
+                if [ -z "$aliyun_appkey" ] || [ -z "$ali_access_key_id" ] || [ -z "$ali_access_key_secret" ]; then
+                    echo -e "${RED}❌ Appkey和AccessKey配置不能为空${RESET}"
+                    configure_asr_service
+                    return 0
+                fi
+                
+                # 更新配置文件
+                sed -i 's|asr_provider_key:.*|asr_provider_key: "AliyunASR"|' "$CONFIG_FILE"
+                sed -i "/^  AliyunASR:/,/^  [A-Za-z]/ s/appkey: .*/appkey: \"$aliyun_appkey\"/" "$CONFIG_FILE"
+                sed -i "s|ali_access_key_id:.*|ali_access_key_id: \"$ali_access_key_id\"|" "$CONFIG_FILE"
+                sed -i "s|ali_access_key_secret:.*|ali_access_key_secret: \"$ali_access_key_secret\"|" "$CONFIG_FILE"
+            fi
+            
+            echo -e "\n${GREEN}✅ 阿里云批量ASR配置完成${RESET}"
+            echo -e "${CYAN}💰 计费说明：批量ASR更便宜（0.004元/秒，¥0.24/分钟）${RESET}"
             ;;
         8)
-            echo -e "${YELLOW}⚠️ 暂未实现火山引擎流式ASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            echo -e "${CYAN}配置DoubaoStreamASR火山引擎流式ASR...${RESET}"
+            # 直接配置DoubaoStreamASR
+            asr_provider_key="DoubaoStreamASR"
+            echo -e "\n${GREEN}✅ 已选择火山引擎流式ASR${RESET}"
+            echo -e "${YELLOW}⚠️ 需要配置火山引擎语音合成服务的API密钥${RESET}"
+            echo -e "${CYAN}🔑 申请地址：https://console.volcengine.com/speech/app${RESET}"
+            echo -e "${CYAN}📝 获取AccessToken地址：https://console.volcengine.com/speech/service/10011${RESET}"
+            
+            read -r -p "请输入火山引擎AppID: " doubao_appid < /dev/tty
+            read -r -p "请输入火山引擎AccessToken: " doubao_access_token < /dev/tty
+            
+            if [ -z "$doubao_appid" ] || [ -z "$doubao_access_token" ]; then
+                echo -e "${RED}❌ AppID和AccessToken配置不能为空${RESET}"
+                configure_asr_service
+                return 0
+            fi
+            
+            echo -e "${CYAN}🔧 可选配置项：${RESET}"
+            read -r -p "是否配置热词文件？(y/N): " has_hotwords < /dev/tty
+            if [[ "$has_hotwords" =~ ^[Yy]$ ]]; then
+                read -r -p "请输入热词文件名称: " boosting_table_name < /dev/tty
+                read -r -p "请输入替换词文件名称: " correct_table_name < /dev/tty
+            fi
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "DoubaoStreamASR"|' "$CONFIG_FILE"
+            sed -i "/^  DoubaoStreamASR:/,/^  [A-Za-z]/ s/appid: .*/appid: \"$doubao_appid\"/" "$CONFIG_FILE"
+            sed -i "/^  DoubaoStreamASR:/,/^  [A-Za-z]/ s|access_token:.*|access_token: \"$doubao_access_token\"|" "$CONFIG_FILE"
+            
+            if [ -n "$boosting_table_name" ]; then
+                sed -i "/^  DoubaoStreamASR:/,/^  [A-Za-z]/ s|boosting_table_name:.*|boosting_table_name: \"$boosting_table_name\"|" "$CONFIG_FILE"
+            fi
+            if [ -n "$correct_table_name" ]; then
+                sed -i "/^  DoubaoStreamASR:/,/^  [A-Za-z]/ s|correct_table_name:.*|correct_table_name: \"$correct_table_name\"|" "$CONFIG_FILE"
+            fi
+            
+            echo -e "\n${GREEN}✅ 火山引擎流式ASR配置完成${RESET}"
+            echo -e "${CYAN}💰 计费说明：流式ASR使用大模型技术，效果更好${RESET}"
             ;;
         9)
-            echo -e "${YELLOW}⚠️ 暂未实现火山引擎批量ASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            echo -e "${CYAN}配置DoubaoASR火山引擎批量ASR...${RESET}"
+            # 直接配置DoubaoASR
+            asr_provider_key="DoubaoASR"
+            echo -e "\n${GREEN}✅ 已选择火山引擎批量ASR${RESET}"
+            echo -e "${YELLOW}⚠️ 需要配置火山引擎语音合成服务的API密钥${RESET}"
+            echo -e "${CYAN}🔑 申请地址：https://console.volcengine.com/speech/app${RESET}"
+            
+            read -r -p "请输入火山引擎AppID: " doubao_appid < /dev/tty
+            read -r -p "请输入火山引擎AccessToken: " doubao_access_token < /dev/tty
+            
+            if [ -z "$doubao_appid" ] || [ -z "$doubao_access_token" ]; then
+                echo -e "${RED}❌ AppID和AccessToken配置不能为空${RESET}"
+                configure_asr_service
+                return 0
+            fi
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "DoubaoASR"|' "$CONFIG_FILE"
+            sed -i "/^  DoubaoASR:/,/^  [A-Za-z]/ s/appid: .*/appid: \"$doubao_appid\"/" "$CONFIG_FILE"
+            sed -i "/^  DoubaoASR:/,/^  [A-Za-z]/ s|access_token:.*|access_token: \"$doubao_access_token\"|" "$CONFIG_FILE"
+            
+            echo -e "\n${GREEN}✅ 火山引擎批量ASR配置完成${RESET}"
+            echo -e "${CYAN}💰 计费说明：批量ASR按次收费，更便宜${RESET}"
             ;;
         10)
-            echo -e "${YELLOW}⚠️ 暂未实现腾讯云ASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            echo -e "${CYAN}配置TencentASR腾讯云ASR...${RESET}"
+            # 直接配置TencentASR
+            asr_provider_key="TencentASR"
+            echo -e "\n${GREEN}✅ 已选择腾讯云ASR${RESET}"
+            echo -e "${YELLOW}⚠️ 需要配置腾讯云语音识别服务的API密钥${RESET}"
+            echo -e "${CYAN}🔑 申请地址：https://console.cloud.tencent.com/cam/capi${RESET}"
+            echo -e "${CYAN}🎁 免费领取资源：https://console.cloud.tencent.com/asr/resourcebundle${RESET}"
+            
+            read -r -p "请输入腾讯云AppId: " tencent_appid < /dev/tty
+            read -r -p "请输入腾讯云SecretId: " tencent_secret_id < /dev/tty
+            read -r -p "请输入腾讯云SecretKey: " tencent_secret_key < /dev/tty
+            echo
+            
+            if [ -z "$tencent_appid" ] || [ -z "$tencent_secret_id" ] || [ -z "$tencent_secret_key" ]; then
+                echo -e "${RED}❌ AppId和SecretKey配置不能为空${RESET}"
+                configure_asr_service
+                return 0
+            fi
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "TencentASR"|' "$CONFIG_FILE"
+            sed -i "/^  TencentASR:/,/^  [A-Za-z]/ s/appid: .*/appid: \"$tencent_appid\"/" "$CONFIG_FILE"
+            sed -i "/^  TencentASR:/,/^  [A-Za-z]/ s/secret_id: .*/secret_id: \"$tencent_secret_id\"/" "$CONFIG_FILE"
+            sed -i "/^  TencentASR:/,/^  [A-Za-z]/ s/secret_key: .*/secret_key: \"$tencent_secret_key\"/" "$CONFIG_FILE"
+            
+            echo -e "\n${GREEN}✅ 腾讯云ASR配置完成${RESET}"
             ;;
         11)
-            echo -e "${YELLOW}⚠️ 暂未实现百度智能云ASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            echo -e "${CYAN}配置BaiduASR百度智能云ASR...${RESET}"
+            # 直接配置BaiduASR
+            asr_provider_key="BaiduASR"
+            echo -e "\n${GREEN}✅ 已选择百度智能云ASR${RESET}"
+            echo -e "${YELLOW}⚠️ 需要配置百度语音技术服务的API密钥${RESET}"
+            echo -e "${CYAN}🔑 申请地址：https://console.bce.baidu.com/ai-engine/old/#/ai/speech/app/list${RESET}"
+            
+            read -r -p "请输入百度AppID: " baidu_app_id < /dev/tty
+            read -r -p "请输入百度API Key: " baidu_api_key < /dev/tty
+            read -r -p "请输入百度Secret Key: " baidu_secret_key < /dev/tty
+            echo
+            
+            if [ -z "$baidu_app_id" ] || [ -z "$baidu_api_key" ] || [ -z "$baidu_secret_key" ]; then
+                echo -e "${RED}❌ AppID和API Key配置不能为空${RESET}"
+                configure_asr_service
+                return 0
+            fi
+            
+            echo -e "${CYAN}🔧 语言参数配置（默认1537为普通话）：${RESET}"
+            echo "   1537: 普通话（默认）"
+            echo "   8001: 英语"
+            echo "   8002: 粤语"
+            read -r -p "请选择语言参数（默认1537）: " baidu_dev_pid < /dev/tty
+            baidu_dev_pid=${baidu_dev_pid:-1537}
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "BaiduASR"|' "$CONFIG_FILE"
+            sed -i "/^  BaiduASR:/,/^  [A-Za-z]/ s/app_id: .*/app_id: \"$baidu_app_id\"/" "$CONFIG_FILE"
+            sed -i "/^  BaiduASR:/,/^  [A-Za-z]/ s/api_key: .*/api_key: \"$baidu_api_key\"/" "$CONFIG_FILE"
+            sed -i "/^  BaiduASR:/,/^  [A-Za-z]/ s/secret_key: .*/secret_key: \"$baidu_secret_key\"/" "$CONFIG_FILE"
+            sed -i "/^  BaiduASR:/,/^  [A-Za-z]/ s/dev_pid: .*/dev_pid: $baidu_dev_pid/" "$CONFIG_FILE"
+            
+            echo -e "\n${GREEN}✅ 百度智能云ASR配置完成${RESET}"
             ;;
         12)
-            echo -e "${YELLOW}⚠️ 暂未实现OpenAI ASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            echo -e "${CYAN}配置OpenaiASR OpenAI ASR...${RESET}"
+            # 直接配置OpenaiASR
+            asr_provider_key="OpenaiASR"
+            echo -e "\n${GREEN}✅ 已选择OpenAI ASR${RESET}"
+            echo -e "${YELLOW}⚠️ 需要配置OpenAI的API密钥${RESET}"
+            echo -e "${CYAN}🔑 申请地址：https://platform.openai.com/settings/organization/api-keys${RESET}"
+            echo -e "${CYAN}📝 支持gpt-4o-transcribe或GPT-4o mini Transcribe模型${RESET}"
+            
+            read -r -p "请输入OpenAI API Key: " openai_api_key < /dev/tty
+            
+            if [ -z "$openai_api_key" ]; then
+                echo -e "${RED}❌ OpenAI API Key不能为空${RESET}"
+                configure_asr_service
+                return 0
+            fi
+            
+            echo -e "${CYAN}🤖 模型选择：${RESET}"
+            echo "   1) gpt-4o-mini-transcribe (推荐，速度快，成本低)"
+            echo "   2) gpt-4o-transcribe (高质量模型)"
+            read -r -p "请选择模型（默认1）: " model_choice < /dev/tty
+            
+            case $model_choice in
+                1|"")
+                    model_name="gpt-4o-mini-transcribe"
+                    ;;
+                2)
+                    model_name="gpt-4o-transcribe"
+                    ;;
+                *)
+                    model_name="gpt-4o-mini-transcribe"
+                    ;;
+            esac
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "OpenaiASR"|' "$CONFIG_FILE"
+            sed -i "/^  OpenaiASR:/,/^  [A-Za-z]/ s/api_key: .*/api_key: \"$openai_api_key\"/" "$CONFIG_FILE"
+            sed -i "/^  OpenaiASR:/,/^  [A-Za-z]/ s/model_name: .*/model_name: $model_name/" "$CONFIG_FILE"
+            
+            echo -e "\n${GREEN}✅ OpenAI ASR配置完成${RESET}"
+            echo -e "${CYAN}🌐 注意：需要网络连接才能使用${RESET}"
             ;;
         13)
-            echo -e "${YELLOW}⚠️ 暂未实现Groq ASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            echo -e "${CYAN}配置GroqASR Groq ASR...${RESET}"
+            # 直接配置GroqASR
+            asr_provider_key="GroqASR"
+            echo -e "\n${GREEN}✅ 已选择Groq ASR${RESET}"
+            echo -e "${YELLOW}⚠️ 需要配置Groq的API密钥${RESET}"
+            echo -e "${CYAN}🔑 申请地址：https://console.groq.com/keys${RESET}"
+            echo -e "${CYAN}📝 使用whisper-large-v3-turbo模型${RESET}"
+            
+            read -r -p "请输入Groq API Key: " groq_api_key < /dev/tty
+            
+            if [ -z "$groq_api_key" ]; then
+                echo -e "${RED}❌ Groq API Key不能为空${RESET}"
+                configure_asr_service
+                return 0
+            fi
+            
+            echo -e "${CYAN}🤖 模型选择：${RESET}"
+            echo "   1) whisper-large-v3-turbo (推荐，速度快)"
+            echo "   2) whisper-large-v3 (高质量模型)"
+            echo "   3) distil-whisper-large-v3-en (仅支持英语)"
+            read -r -p "请选择模型（默认1）: " groq_model_choice < /dev/tty
+            
+            case $groq_model_choice in
+                1|"")
+                    groq_model_name="whisper-large-v3-turbo"
+                    ;;
+                2)
+                    groq_model_name="whisper-large-v3"
+                    ;;
+                3)
+                    groq_model_name="distil-whisper-large-v3-en"
+                    ;;
+                *)
+                    groq_model_name="whisper-large-v3-turbo"
+                    ;;
+            esac
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "GroqASR"|' "$CONFIG_FILE"
+            sed -i "/^  GroqASR:/,/^  [A-Za-z]/ s/api_key: .*/api_key: \"$groq_api_key\"/" "$CONFIG_FILE"
+            sed -i "/^  GroqASR:/,/^  [A-Za-z]/ s/model_name: .*/model_name: $groq_model_name/" "$CONFIG_FILE"
+            
+            echo -e "\n${GREEN}✅ Groq ASR配置完成${RESET}"
+            echo -e "${CYAN}🌐 注意：需要网络连接才能使用${RESET}"
             ;;
         14)
-            echo -e "${YELLOW}⚠️ 暂未实现通义千问ASR配置，请选择其他ASR服务${RESET}"
-            sleep 2
-            config_asr_advanced
+            echo -e "${CYAN}配置Qwen3ASRFlash通义千问ASR...${RESET}"
+            # 直接配置Qwen3ASRFlash
+            asr_provider_key="Qwen3ASRFlash"
+            echo -e "\n${GREEN}✅ 已选择通义千问Qwen3-ASR-Flash${RESET}"
+            echo -e "${YELLOW}⚠️ 需要配置阿里云百炼平台的API密钥${RESET}"
+            echo -e "${CYAN}🔑 申请地址：https://bailian.console.aliyun.com/#/api-key${RESET}"
+            echo -e "${CYAN}📝 支持多语言识别、歌唱识别、噪声拒识等功能${RESET}"
+            
+            read -r -p "请输入阿里云百炼API Key: " qwen_api_key < /dev/tty
+            
+            if [ -z "$qwen_api_key" ]; then
+                echo -e "${RED}❌ 阿里云百炼API Key不能为空${RESET}"
+                configure_asr_service
+                return 0
+            fi
+            
+            echo -e "${CYAN}🔧 ASR选项配置：${RESET}"
+            read -r -p "是否启用自动语种检测？(Y/n): " enable_lid_choice < /dev/tty
+            if [[ "$enable_lid_choice" =~ ^[Nn]$ ]]; then
+                enable_lid="false"
+            else
+                enable_lid="true"
+            fi
+            
+            read -r -p "是否启用逆文本归一化？(Y/n): " enable_itn_choice < /dev/tty
+            if [[ "$enable_itn_choice" =~ ^[Nn]$ ]]; then
+                enable_itn="false"
+            else
+                enable_itn="true"
+            fi
+            
+            read -r -p "请输入上下文信息（可选，提高识别准确率）: " qwen_context < /dev/tty
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "Qwen3ASRFlash"|' "$CONFIG_FILE"
+            sed -i "/^  Qwen3ASRFlash:/,/^  [A-Za-z]/ s/api_key: .*/api_key: \"$qwen_api_key\"/" "$CONFIG_FILE"
+            sed -i "/^  Qwen3ASRFlash:/,/^  [A-Za-z]/ s/enable_lid: .*/enable_lid: $enable_lid/" "$CONFIG_FILE"
+            sed -i "/^  Qwen3ASRFlash:/,/^  [A-Za-z]/ s/enable_itn: .*/enable_itn: $enable_itn/" "$CONFIG_FILE"
+            
+            if [ -n "$qwen_context" ]; then
+                sed -i "/^  Qwen3ASRFlash:/,/^  [A-Za-z]/ s|context:.*|context: \"$qwen_context\"|" "$CONFIG_FILE"
+            fi
+            
+            echo -e "\n${GREEN}✅ 通义千问ASR配置完成${RESET}"
+            echo -e "${CYAN}🌐 注意：需要网络连接才能使用${RESET}"
             ;;
         15)
             config_xunfei_stream_asr
@@ -3590,16 +4777,16 @@ config_keys() {
         echo -e "\n${PURPLE}==================================================${RESET}"
         echo -e "${CYAN}🔑 选择配置方式  🔑${RESET}"
         echo -e "${PURPLE}==================================================${RESET}"
-        echo "0) 现在通过脚本配置密钥和服务商"
-        echo "1) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
-        echo "2) 退出配置并退出脚本"
-        echo "3) 不配置所有配置，直接返回菜单"
-        echo "4) 返回上一个菜单"
-        read -r -p "请选择（默认0）：" key_choice < /dev/tty
-        key_choice=${key_choice:-0}
+        echo "0) 返回上一个菜单"
+        echo "1) 现在通过脚本配置密钥和服务商"
+        echo "2) 稍后手动填写所有配置（脚本将预设在线服务商以避免启动报错）"
+        echo "3) 退出配置"
+
+        read -r -p "请选择（默认1）：" key_choice < /dev/tty
+        key_choice=${key_choice:-1}
         
         # 处理返回上一个菜单
-        if [ "$key_choice" = "4" ]; then
+        if [ "$key_choice" = "0" ]; then
             echo -e "\n${CYAN}🔄 返回上一个菜单${RESET}"
             main_menu
             return 1
@@ -3611,7 +4798,7 @@ config_keys() {
             echo -e "${CYAN}ℹ️ 将跳过所有配置步骤${RESET}"
             echo ""
             echo "请选择："
-            echo "1) 确认不配置所有配置"
+            echo "1) 确认不配置所有配置项"
             echo "2) 取消，返回配置选择菜单"
             read -r -p "请选择（默认1）：" confirm_skip < /dev/tty
             confirm_skip=${confirm_skip:-1}
@@ -3638,14 +4825,14 @@ config_keys() {
             fi
         fi
         
-        # 处理详细配置选项（选项0）
-        if [ "$key_choice" = "0" ]; then
+        # 处理详细配置选项（选项1）
+        if [ "$key_choice" = "1" ]; then
             echo -e "\n${GREEN}✅ 开始进行详细配置...${RESET}"
             break  # 退出循环，进入详细配置
         fi
         
-        # 处理本地ASR转云服务选项（选项1）
-        if [ "$key_choice" = "1" ]; then
+        # 处理本地ASR转云服务选项（选项2）
+        if [ "$key_choice" = "2" ]; then
             echo -e "\n${YELLOW}⚠️ 已选择稍后手动填写。${RESET}"
             echo -e "${CYAN}ℹ️ 脚本将修改现有配置文件，将本地ASR模型替换为云服务ASR。${RESET}"
             echo -e "${CYAN}ℹ️ 这样可以避免服务启动失败，同时保留您的其他配置。${RESET}"
@@ -9096,6 +10283,7 @@ config_management_menu() {
         clear
         echo -e "\n${PURPLE}==================================================${RESET}"
         echo -e "${CYAN}📄 配置文件管理工具 📄${RESET}"
+        echo -e "${CYAN}这个工具有很大的逻辑问题，懒得修了，有能力的大佬PR${RESET}"
         echo -e "${PURPLE}==================================================${RESET}"
         
         echo -e "\n${WHITE_RED}配置文件管理选项:${RESET}"
@@ -9341,63 +10529,218 @@ configure_asr_service() {
             ;;
         1)
             echo -e "${CYAN}配置FunASR本地模型...${RESET}"
-            config_asr_advanced
+            # 直接配置FunASR
+            asr_provider_key="FunASR"
+            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择FunASR本地模型${RESET}"
+                echo -e "${YELLOW}💡 建议选择其他ASR服务或升级服务器内存${RESET}"
+                sleep 2
+                configure_asr_service
+                return 0
+            fi
+            echo -e "\n${GREEN}✅ 已选择本地模型 FunASR。${RESET}"
+            echo -e "${CYAN}📦 将下载SenseVoiceSmall模型到本地（需要约1GB存储空间）${RESET}"
+            read -r -p "是否继续下载FunASR模型？(y/N): " confirm_download < /dev/tty
+            
+            if [[ "$confirm_download" =~ ^[Yy]$ ]]; then
+                echo -e "${CYAN}🔄 正在下载FunASR模型...${RESET}"
+                echo -e "${CYAN}📍 下载地址: $LOCAL_ASR_MODEL_URL${RESET}"
+                
+                # 创建模型目录
+                mkdir -p "$MAIN_DIR/models"
+                
+                # 下载模型文件
+                if curl -L -o "$MAIN_DIR/models/SenseVoiceSmall.pt" "$LOCAL_ASR_MODEL_URL" --retry 3 --retry-delay 5; then
+                    echo -e "${GREEN}✅ FunASR模型下载完成！${RESET}"
+                else
+                    echo -e "${RED}❌ 模型下载失败，请检查网络连接${RESET}"
+                    configure_asr_service
+                    return 0
+                fi
+            fi
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "FunASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ FunASR配置完成${RESET}"
             ;;
         2)
             echo -e "${CYAN}配置FunASRServer独立服务...${RESET}"
-            config_asr_advanced
+            # 直接配置FunASRServer
+            asr_provider_key="FunASRServer"
+            echo -e "\n${GREEN}✅ 已选择 FunASRServer 独立部署服务${RESET}"
+            echo -e "${CYAN}🔧 配置独立ASR服务器地址和端口${RESET}"
+            
+            read -r -p "请输入ASR服务器地址 (默认localhost): " asr_server_host < /dev/tty
+            asr_server_host=${asr_server_host:-localhost}
+            read -r -p "请输入ASR服务器端口 (默认9880): " asr_server_port < /dev/tty
+            asr_server_port=${asr_server_port:-9880}
+            
+            # 更新配置文件
+            sed -i "s|asr_provider_key:.*|asr_provider_key: \"FunASRServer\"|" "$CONFIG_FILE"
+            sed -i "s|asr_server_host:.*|asr_server_host: \"$asr_server_host\"|" "$CONFIG_FILE"
+            sed -i "s|asr_server_port:.*|asr_server_port: $asr_server_port|" "$CONFIG_FILE"
+            
+            echo -e "\n${GREEN}✅ FunASRServer配置完成${RESET}"
             ;;
         3)
             echo -e "${CYAN}配置SherpaASR本地模型...${RESET}"
-            config_asr_advanced
+            # 直接配置SherpaASR
+            asr_provider_key="SherpaASR"
+            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择SherpaASR本地模型${RESET}"
+                echo -e "${YELLOW}💡 建议选择其他ASR服务或升级服务器内存${RESET}"
+                sleep 2
+                configure_asr_service
+                return 0
+            fi
+            echo -e "\n${GREEN}✅ 已选择本地模型 SherpaASR。${RESET}"
+            echo -e "${CYAN}📦 将下载SherpaASR模型到本地${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "SherpaASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ SherpaASR配置完成${RESET}"
             ;;
         4)
             echo -e "${CYAN}配置SherpaParaformerASR本地模型...${RESET}"
-            config_asr_advanced
+            # 直接配置SherpaParaformerASR
+            asr_provider_key="SherpaParaformerASR"
+            echo -e "\n${GREEN}✅ 已选择本地模型 SherpaParaformerASR。${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "SherpaParaformerASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ SherpaParaformerASR配置完成${RESET}"
             ;;
         5)
             echo -e "${CYAN}配置VoskASR本地模型...${RESET}"
-            config_asr_advanced
+            # 直接配置VoskASR
+            asr_provider_key="VoskASR"
+            if [ "$IS_MEMORY_SUFFICIENT" = false ]; then
+                echo -e "\n${RED}❌ 内存不足 (${MEM_TOTAL}GB < 4GB)，无法选择VoskASR本地模型${RESET}"
+                echo -e "${YELLOW}💡 建议选择其他ASR服务或升级服务器内存${RESET}"
+                sleep 2
+                configure_asr_service
+                return 0
+            fi
+            echo -e "\n${GREEN}✅ 已选择本地模型 VoskASR。${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "VoskASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ VoskASR配置完成${RESET}"
             ;;
         6)
             echo -e "${CYAN}配置AliyunStreamASR阿里云流式...${RESET}"
-            config_asr_advanced
+            # 直接配置AliyunStreamASR
+            asr_provider_key="AliyunStreamASR"
+            echo -e "\n${GREEN}✅ 已选择阿里云流式ASR${RESET}"
+            echo -e "${YELLOW}⚠️ 需要配置阿里云语音识别服务的API密钥${RESET}"
+            echo -e "${CYAN}🔑 开通地址：https://nls-gateway.cn-shanghai.aliyuncs.com${RESET}"
+            echo -e "${CYAN}📝 获取AccessKey和SecretKey${RESET}"
+            
+            read -r -p "请输入阿里云AccessKey ID: " ali_access_key_id < /dev/tty
+            read -r -s -p "请输入阿里云AccessKey Secret: " ali_access_key_secret < /dev/tty
+            echo
+            
+            if [ -z "$ali_access_key_id" ] || [ -z "$ali_access_key_secret" ]; then
+                echo -e "${RED}❌ AccessKey配置不能为空${RESET}"
+                configure_asr_service
+                return 0
+            fi
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "AliyunStreamASR"|' "$CONFIG_FILE"
+            sed -i "s|ali_access_key_id:.*|ali_access_key_id: \"$ali_access_key_id\"|" "$CONFIG_FILE"
+            sed -i "s|ali_access_key_secret:.*|ali_access_key_secret: \"$ali_access_key_secret\"|" "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ 阿里云流式ASR配置完成${RESET}"
             ;;
         7)
             echo -e "${CYAN}配置AliyunASR阿里云批量...${RESET}"
-            config_asr_advanced
+            # 直接配置AliyunASR
+            asr_provider_key="AliyunASR"
+            echo -e "\n${GREEN}✅ 已选择阿里云批量ASR${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "AliyunASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ 阿里云批量ASR配置完成${RESET}"
             ;;
         8)
             echo -e "${CYAN}配置DoubaoStreamASR火山引擎流式...${RESET}"
-            config_asr_advanced
+            # 直接配置DoubaoStreamASR
+            asr_provider_key="DoubaoStreamASR"
+            echo -e "\n${GREEN}✅ 已选择火山引擎流式ASR${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "DoubaoStreamASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ 火山引擎流式ASR配置完成${RESET}"
             ;;
         9)
             echo -e "${CYAN}配置DoubaoASR火山引擎批量...${RESET}"
-            config_asr_advanced
+            # 直接配置DoubaoASR
+            asr_provider_key="DoubaoASR"
+            echo -e "\n${GREEN}✅ 已选择火山引擎批量ASR${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "DoubaoASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ 火山引擎批量ASR配置完成${RESET}"
             ;;
         10)
             echo -e "${CYAN}配置TencentASR腾讯云...${RESET}"
-            config_asr_advanced
+            # 直接配置TencentASR
+            asr_provider_key="TencentASR"
+            echo -e "\n${GREEN}✅ 已选择腾讯云ASR${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "TencentASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ 腾讯云ASR配置完成${RESET}"
             ;;
         11)
             echo -e "${CYAN}配置BaiduASR百度智能云...${RESET}"
-            config_asr_advanced
+            # 直接配置BaiduASR
+            asr_provider_key="BaiduASR"
+            echo -e "\n${GREEN}✅ 已选择百度智能云ASR${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "BaiduASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ 百度智能云ASR配置完成${RESET}"
             ;;
         12)
             echo -e "${CYAN}配置OpenaiASR OpenAI...${RESET}"
-            config_asr_advanced
+            # 直接配置OpenaiASR
+            asr_provider_key="OpenaiASR"
+            echo -e "\n${GREEN}✅ 已选择OpenAI ASR${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "OpenaiASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ OpenAI ASR配置完成${RESET}"
             ;;
         13)
             echo -e "${CYAN}配置GroqASR Groq...${RESET}"
-            config_asr_advanced
+            # 直接配置GroqASR
+            asr_provider_key="GroqASR"
+            echo -e "\n${GREEN}✅ 已选择Groq ASR${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "GroqASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ Groq ASR配置完成${RESET}"
             ;;
         14)
             echo -e "${CYAN}配置Qwen3ASRFlash通义千问...${RESET}"
-            config_asr_advanced
+            # 直接配置Qwen3ASRFlash
+            asr_provider_key="Qwen3ASRFlash"
+            echo -e "\n${GREEN}✅ 已选择通义千问ASR${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "Qwen3ASRFlash"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ 通义千问ASR配置完成${RESET}"
             ;;
         15)
             echo -e "${CYAN}配置XunfeiStreamASR讯飞流式...${RESET}"
-            config_asr_advanced
+            # 直接配置XunfeiStreamASR
+            asr_provider_key="XunfeiStreamASR"
+            echo -e "\n${GREEN}✅ 已选择讯飞流式ASR${RESET}"
+            
+            # 更新配置文件
+            sed -i 's|asr_provider_key:.*|asr_provider_key: "XunfeiStreamASR"|' "$CONFIG_FILE"
+            echo -e "\n${GREEN}✅ 讯飞流式ASR配置完成${RESET}"
             ;;
         *)
             echo -e "${RED}❌ 无效选择${RESET}"
