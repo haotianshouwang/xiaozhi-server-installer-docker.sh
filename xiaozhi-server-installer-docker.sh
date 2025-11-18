@@ -7,6 +7,61 @@ trap exit_confirm SIGINT
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
 # 版本：1.2.83（删除配置文件不存在的LLM配置项）
+# 修复内容（V1.2.83）：
+# - 删除配置文件不存在的LLM配置项：KimiLLM、SparkLLM、WenxinLLM、OpenaiLLM、GroqLLM
+# - 重新调整LLM菜单选项和case语句编号，从15个减少到10个
+# - 更新高级LLM配置函数，删除无效配置项
+# 修复内容（V1.2.82）：
+# - 优化ASR服务商菜单顺序，将FunASRServer放在FunASR后面
+# - 调整菜单顺序：FunASR、FunASRServer、SherpaASR、SherpaParaformerASR、VoskASR
+# - 同步调整所有case语句编号，确保菜单选项与功能对应正确
+# 修复内容（V1.2.81）：
+# - 修复ASR服务商菜单显示顺序问题
+# - 调整本地模型排列顺序：FunASR、SherpaASR、SherpaParaformerASR、VoskASR
+# - 将VoskASR从第13位移动到第4位，确保本地模型连续显示
+# - 更新相关case语句编号，确保菜单选项与功能对应正确
+# - 修复重复main函数调用语法错误
+# 修复内容（V1.2.80）：
+# - 修复配置文件管理菜单返回逻辑，使用continue而非return
+# - 修复人设配置空输入处理，自动使用现有默认配置
+# - 修复Memory配置返回逻辑，正确返回TTS配置
+# 修复内容（V1.2.76）：
+# - 修复人设配置函数返回语句缺失问题
+# - 新增阿里云配置智能共享功能
+# - 实现Access Key ID和Access Key Secret在阿里云服务间共享
+# - 优化阿里云ASR和TTS配置流程，避免重复输入
+# - 添加配置检测和复用机制
+# V1.2.75:
+# - 修复config_asr_advanced函数中缺失的本地ASR模型部署功能
+# - 恢复FunASR本地模型下载和配置
+# - 添加SherpaASR、SherpaParaformerASR、VoskASR本地模型配置
+# - 实现智能内存检查和用户确认
+# - 支持模型自动下载和手动下载模式
+# - 完善配置文件自动更新机制
+# V1.2.80:
+# - 修正配置文件管理菜单返回逻辑，返回到配置文件管理菜单而非主菜单
+# - 区分配置文件管理菜单和脚本配置流程的不同返回逻辑
+# V1.2.79:
+# - 修复配置文件管理菜单逻辑，每个配置项完成后直接返回主菜单
+# - 修复人设配置，用户未输入时使用现有默认配置
+# - 修复Memory配置返回上一步逻辑，避免循环
+# V1.2.78:
+# - 修复ASR配置菜单函数调用，防止服务器卡死
+# - 修正配置步骤显示一致性（1/7-7/7）
+# V1.2.77:
+# - 新增阿里云配置共享功能
+# - 人设配置功能完善
+# V1.2.76:
+# - 实现智能内存检查和用户确认
+# - 支持模型自动下载和手动下载模式
+# - 完善配置文件自动更新机制
+# V1.2.75:
+# - 修复语法错误
+# V1.2.74:
+# - 新增百炼API密钥智能填充功能
+# - 修正人设配置字符限制从4000字到2000字
+# V1.2.73:
+# - 修正人设配置字符限制错误
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
@@ -3950,17 +4005,24 @@ config_edge_tts() {
     esac
     
     # 更新配置文件
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: EdgeTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    sed -i "s/^  TTS: .*/  TTS: EdgeTTS/" "$CONFIG_FILE"
     
-    # 写入EdgeTTS配置
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  EdgeTTS:
-    type: edge
-    voice: $voice
-    output_dir: tmp/
-EOF
+    # 检查并更新EdgeTTS配置
+    if grep -q "^  EdgeTTS:" "$CONFIG_FILE"; then
+        # 如果EdgeTTS配置块已存在，精确更新字段
+        sed -i '/^  EdgeTTS:/,/^  [A-Z]/ {
+            /^    voice:/c\    voice: "'$voice'"
+            /^    output_dir:/c\    output_dir: "tmp/"
+        }' "$CONFIG_FILE"
+    else
+        # 如果EdgeTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    EdgeTTS:\n      type: edge\n      voice: "'$voice'"\n      output_dir: "tmp/"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  EdgeTTS:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
     
     echo -e "${GREEN}✅ EdgeTTS配置完成，使用音色：$voice${RESET}"
 }
@@ -4001,24 +4063,35 @@ config_doubao_tts() {
             ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: DoubaoTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: DoubaoTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  DoubaoTTS:
-    type: doubao
-    api_url: https://openspeech.bytedance.com/api/v1/tts
-    voice: $voice
-    output_dir: tmp/
-    authorization: "Bearer;"
-    appid: $appid
-    access_token: $access_token
-    cluster: volcano_tts
-    speed_ratio: 1.0
-    volume_ratio: 1.0
-    pitch_ratio: 1.0
-EOF
+    # 检查并更新DoubaoTTS配置
+    if grep -q "^  DoubaoTTS:" "$CONFIG_FILE"; then
+        # 如果DoubaoTTS配置块已存在，精确更新字段
+        sed -i '/^  DoubaoTTS:/,/^  [A-Z]/ {
+            /^    voice:/c\    voice: "'$voice'"
+            /^    appid:/c\    appid: "'$appid'"
+            /^    access_token:/c\    access_token: "'$access_token'"
+            /^    speed_ratio:/c\    speed_ratio: 1.0
+            /^    volume_ratio:/c\    volume_ratio: 1.0
+            /^    pitch_ratio:/c\    pitch_ratio: 1.0
+        }' "$CONFIG_FILE"
+    else
+        # 如果DoubaoTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    DoubaoTTS:\n      type: doubao\n      api_url: "https://openspeech.bytedance.com/api/v1/tts"\n      voice: "'$voice'"\n      output_dir: "tmp/"\n      authorization: "Bearer;"\n      appid: "'$appid'"\n      access_token: "'$access_token'"\n      cluster: volcano_tts\n      speed_ratio: 1.0\n      volume_ratio: 1.0\n      pitch_ratio: 1.0' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  DoubaoTTS:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    appid:" "$CONFIG_FILE"; then
+        sed -i '/^  DoubaoTTS:/a\    appid: "'$appid'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    access_token:" "$CONFIG_FILE"; then
+        sed -i '/^  DoubaoTTS:/a\    access_token: "'$access_token'"' "$CONFIG_FILE"
+    fi
     
     echo -e "${GREEN}✅ DoubaoTTS配置完成${RESET}"
 }
@@ -4049,34 +4122,40 @@ config_gpt_sovits_v2() {
     read -r -p "Temperature (默认1): " temperature < /dev/tty
     temperature=${temperature:-1}
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: GPT_SOVITS_V2\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新TTS selected_module
+    sed -i "/^  TTS: /c\  TTS: GPT_SOVITS_V2" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  GPT_SOVITS_V2:
-    type: gpt_sovits_v2
-    url: "http://$sovits_url/tts"
-    output_dir: tmp/
-    text_lang: "auto"
-    ref_audio_path: "$ref_audio"
-    prompt_text: "$prompt_text"
-    prompt_lang: "zh"
-    top_k: $top_k
-    top_p: 1
-    temperature: $temperature
-    text_split_method: "cut0"
-    batch_size: 1
-    batch_threshold: 0.75
-    split_bucket: true
-    return_fragment: false
-    speed_factor: 1.0
-    streaming_mode: false
-    seed: -1
-    parallel_infer: true
-    repetition_penalty: 1.35
-    aux_ref_audio_paths: []
-EOF
+    # 检查并更新配置
+    if grep -q "^  GPT_SOVITS_V2:" "$CONFIG_FILE"; then
+        # 如果配置块已存在，精确更新字段
+        sed -i '/^  GPT_SOVITS_V2:/,/^  [A-Z]/ {
+            /^    url:/c\    url: "http://$sovits_url/tts"
+            /^    ref_audio_path:/c\    ref_audio_path: "$ref_audio"
+            /^    prompt_text:/c\    prompt_text: "$prompt_text"
+            /^    top_k:/c\    top_k: $top_k
+            /^    temperature:/c\    temperature: $temperature
+        }' "$CONFIG_FILE"
+    else
+        # 如果配置块不存在，插入配置
+        sed -i '/^  TTS:/a\    GPT_SOVITS_V2:\n      type: gpt_sovits_v2\n      url: "http://$sovits_url/tts"\n      output_dir: tmp/\n      text_lang: "auto"\n      ref_audio_path: "$ref_audio"\n      prompt_text: "$prompt_text"\n      prompt_lang: "zh"\n      top_k: $top_k\n      top_p: 1\n      temperature: $temperature\n      text_split_method: "cut0"\n      batch_size: 1\n      batch_threshold: 0.75\n      split_bucket: true\n      return_fragment: false\n      speed_factor: 1.0\n      streaming_mode: false\n      seed: -1\n      parallel_infer: true\n      repetition_penalty: 1.35\n      aux_ref_audio_paths: []' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "^    url:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V2:/a\    url: "http://$sovits_url/tts"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    ref_audio_path:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V2:/a\    ref_audio_path: "$ref_audio"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    prompt_text:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V2:/a\    prompt_text: "$prompt_text"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    top_k:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V2:/a\    top_k: $top_k' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    temperature:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V2:/a\    temperature: $temperature' "$CONFIG_FILE"
+    fi
     
     echo -e "${GREEN}✅ GPT-SoVITS V2配置完成${RESET}"
     echo -e "${YELLOW}💡 请确保TTS服务已启动在 $sovits_url${RESET}"
@@ -4110,28 +4189,44 @@ config_gpt_sovits_v3() {
     read -r -p "Speed (默认1.0): " speed_v3 < /dev/tty
     speed_v3=${speed_v3:-1.0}
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: GPT_SOVITS_V3\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新TTS selected_module
+    sed -i "/^  TTS: /c\  TTS: GPT_SOVITS_V3" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  GPT_SOVITS_V3:
-    type: gpt_sovits_v3
-    url: "http://$sovits_v3_url"
-    output_dir: tmp/
-    text_language: "auto"
-    refer_wav_path: "$refer_wav"
-    prompt_language: "zh"
-    prompt_text: "$prompt_text_v3"
-    top_k: $top_k_v3
-    top_p: 1.0
-    temperature: $temp_v3
-    cut_punc: ""
-    speed: $speed_v3
-    inp_refs: []
-    sample_steps: 32
-    if_sr: false
-EOF
+    # 检查并更新配置
+    if grep -q "^  GPT_SOVITS_V3:" "$CONFIG_FILE"; then
+        # 如果配置块已存在，精确更新字段
+        sed -i '/^  GPT_SOVITS_V3:/,/^  [A-Z]/ {
+            /^    url:/c\    url: "http://$sovits_v3_url"
+            /^    refer_wav_path:/c\    refer_wav_path: "$refer_wav"
+            /^    prompt_text:/c\    prompt_text: "$prompt_text_v3"
+            /^    top_k:/c\    top_k: $top_k_v3
+            /^    temperature:/c\    temperature: $temp_v3
+            /^    speed:/c\    speed: $speed_v3
+        }' "$CONFIG_FILE"
+    else
+        # 如果配置块不存在，插入配置
+        sed -i '/^  TTS:/a\    GPT_SOVITS_V3:\n      type: gpt_sovits_v3\n      url: "http://$sovits_v3_url"\n      output_dir: tmp/\n      text_language: "auto"\n      refer_wav_path: "$refer_wav"\n      prompt_language: "zh"\n      prompt_text: "$prompt_text_v3"\n      top_k: $top_k_v3\n      top_p: 1.0\n      temperature: $temp_v3\n      cut_punc: ""\n      speed: $speed_v3\n      inp_refs: []\n      sample_steps: 32\n      if_sr: false' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "^    url:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V3:/a\    url: "http://$sovits_v3_url"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    refer_wav_path:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V3:/a\    refer_wav_path: "$refer_wav"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    prompt_text:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V3:/a\    prompt_text: "$prompt_text_v3"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    top_k:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V3:/a\    top_k: $top_k_v3' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    temperature:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V3:/a\    temperature: $temp_v3' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    speed:" "$CONFIG_FILE"; then
+        sed -i '/^  GPT_SOVITS_V3:/a\    speed: $speed_v3' "$CONFIG_FILE"
+    fi
     
     echo -e "${GREEN}✅ GPT-SoVITS V3配置完成${RESET}"
     echo -e "${YELLOW}💡 请确保服务已启动在 $sovits_v3_url${RESET}"
@@ -4462,20 +4557,29 @@ config_openai_tts() {
         *) voice="onyx" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: OpenAITTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: OpenAITTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  OpenAITTS:
-    type: openai
-    api_key: $openai_key
-    api_url: https://api.openai.com/v1/audio/speech
-    model: tts-1
-    voice: $voice
-    speed: 1
-    output_dir: tmp/
-EOF
+    # 检查并更新OpenAITTS配置
+    if grep -q "^  OpenAITTS:" "$CONFIG_FILE"; then
+        # 如果OpenAITTS配置块已存在，精确更新字段
+        sed -i '/^  OpenAITTS:/,/^  [A-Z]/ {
+            /^    api_key:/c\    api_key: "'$openai_key'"
+            /^    voice:/c\    voice: "'$voice'"
+            /^    speed:/c\    speed: 1
+        }' "$CONFIG_FILE"
+    else
+        # 如果OpenAITTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    OpenAITTS:\n      type: openai\n      api_key: "'$openai_key'"\n      api_url: "https://api.openai.com/v1/audio/speech"\n      model: "tts-1"\n      voice: "'$voice'"\n      speed: 1\n      output_dir: "tmp/"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    api_key:" "$CONFIG_FILE"; then
+        sed -i '/^  OpenAITTS:/a\    api_key: "'$openai_key'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  OpenAITTS:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
     
     echo -e "${GREEN}✅ OpenAI TTS配置完成${RESET}"
 }
@@ -4486,22 +4590,32 @@ config_huoshan_tts() {
     read -r -p "AppID: " huoshan_appid < /dev/tty
     read -r -p "Access Token: " huoshan_token < /dev/tty
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: HuoshanDoubleStreamTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: HuoshanDoubleStreamTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  HuoshanDoubleStreamTTS:
-    type: huoshan_double_stream
-    ws_url: wss://openspeech.bytedance.com/api/v3/tts/bidirection
-    appid: $huoshan_appid
-    access_token: $huoshan_token
-    resource_id: volc.service_type.10029
-    speaker: zh_female_wanwanxiaohe_moon_bigtts
-    speech_rate: 0
-    loudness_rate: 0
-    pitch: 0
-EOF
+    # 检查并更新HuoshanDoubleStreamTTS配置
+    if grep -q "^  HuoshanDoubleStreamTTS:" "$CONFIG_FILE"; then
+        # 如果HuoshanDoubleStreamTTS配置块已存在，精确更新字段
+        sed -i '/^  HuoshanDoubleStreamTTS:/,/^  [A-Z]/ {
+            /^    appid:/c\    appid: "'$huoshan_appid'"
+            /^    access_token:/c\    access_token: "'$huoshan_token'"
+            /^    speaker:/c\    speaker: "zh_female_wanwanxiaohe_moon_bigtts"
+            /^    speech_rate:/c\    speech_rate: 0
+            /^    loudness_rate:/c\    loudness_rate: 0
+            /^    pitch:/c\    pitch: 0
+        }' "$CONFIG_FILE"
+    else
+        # 如果HuoshanDoubleStreamTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    HuoshanDoubleStreamTTS:\n      type: huoshan_double_stream\n      ws_url: "wss://openspeech.bytedance.com/api/v3/tts/bidirection"\n      appid: "'$huoshan_appid'"\n      access_token: "'$huoshan_token'"\n      resource_id: "volc.service_type.10029"\n      speaker: "zh_female_wanwanxiaohe_moon_bigtts"\n      speech_rate: 0\n      loudness_rate: 0\n      pitch: 0' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    appid:" "$CONFIG_FILE"; then
+        sed -i '/^  HuoshanDoubleStreamTTS:/a\    appid: "'$huoshan_appid'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    access_token:" "$CONFIG_FILE"; then
+        sed -i '/^  HuoshanDoubleStreamTTS:/a\    access_token: "'$huoshan_token'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 火山大模型TTS配置完成${RESET}"
 }
 
@@ -4524,20 +4638,82 @@ config_aliyun_tts() {
         fi
     fi
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: AliyunTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 确保输入的变量不为空
+    if [ -z "$aliyun_appkey" ]; then
+        echo -e "${RED}❌ AppKey不能为空！${RESET}"
+        return 1
+    fi
+    if [ -z "$access_key_id" ] || [ -z "$access_key_secret" ]; then
+        echo -e "${RED}❌ Access Key ID 和 Access Key Secret 都不能为空！${RESET}"
+        return 1
+    fi
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  AliyunTTS:
-    type: aliyun
-    output_dir: tmp/
-    appkey: $aliyun_appkey
-    voice: xiaoyun
-    access_key_id: $access_key_id
-    access_key_secret: $access_key_secret
-EOF
+    # 更新selected_module中的TTS配置
+    sed -i "s/^  TTS: .*/  TTS: AliyunTTS/" "$CONFIG_FILE"
+    
+    # 检查是否已存在AliyunTTS配置
+    if grep -q "^  AliyunTTS:" "$CONFIG_FILE"; then
+        # 如果存在AliyunTTS配置，逐个字段替换
+        sed -i '/^  AliyunTTS:/,/^  [A-Z]/ {
+            /^    type:/c\    type: aliyun
+            /^    output_dir:/c\    output_dir: tmp/
+            /^    appkey:/c\    appkey: '"$aliyun_appkey"'
+            /^    voice:/c\    voice: xiaoyun
+            /^    access_key_id:/c\    access_key_id: '"$access_key_id"'
+            /^    access_key_secret:/c\    access_key_secret: '"$access_key_secret"'
+            /^    token:/d
+        }' "$CONFIG_FILE"
+        
+        # 添加缺失的字段
+        if ! grep -q "    appkey:" "$CONFIG_FILE"; then
+            sed -i '/^  AliyunTTS:/a\    appkey: '"$aliyun_appkey"'' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    access_key_id:" "$CONFIG_FILE"; then
+            sed -i '/^    appkey:/a\    access_key_id: '"$access_key_id"'' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    access_key_secret:" "$CONFIG_FILE"; then
+            sed -i '/^    access_key_id:/a\    access_key_secret: '"$access_key_secret"'' "$CONFIG_FILE"
+        fi
+    else
+        # 如果不存在AliyunTTS配置，在TTS部分下添加
+        if grep -q "^TTS:" "$CONFIG_FILE"; then
+            # 找到TTS部分的结束位置，插入新配置
+            local tts_end_line=$(grep -n "^TTS:" "$CONFIG_FILE" | cut -d: -f1)
+            if [ -n "$tts_end_line" ]; then
+                # 找到下一个顶级配置的开始行
+                local next_section_line=$(awk 'NR>'"$tts_end_line"' && /^[^[:space:]]/ {print NR; exit}' "$CONFIG_FILE")
+                if [ -n "$next_section_line" ]; then
+                    # 在TTS部分结束前插入配置
+                    sed -i "$((next_section_line-1))i\\
+\\
+  AliyunTTS:\\
+    type: aliyun\\
+    output_dir: tmp/\\
+    appkey: $aliyun_appkey\\
+    voice: xiaoyun\\
+    access_key_id: $access_key_id\\
+    access_key_secret: $access_key_secret" "$CONFIG_FILE"
+                else
+                    # 如果没有下一个部分，在文件末尾添加
+                    echo "" >> "$CONFIG_FILE"
+                    echo "TTS:" >> "$CONFIG_FILE"
+                    echo "  AliyunTTS:" >> "$CONFIG_FILE"
+                    echo "    type: aliyun" >> "$CONFIG_FILE"
+                    echo "    output_dir: tmp/" >> "$CONFIG_FILE"
+                    echo "    appkey: $aliyun_appkey" >> "$CONFIG_FILE"
+                    echo "    voice: xiaoyun" >> "$CONFIG_FILE"
+                    echo "    access_key_id: $access_key_id" >> "$CONFIG_FILE"
+                    echo "    access_key_secret: $access_key_secret" >> "$CONFIG_FILE"
+                fi
+            fi
+        fi
+    fi
+    
     echo -e "${GREEN}✅ 阿里云TTS配置完成${RESET}"
+    echo -e "${CYAN}📝 配置信息：${RESET}"
+    echo "  - AppKey: $aliyun_appkey"
+    echo "  - Access Key ID: ${access_key_id:0:8}****"
+    echo "  - TTS类型: AliyunTTS"
 }
 
 # 讯飞ASR配置
@@ -4617,27 +4793,32 @@ config_xunfei_stream_asr() {
         return 1
     fi
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: XunfeiStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: LinkeraiTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新ASR selected_module
+    sed -i "/^  ASR: /c\  ASR: XunfeiStreamASR" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-ASR:
-  XunfeiStreamASR:
-    type: xunfei_stream
-    api_url: wss://rtasr.xfyun.cn/v1/ws
-    app_id: $app_id
-    api_secret: $api_secret
-    api_key: $api_key
-    language: zh_cn
-    domain: rtasr
-    vinfo: 1
-    vinfo_prompt: 
-    vinfo_enable: 1
-    voinfo_enable: 1
-    voice_type: 
-    voice_languages: 
-    output_dir: tmp/
-EOF
+    # 检查并更新配置
+    if grep -q "^  XunfeiStreamASR:" "$CONFIG_FILE"; then
+        # 如果配置块已存在，精确更新字段
+        sed -i '/^  XunfeiStreamASR:/,/^  [A-Z]/ {
+            /^    app_id:/c\    app_id: "$app_id"
+            /^    api_secret:/c\    api_secret: "$api_secret"
+            /^    api_key:/c\    api_key: "$api_key"
+        }' "$CONFIG_FILE"
+    else
+        # 如果配置块不存在，插入配置
+        sed -i '/^  ASR:/a\    XunfeiStreamASR:\n      type: xunfei_stream\n      api_url: wss://rtasr.xfyun.cn/v1/ws\n      app_id: "$app_id"\n      api_secret: "$api_secret"\n      api_key: "$api_key"\n      language: zh_cn\n      domain: rtasr\n      vinfo: 1\n      vinfo_prompt:\n      vinfo_enable: 1\n      voinfo_enable: 1\n      voice_type:\n      voice_languages:\n      output_dir: tmp/' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "^    app_id:" "$CONFIG_FILE"; then
+        sed -i '/^  XunfeiStreamASR:/a\    app_id: "$app_id"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    api_secret:" "$CONFIG_FILE"; then
+        sed -i '/^  XunfeiStreamASR:/a\    api_secret: "$api_secret"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    api_key:" "$CONFIG_FILE"; then
+        sed -i '/^  XunfeiStreamASR:/a\    api_key: "$api_key"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 讯飞流式ASR配置完成${RESET}"
 }
 
@@ -4647,20 +4828,33 @@ config_xunfei_tts() {
     read -r -p "API Secret: " xunfei_secret < /dev/tty
     read -r -p "API Key: " xunfei_key < /dev/tty
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: XunFeiTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: XunFeiTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  XunFeiTTS:
-    type: xunfei_stream
-    api_url: wss://cbm01.cn-huabei-1.xf-yun.com/v1/private/mcd9m97e6
-    app_id: $xunfei_appid
-    api_secret: $xunfei_secret
-    api_key: $xunfei_key
-    voice: x5_lingxiaoxuan_flow
-    output_dir: tmp/
-EOF
+    # 检查并更新XunFeiTTS配置
+    if grep -q "^  XunFeiTTS:" "$CONFIG_FILE"; then
+        # 如果XunFeiTTS配置块已存在，精确更新字段
+        sed -i '/^  XunFeiTTS:/,/^  [A-Z]/ {
+            /^    app_id:/c\    app_id: "'$xunfei_appid'"
+            /^    api_secret:/c\    api_secret: "'$xunfei_secret'"
+            /^    api_key:/c\    api_key: "'$xunfei_key'"
+            /^    voice:/c\    voice: "x5_lingxiaoxuan_flow"
+        }' "$CONFIG_FILE"
+    else
+        # 如果XunFeiTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    XunFeiTTS:\n      type: xunfei_stream\n      api_url: "wss://cbm01.cn-huabei-1.xf-yun.com/v1/private/mcd9m97e6"\n      app_id: "'$xunfei_appid'"\n      api_secret: "'$xunfei_secret'"\n      api_key: "'$xunfei_key'"\n      voice: "x5_lingxiaoxuan_flow"\n      output_dir: "tmp/"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    app_id:" "$CONFIG_FILE"; then
+        sed -i '/^  XunFeiTTS:/a\    app_id: "'$xunfei_appid'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    api_secret:" "$CONFIG_FILE"; then
+        sed -i '/^  XunFeiTTS:/a\    api_secret: "'$xunfei_secret'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    api_key:" "$CONFIG_FILE"; then
+        sed -i '/^  XunFeiTTS:/a\    api_key: "'$xunfei_key'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 讯飞TTS配置完成${RESET}"
 }
 
@@ -4673,31 +4867,28 @@ config_fish_speech() {
     
     read -r -p "参考音频路径: " fish_ref_audio < /dev/tty
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: FishSpeech\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新TTS selected_module
+    sed -i "/^  TTS: /c\  TTS: FishSpeech" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  FishSpeech:
-    type: fishspeech
-    output_dir: tmp/
-    response_format: wav
-    reference_id: null
-    reference_audio: ["$fish_ref_audio"]
-    reference_text: ["哈啰啊，我是小智啦，声音好听的中国台湾女孩一枚，超开心认识你耶"]
-    normalize: true
-    max_new_tokens: 1024
-    chunk_length: 200
-    top_p: 0.7
-    repetition_penalty: 1.2
-    temperature: 0.7
-    streaming: false
-    use_memory_cache: "on"
-    seed: null
-    channels: 1
-    rate: 44100
-    api_url: "$fish_url/v1/tts"
-EOF
+    # 检查并更新配置
+    if grep -q "^  FishSpeech:" "$CONFIG_FILE"; then
+        # 如果配置块已存在，精确更新字段
+        sed -i '/^  FishSpeech:/,/^  [A-Z]/ {
+            /^    reference_audio:/c\    reference_audio: ["$fish_ref_audio"]
+            /^    api_url:/c\    api_url: "$fish_url/v1/tts"
+        }' "$CONFIG_FILE"
+    else
+        # 如果配置块不存在，插入配置
+        sed -i '/^  TTS:/a\    FishSpeech:\n      type: fishspeech\n      output_dir: tmp/\n      response_format: wav\n      reference_id: null\n      reference_audio: ["$fish_ref_audio"]\n      reference_text: ["哈啰啊，我是小智啦，声音好听的中国台湾女孩一枚，超开心认识你耶"]\n      normalize: true\n      max_new_tokens: 1024\n      chunk_length: 200\n      top_p: 0.7\n      repetition_penalty: 1.2\n      temperature: 0.7\n      streaming: false\n      use_memory_cache: "on"\n      seed: null\n      channels: 1\n      rate: 44100\n      api_url: "$fish_url/v1/tts"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "^    reference_audio:" "$CONFIG_FILE"; then
+        sed -i '/^  FishSpeech:/a\    reference_audio: ["$fish_ref_audio"]' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    api_url:" "$CONFIG_FILE"; then
+        sed -i '/^  FishSpeech:/a\    api_url: "$fish_url/v1/tts"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ FishSpeech配置完成${RESET}"
 }
 
@@ -4727,19 +4918,28 @@ config_cosyvoice_siliconflow() {
         *) voice="FunAudioLLM/CosyVoice2-0.5B:alex" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: CosyVoiceSiliconflow\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: CosyVoiceSiliconflow/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  CosyVoiceSiliconflow:
-    type: siliconflow
-    model: FunAudioLLM/CosyVoice2-0.5B
-    voice: $voice
-    output_dir: tmp/
-    access_token: $token
-    response_format: wav
-EOF
+    # 检查并更新CosyVoiceSiliconflow配置
+    if grep -q "^  CosyVoiceSiliconflow:" "$CONFIG_FILE"; then
+        # 如果CosyVoiceSiliconflow配置块已存在，精确更新字段
+        sed -i '/^  CosyVoiceSiliconflow:/,/^  [A-Z]/ {
+            /^    voice:/c\    voice: "'$voice'"
+            /^    access_token:/c\    access_token: "'$token'"
+        }' "$CONFIG_FILE"
+    else
+        # 如果CosyVoiceSiliconflow配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    CosyVoiceSiliconflow:\n      type: siliconflow\n      model: "FunAudioLLM/CosyVoice2-0.5B"\n      voice: "'$voice'"\n      output_dir: "tmp/"\n      access_token: "'$token'"\n      response_format: "wav"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  CosyVoiceSiliconflow:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    access_token:" "$CONFIG_FILE"; then
+        sed -i '/^  CosyVoiceSiliconflow:/a\    access_token: "'$token'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 硅基流动CosyVoice配置完成${RESET}"
 }
 
@@ -4767,18 +4967,28 @@ config_cozecn_tts() {
         *) voice="7426720361733046281" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: CozeCnTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: CozeCnTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  CozeCnTTS:
-    type: cozecn
-    voice: $voice
-    output_dir: tmp/
-    access_token: $token
-    response_format: wav
-EOF
+    # 检查并更新CozeCnTTS配置
+    if grep -q "^  CozeCnTTS:" "$CONFIG_FILE"; then
+        # 如果CozeCnTTS配置块已存在，精确更新字段
+        sed -i '/^  CozeCnTTS:/,/^  [A-Z]/ {
+            /^    voice:/c\    voice: "'$voice'"
+            /^    access_token:/c\    access_token: "'$token'"
+        }' "$CONFIG_FILE"
+    else
+        # 如果CozeCnTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    CozeCnTTS:\n      type: cozecn\n      voice: "'$voice'"\n      output_dir: "tmp/"\n      access_token: "'$token'"\n      response_format: "wav"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  CozeCnTTS:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    access_token:" "$CONFIG_FILE"; then
+        sed -i '/^  CozeCnTTS:/a\    access_token: "'$token'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ Coze中国TTS配置完成${RESET}"
 }
 
@@ -4808,20 +5018,29 @@ config_volces_aigateway_tts() {
         *) voice="zh_male_shaonianzixin_moon_bigtts" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: VolcesAiGatewayTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: VolcesAiGatewayTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  VolcesAiGatewayTTS:
-    type: openai
-    api_key: $api_key
-    api_url: https://ai-gateway.vei.volces.com/v1/audio/speech
-    model: doubao-tts
-    voice: $voice
-    speed: 1
-    output_dir: tmp/
-EOF
+    # 检查并更新VolcesAiGatewayTTS配置
+    if grep -q "^  VolcesAiGatewayTTS:" "$CONFIG_FILE"; then
+        # 如果VolcesAiGatewayTTS配置块已存在，精确更新字段
+        sed -i '/^  VolcesAiGatewayTTS:/,/^  [A-Z]/ {
+            /^    api_key:/c\    api_key: "'$api_key'"
+            /^    voice:/c\    voice: "'$voice'"
+            /^    speed:/c\    speed: 1
+        }' "$CONFIG_FILE"
+    else
+        # 如果VolcesAiGatewayTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    VolcesAiGatewayTTS:\n      type: openai\n      api_key: "'$api_key'"\n      api_url: "https://ai-gateway.vei.volces.com/v1/audio/speech"\n      model: "doubao-tts"\n      voice: "'$voice'"\n      speed: 1\n      output_dir: "tmp/"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    api_key:" "$CONFIG_FILE"; then
+        sed -i '/^  VolcesAiGatewayTTS:/a\    api_key: "'$api_key'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  VolcesAiGatewayTTS:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 火山引擎AI网关TTS配置完成${RESET}"
 }
 
@@ -4852,19 +5071,32 @@ config_minimax_tts() {
         *) voice_id="female-shaonv" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: MinimaxTTSHTTPStream\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: MinimaxTTSHTTPStream/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  MinimaxTTSHTTPStream:
-    type: minimax_httpstream
-    output_dir: tmp/
-    group_id: $group_id
-    api_key: $api_key
-    model: "speech-01-turbo"
-    voice_id: $voice_id
-EOF
+    # 检查并更新MinimaxTTSHTTPStream配置
+    if grep -q "^  MinimaxTTSHTTPStream:" "$CONFIG_FILE"; then
+        # 如果MinimaxTTSHTTPStream配置块已存在，精确更新字段
+        sed -i '/^  MinimaxTTSHTTPStream:/,/^  [A-Z]/ {
+            /^    group_id:/c\    group_id: "'$group_id'"
+            /^    api_key:/c\    api_key: "'$api_key'"
+            /^    voice_id:/c\    voice_id: "'$voice_id'"
+        }' "$CONFIG_FILE"
+    else
+        # 如果MinimaxTTSHTTPStream配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    MinimaxTTSHTTPStream:\n      type: minimax_httpstream\n      output_dir: "tmp/"\n      group_id: "'$group_id'"\n      api_key: "'$api_key'"\n      model: "speech-01-turbo"\n      voice_id: "'$voice_id'"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    group_id:" "$CONFIG_FILE"; then
+        sed -i '/^  MinimaxTTSHTTPStream:/a\    group_id: "'$group_id'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    api_key:" "$CONFIG_FILE"; then
+        sed -i '/^  MinimaxTTSHTTPStream:/a\    api_key: "'$api_key'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    voice_id:" "$CONFIG_FILE"; then
+        sed -i '/^  MinimaxTTSHTTPStream:/a\    voice_id: "'$voice_id'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ MiniMax流式TTS配置完成${RESET}"
 }
 
@@ -4908,26 +5140,161 @@ config_aliyun_stream_tts() {
         *) voice="longxiaochun" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: AliyunStreamTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 使用共享配置函数检查Access Key
+    local access_key_id=""
+    local access_key_secret=""
+    if ! check_and_share_aliyun_credentials "TTS"; then
+        echo -e "${YELLOW}💡 请配置Access Key（如果需要）：${RESET}"
+        read -r -p "Access Key ID (可选): " access_key_id < /dev/tty
+        read -r -p "Access Key Secret (可选): " access_key_secret < /dev/tty
+    else
+        # 从配置文件获取已存在的配置
+        if [ -f "$CONFIG_FILE" ]; then
+            access_key_id=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_id:" | sed 's/.*access_key_id: *"\?\([^"]*\)".*/\1/' | head -1)
+            access_key_secret=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_secret:" | sed 's/.*access_key_secret: *"\?\([^"]*\)".*/\1/' | head -1)
+        fi
+    fi
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  AliyunStreamTTS:
-    type: aliyun_stream
-    output_dir: tmp/
-    appkey: $appkey
-    token: $token
-    voice: $voice
-    access_key_id: 你的阿里云账号access_key_id
-    access_key_secret: 你的阿里云账号access_key_secret
-    host: nls-gateway-cn-beijing.aliyuncs.com
-    format: pcm
-    sample_rate: 16000
-    volume: 50
-    speech_rate: 0
-    pitch_rate: 0
-EOF
+    # 确保输入的变量不为空
+    if [ -z "$appkey" ]; then
+        echo -e "${RED}❌ AppKey不能为空！${RESET}"
+        return 1
+    fi
+    if [ -z "$token" ]; then
+        echo -e "${RED}❌ Access Token不能为空！${RESET}"
+        return 1
+    fi
+    
+    # 更新selected_module中的TTS配置
+    sed -i "s/^  TTS: .*/  TTS: AliyunStreamTTS/" "$CONFIG_FILE"
+    
+    # 检查是否已存在AliyunStreamTTS配置
+    if grep -q "^  AliyunStreamTTS:" "$CONFIG_FILE"; then
+        # 如果存在AliyunStreamTTS配置，逐个字段替换
+        sed -i '/^  AliyunStreamTTS:/,/^  [A-Z]/ {
+            /^    type:/c\    type: aliyun_stream
+            /^    output_dir:/c\    output_dir: tmp/
+            /^    appkey:/c\    appkey: "$appkey"
+            /^    token:/c\    token: "$token"
+            /^    voice:/c\    voice: "$voice"
+            /^    host:/c\    host: nls-gateway-cn-beijing.aliyuncs.com
+            /^    format:/c\    format: pcm
+            /^    sample_rate:/c\    sample_rate: 16000
+            /^    volume:/c\    volume: 50
+            /^    speech_rate:/c\    speech_rate: 0
+            /^    pitch_rate:/c\    pitch_rate: 0
+            /^    access_key_id:/c\    access_key_id: "$access_key_id"
+            /^    access_key_secret:/c\    access_key_secret: "$access_key_secret"
+        }' "$CONFIG_FILE"
+        
+        # 添加缺失的字段
+        if ! grep -q "    appkey:" "$CONFIG_FILE"; then
+            sed -i '/^  AliyunStreamTTS:/a\    appkey: "'$appkey'"' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    token:" "$CONFIG_FILE"; then
+            sed -i '/^    appkey:/a\    token: "'$token'"' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    voice:" "$CONFIG_FILE"; then
+            sed -i '/^    token:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    type:" "$CONFIG_FILE"; then
+            sed -i '/^  AliyunStreamTTS:/a\    type: aliyun_stream' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    output_dir:" "$CONFIG_FILE"; then
+            sed -i '/^    type:/a\    output_dir: tmp/' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    host:" "$CONFIG_FILE"; then
+            sed -i '/^    output_dir:/a\    host: nls-gateway-cn-beijing.aliyuncs.com' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    format:" "$CONFIG_FILE"; then
+            sed -i '/^    host:/a\    format: pcm' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    sample_rate:" "$CONFIG_FILE"; then
+            sed -i '/^    format:/a\    sample_rate: 16000' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    volume:" "$CONFIG_FILE"; then
+            sed -i '/^    sample_rate:/a\    volume: 50' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    speech_rate:" "$CONFIG_FILE"; then
+            sed -i '/^    volume:/a\    speech_rate: 0' "$CONFIG_FILE"
+        fi
+        if ! grep -q "    pitch_rate:" "$CONFIG_FILE"; then
+            sed -i '/^    speech_rate:/a\    pitch_rate: 0' "$CONFIG_FILE"
+        fi
+        
+        # 处理Access Key字段
+        if [ -n "$access_key_id" ] && [ "$access_key_id" != "null" ]; then
+            if ! grep -q "    access_key_id:" "$CONFIG_FILE"; then
+                sed -i '/^    pitch_rate:/a\    access_key_id: "'$access_key_id'"' "$CONFIG_FILE"
+            else
+                sed -i '/^  AliyunStreamTTS:/,/^  [A-Z]/ s|^    access_key_id: .*|    access_key_id: "'$access_key_id'"|' "$CONFIG_FILE"
+            fi
+        fi
+        if [ -n "$access_key_secret" ] && [ "$access_key_secret" != "null" ]; then
+            if ! grep -q "    access_key_secret:" "$CONFIG_FILE"; then
+                if grep -q "    access_key_id:" "$CONFIG_FILE"; then
+                    sed -i '/^    access_key_id:/a\    access_key_secret: "'$access_key_secret'"' "$CONFIG_FILE"
+                else
+                    sed -i '/^    pitch_rate:/a\    access_key_secret: "'$access_key_secret'"' "$CONFIG_FILE"
+                fi
+            else
+                sed -i '/^  AliyunStreamTTS:/,/^  [A-Z]/ s|^    access_key_secret: .*|    access_key_secret: "'$access_key_secret'"|' "$CONFIG_FILE"
+            fi
+        fi
+    else
+        # 如果不存在AliyunStreamTTS配置，在TTS部分下添加
+        if grep -q "^TTS:" "$CONFIG_FILE"; then
+            # 找到TTS部分的结束位置，插入新配置
+            local tts_end_line=$(grep -n "^TTS:" "$CONFIG_FILE" | cut -d: -f1)
+            if [ -n "$tts_end_line" ]; then
+                # 找到下一个顶级配置的开始行
+                local next_section_line=$(awk 'NR>'"$tts_end_line"' && /^[^[:space:]]/ {print NR; exit}' "$CONFIG_FILE")
+                if [ -n "$next_section_line" ]; then
+                    # 在TTS部分结束前插入配置
+                    sed -i "$((next_section_line-1))i\
+\
+  AliyunStreamTTS:\
+    type: aliyun_stream\
+    output_dir: tmp/\
+    appkey: \"$appkey\"\
+    token: \"$token\"\
+    voice: \"$voice\"\
+    host: nls-gateway-cn-beijing.aliyuncs.com\
+    format: pcm\
+    sample_rate: 16000\
+    volume: 50\
+    speech_rate: 0\
+    pitch_rate: 0" "$CONFIG_FILE"
+                    
+                    # 添加Access Key（如果提供）
+                    if [ -n "$access_key_id" ] && [ "$access_key_id" != "null" ] && [ -n "$access_key_secret" ] && [ "$access_key_secret" != "null" ]; then
+                        sed -i '/^    pitch_rate:/a\    access_key_id: "'$access_key_id'"' "$CONFIG_FILE"
+                        sed -i '/^    access_key_id:/a\    access_key_secret: "'$access_key_secret'"' "$CONFIG_FILE"
+                    fi
+                else
+                    # 如果没有下一个部分，在文件末尾添加
+                    echo "" >> "$CONFIG_FILE"
+                    echo "TTS:" >> "$CONFIG_FILE"
+                    echo "  AliyunStreamTTS:" >> "$CONFIG_FILE"
+                    echo "    type: aliyun_stream" >> "$CONFIG_FILE"
+                    echo "    output_dir: tmp/" >> "$CONFIG_FILE"
+                    echo "    appkey: \"$appkey\"" >> "$CONFIG_FILE"
+                    echo "    token: \"$token\"" >> "$CONFIG_FILE"
+                    echo "    voice: \"$voice\"" >> "$CONFIG_FILE"
+                    echo "    host: nls-gateway-cn-beijing.aliyuncs.com" >> "$CONFIG_FILE"
+                    echo "    format: pcm" >> "$CONFIG_FILE"
+                    echo "    sample_rate: 16000" >> "$CONFIG_FILE"
+                    echo "    volume: 50" >> "$CONFIG_FILE"
+                    echo "    speech_rate: 0" >> "$CONFIG_FILE"
+                    echo "    pitch_rate: 0" >> "$CONFIG_FILE"
+                    if [ -n "$access_key_id" ] && [ "$access_key_id" != "null" ] && [ -n "$access_key_secret" ] && [ "$access_key_secret" != "null" ]; then
+                        echo "    access_key_id: \"$access_key_id\"" >> "$CONFIG_FILE"
+                        echo "    access_key_secret: \"$access_key_secret\"" >> "$CONFIG_FILE"
+                    fi
+                fi
+            fi
+        fi
+    fi
     echo -e "${GREEN}✅ 阿里云流式CosyVoice配置完成${RESET}"
 }
 
@@ -4971,20 +5338,36 @@ config_tencent_tts() {
         *) voice="101001" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: TencentTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: TencentTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  TencentTTS:
-    type: tencent
-    output_dir: tmp/
-    appid: $appid
-    secret_id: $secret_id
-    secret_key: $secret_key
-    region: ap-guangzhou
-    voice: $voice
-EOF
+    # 检查并更新TencentTTS配置
+    if grep -q "^  TencentTTS:" "$CONFIG_FILE"; then
+        # 如果TencentTTS配置块已存在，精确更新字段
+        sed -i '/^  TencentTTS:/,/^  [A-Z]/ {
+            /^    appid:/c\    appid: "'$appid'"
+            /^    secret_id:/c\    secret_id: "'$secret_id'"
+            /^    secret_key:/c\    secret_key: "'$secret_key'"
+            /^    voice:/c\    voice: "'$voice'"
+        }' "$CONFIG_FILE"
+    else
+        # 如果TencentTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    TencentTTS:\n      type: tencent\n      output_dir: "tmp/"\n      appid: "'$appid'"\n      secret_id: "'$secret_id'"\n      secret_key: "'$secret_key'"\n      region: "ap-guangzhou"\n      voice: "'$voice'"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    appid:" "$CONFIG_FILE"; then
+        sed -i '/^  TencentTTS:/a\    appid: "'$appid'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    secret_id:" "$CONFIG_FILE"; then
+        sed -i '/^  TencentTTS:/a\    secret_id: "'$secret_id'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    secret_key:" "$CONFIG_FILE"; then
+        sed -i '/^  TencentTTS:/a\    secret_key: "'$secret_key'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  TencentTTS:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 腾讯云TTS配置完成${RESET}"
 }
 
@@ -5014,19 +5397,28 @@ config_tts_302ai() {
         *) voice="zh_female_wanwanxiaohe_moon_bigtts" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: TTS302AI\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新TTS selected_module
+    sed -i "/^  TTS: /c\  TTS: TTS302AI" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  TTS302AI:
-    type: doubao
-    api_url: https://api.302ai.cn/doubao/tts_hd
-    authorization: "Bearer "
-    voice: "$voice"
-    output_dir: tmp/
-    access_token: "$access_token"
-EOF
+    # 检查并更新配置
+    if grep -q "^  TTS302AI:" "$CONFIG_FILE"; then
+        # 如果配置块已存在，精确更新字段
+        sed -i '/^  TTS302AI:/,/^  [A-Z]/ {
+            /^    voice:/c\    voice: "$voice"
+            /^    access_token:/c\    access_token: "$access_token"
+        }' "$CONFIG_FILE"
+    else
+        # 如果配置块不存在，插入配置
+        sed -i '/^  TTS:/a\    TTS302AI:\n      type: doubao\n      api_url: https://api.302ai.cn/doubao/tts_hd\n      authorization: "Bearer "\n      voice: "$voice"\n      output_dir: tmp/\n      access_token: "$access_token"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "^    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  TTS302AI:/a\    voice: "$voice"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    access_token:" "$CONFIG_FILE"; then
+        sed -i '/^  TTS302AI:/a\    access_token: "$access_token"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 302AI TTS配置完成${RESET}"
 }
 
@@ -5056,19 +5448,28 @@ config_gizwits_tts() {
         *) voice="zh_female_wanwanxiaohe_moon_bigtts" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: GizwitsTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: GizwitsTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  GizwitsTTS:
-    type: doubao
-    api_url: https://bytedance.gizwitsapi.com/api/v1/tts
-    authorization: "Bearer "
-    voice: "$voice"
-    output_dir: tmp/
-    access_token: "$access_token"
-EOF
+    # 检查并更新GizwitsTTS配置
+    if grep -q "^  GizwitsTTS:" "$CONFIG_FILE"; then
+        # 如果GizwitsTTS配置块已存在，精确更新字段
+        sed -i '/^  GizwitsTTS:/,/^  [A-Z]/ {
+            /^    voice:/c\    voice: "'$voice'"
+            /^    access_token:/c\    access_token: "'$access_token'"
+        }' "$CONFIG_FILE"
+    else
+        # 如果GizwitsTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    GizwitsTTS:\n      type: doubao\n      api_url: "https://bytedance.gizwitsapi.com/api/v1/tts"\n      authorization: "Bearer "\n      voice: "'$voice'"\n      output_dir: "tmp/"\n      access_token: "'$access_token'"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  GizwitsTTS:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    access_token:" "$CONFIG_FILE"; then
+        sed -i '/^  GizwitsTTS:/a\    access_token: "'$access_token'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 机智云TTS配置完成${RESET}"
 }
 
@@ -5117,22 +5518,35 @@ config_alibl_tts() {
         *) voice="longcheng_v2" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: AliBLTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: AliBLTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  AliBLTTS:
-    type: alibl_stream
-    api_key: $api_key
-    model: "$model"
-    voice: "$voice"
-    output_dir: tmp/
-    format: pcm
-    sample_rate: 24000
-    volume: 50
-    rate: 1
-    pitch: 1
+    # 检查并更新AliBLTTS配置
+    if grep -q "^  AliBLTTS:" "$CONFIG_FILE"; then
+        # 如果AliBLTTS配置块已存在，精确更新字段
+        sed -i '/^  AliBLTTS:/,/^  [A-Z]/ {
+            /^    api_key:/c\    api_key: "'$api_key'"
+            /^    model:/c\    model: "'$model'"
+            /^    voice:/c\    voice: "'$voice'"
+            /^    volume:/c\    volume: 50
+            /^    rate:/c\    rate: 1
+            /^    pitch:/c\    pitch: 1
+        }' "$CONFIG_FILE"
+    else
+        # 如果AliBLTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    AliBLTTS:\n      type: alibl_stream\n      api_key: "'$api_key'"\n      model: "'$model'"\n      voice: "'$voice'"\n      output_dir: "tmp/"\n      format: "pcm"\n      sample_rate: 24000\n      volume: 50\n      rate: 1\n      pitch: 1' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    api_key:" "$CONFIG_FILE"; then
+        sed -i '/^  AliBLTTS:/a\    api_key: "'$api_key'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    model:" "$CONFIG_FILE"; then
+        sed -i '/^  AliBLTTS:/a\    model: "'$model'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  AliBLTTS:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
 EOF
     echo -e "${GREEN}✅ 阿里百炼CosyVoice配置完成${RESET}"
 }
@@ -5159,29 +5573,36 @@ config_custom_tts() {
     read -r -p "语速 (默认1): " speed < /dev/tty
     speed=${speed:-1}
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: CustomTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: CustomTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  CustomTTS:
-    type: custom
-    method: $method
-    url: "$url/v1/audio/speech"
-    params:
-      input: "{prompt_text}"
-      response_format: "mp3"
-      download_format: "mp3"
-      voice: "$voice"
-      lang_code: "$lang_code"
-      return_download_link: true
-      speed: $speed
-      stream: false
-    headers:
-      # Authorization: Bearer xxxx
-    format: mp3
-    output_dir: tmp/
-EOF
+    # 检查并更新CustomTTS配置
+    if grep -q "^  CustomTTS:" "$CONFIG_FILE"; then
+        # 如果CustomTTS配置块已存在，精确更新字段
+        sed -i '/^  CustomTTS:/,/^  [A-Z]/ {
+            /^    method:/c\    method: "'$method'"
+            /^      speed:/c\      speed: '$speed'
+            /^      voice:/c\      voice: "'$voice'"
+            /^      lang_code:/c\      lang_code: "'$lang_code'"
+        }' "$CONFIG_FILE"
+    else
+        # 如果CustomTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    CustomTTS:\n      type: custom\n      method: "'$method'"\n      url: "'$url'/v1/audio/speech"\n      params:\n        input: "{prompt_text}"\n        response_format: "mp3"\n        download_format: "mp3"\n        voice: "'$voice'"\n        lang_code: "'$lang_code'"\n        return_download_link: true\n        speed: '$speed'\n        stream: false\n      headers:\n        # Authorization: Bearer xxxx\n      format: mp3\n      output_dir: "tmp/"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    method:" "$CONFIG_FILE"; then
+        sed -i '/^  CustomTTS:/a\    method: "'$method'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "      speed:" "$CONFIG_FILE"; then
+        sed -i '/^  CustomTTS:/a\      speed: '$speed'' "$CONFIG_FILE"
+    fi
+    if ! grep -q "      voice:" "$CONFIG_FILE"; then
+        sed -i '/^  CustomTTS:/a\      voice: "'$voice'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "      lang_code:" "$CONFIG_FILE"; then
+        sed -i '/^  CustomTTS:/a\      lang_code: "'$lang_code'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 自定义TTS配置完成${RESET}"
     echo -e "${YELLOW}💡 提示：请确保自定义TTS服务正常运行${RESET}"
 }
@@ -5218,19 +5639,28 @@ config_linkerai_tts() {
         *) voice="OUeAo1mhq6IBExi" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: LinkeraiTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新配置文件
+    sed -i "s/^  TTS: .*/  TTS: LinkeraiTTS/" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  LinkeraiTTS:
-    type: linkerai
-    api_url: https://tts.linkerai.cn/tts
-    audio_format: "pcm"
-    access_token: "$access_token"
-    voice: "$voice"
-    output_dir: tmp/
-EOF
+    # 检查并更新LinkeraiTTS配置
+    if grep -q "^  LinkeraiTTS:" "$CONFIG_FILE"; then
+        # 如果LinkeraiTTS配置块已存在，精确更新字段
+        sed -i '/^  LinkeraiTTS:/,/^  [A-Z]/ {
+            /^    access_token:/c\    access_token: "'$access_token'"
+            /^    voice:/c\    voice: "'$voice'"
+        }' "$CONFIG_FILE"
+    else
+        # 如果LinkeraiTTS配置块不存在，在TTS部分插入配置
+        sed -i '/^  TTS:/a\    LinkeraiTTS:\n      type: linkerai\n      api_url: "https://tts.linkerai.cn/tts"\n      audio_format: "pcm"\n      access_token: "'$access_token'"\n      voice: "'$voice'"\n      output_dir: "tmp/"' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "    access_token:" "$CONFIG_FILE"; then
+        sed -i '/^  LinkeraiTTS:/a\    access_token: "'$access_token'"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  LinkeraiTTS:/a\    voice: "'$voice'"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ LinkerAI TTS配置完成${RESET}"
 }
 
@@ -5267,21 +5697,40 @@ config_paddle_speech_tts() {
     read -r -p "音量 (默认1.0): " volume < /dev/tty
     volume=${volume:-1.0}
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: PaddleSpeechTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新TTS selected_module
+    sed -i "/^  TTS: /c\  TTS: PaddleSpeechTTS" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  PaddleSpeechTTS:
-    type: paddle_speech
-    protocol: $protocol
-    url: $url/paddlespeech/tts/streaming
-    spk_id: 0
-    sample_rate: $sample_rate
-    speed: $speed
-    volume: $volume
-    save_path: 
-EOF
+    # 检查并更新配置
+    if grep -q "^  PaddleSpeechTTS:" "$CONFIG_FILE"; then
+        # 如果配置块已存在，精确更新字段
+        sed -i '/^  PaddleSpeechTTS:/,/^  [A-Z]/ {
+            /^    protocol:/c\    protocol: $protocol
+            /^    url:/c\    url: $url/paddlespeech/tts/streaming
+            /^    sample_rate:/c\    sample_rate: $sample_rate
+            /^    speed:/c\    speed: $speed
+            /^    volume:/c\    volume: $volume
+        }' "$CONFIG_FILE"
+    else
+        # 如果配置块不存在，插入配置
+        sed -i '/^  TTS:/a\    PaddleSpeechTTS:\n      type: paddle_speech\n      protocol: $protocol\n      url: $url/paddlespeech/tts/streaming\n      spk_id: 0\n      sample_rate: $sample_rate\n      speed: $speed\n      volume: $volume\n      save_path:' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "^    protocol:" "$CONFIG_FILE"; then
+        sed -i '/^  PaddleSpeechTTS:/a\    protocol: $protocol' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    url:" "$CONFIG_FILE"; then
+        sed -i '/^  PaddleSpeechTTS:/a\    url: $url/paddlespeech/tts/streaming' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    sample_rate:" "$CONFIG_FILE"; then
+        sed -i '/^  PaddleSpeechTTS:/a\    sample_rate: $sample_rate' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    speed:" "$CONFIG_FILE"; then
+        sed -i '/^  PaddleSpeechTTS:/a\    speed: $speed' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    volume:" "$CONFIG_FILE"; then
+        sed -i '/^  PaddleSpeechTTS:/a\    volume: $volume' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ 百度飞桨PaddleSpeech配置完成${RESET}"
     echo -e "${YELLOW}💡 提示：请先部署PaddleSpeech服务${RESET}"
 }
@@ -5315,18 +5764,32 @@ config_index_stream_tts() {
         *) voice="jay_klee" ;;
     esac
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: IndexStreamTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新TTS selected_module
+    sed -i "/^  TTS: /c\  TTS: IndexStreamTTS" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  IndexStreamTTS:
-    type: index_stream
-    api_url: $api_url/tts
-    audio_format: "$audio_format"
-    voice: "$voice"
-    output_dir: tmp/
-EOF
+    # 检查并更新配置
+    if grep -q "^  IndexStreamTTS:" "$CONFIG_FILE"; then
+        # 如果配置块已存在，精确更新字段
+        sed -i '/^  IndexStreamTTS:/,/^  [A-Z]/ {
+            /^    api_url:/c\    api_url: $api_url/tts
+            /^    audio_format:/c\    audio_format: "$audio_format"
+            /^    voice:/c\    voice: "$voice"
+        }' "$CONFIG_FILE"
+    else
+        # 如果配置块不存在，插入配置
+        sed -i '/^  TTS:/a\    IndexStreamTTS:\n      type: index_stream\n      api_url: $api_url/tts\n      audio_format: "$audio_format"\n      voice: "$voice"\n      output_dir: tmp/' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "^    api_url:" "$CONFIG_FILE"; then
+        sed -i '/^  IndexStreamTTS:/a\    api_url: $api_url/tts' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    audio_format:" "$CONFIG_FILE"; then
+        sed -i '/^  IndexStreamTTS:/a\    audio_format: "$audio_format"' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    voice:" "$CONFIG_FILE"; then
+        sed -i '/^  IndexStreamTTS:/a\    voice: "$voice"' "$CONFIG_FILE"
+    fi
     echo -e "${GREEN}✅ Index-TTS配置完成${RESET}"
     echo -e "${YELLOW}💡 提示：请先部署Index-TTS-vLLM服务${RESET}"
 }
@@ -5366,23 +5829,48 @@ config_acgn_tts() {
     read -r -p "情感 (默认1): " emotion < /dev/tty
     emotion=${emotion:-1}
     
-    sed -i "s/selected_module:/selected_module:\n  VAD: SileroVAD\n  ASR: AliyunStreamASR\n  LLM: ChatGLMLLM\n  VLLM: ChatGLMVLLM\n  TTS: ACGNTTS\n  Memory: nomem\n  Intent: function_call/" "$CONFIG_FILE"
+    # 更新TTS selected_module
+    sed -i "/^  TTS: /c\  TTS: ACGNTTS" "$CONFIG_FILE"
     
-    cat >> "$CONFIG_FILE" << EOF
-
-TTS:
-  ACGNTTS:
-    type: ttson
-    token: $token
-    voice_id: $voice_id
-    speed_factor: $speed_factor
-    pitch_factor: $pitch_factor
-    volume_change_dB: $volume_change_dB
-    to_lang: $to_lang
-    url: https://u95167-bd74-2aef8085.westx.seetacloud.com:8443/flashsummary/tts?token=
-    format: mp3
-    output_dir: tmp/
-    emotion: $emotion
+    # 检查并更新配置
+    if grep -q "^  ACGNTTS:" "$CONFIG_FILE"; then
+        # 如果配置块已存在，精确更新字段
+        sed -i '/^  ACGNTTS:/,/^  [A-Z]/ {
+            /^    token:/c\    token: $token
+            /^    voice_id:/c\    voice_id: $voice_id
+            /^    speed_factor:/c\    speed_factor: $speed_factor
+            /^    pitch_factor:/c\    pitch_factor: $pitch_factor
+            /^    volume_change_dB:/c\    volume_change_dB: $volume_change_dB
+            /^    to_lang:/c\    to_lang: $to_lang
+            /^    emotion:/c\    emotion: $emotion
+        }' "$CONFIG_FILE"
+    else
+        # 如果配置块不存在，插入配置
+        sed -i '/^  TTS:/a\    ACGNTTS:\n      type: ttson\n      token: $token\n      voice_id: $voice_id\n      speed_factor: $speed_factor\n      pitch_factor: $pitch_factor\n      volume_change_dB: $volume_change_dB\n      to_lang: $to_lang\n      url: https://u95167-bd74-2aef8085.westx.seetacloud.com:8443/flashsummary/tts?token=\n      format: mp3\n      output_dir: tmp/\n      emotion: $emotion' "$CONFIG_FILE"
+    fi
+    
+    # 检查并补充缺失的字段
+    if ! grep -q "^    token:" "$CONFIG_FILE"; then
+        sed -i '/^  ACGNTTS:/a\    token: $token' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    voice_id:" "$CONFIG_FILE"; then
+        sed -i '/^  ACGNTTS:/a\    voice_id: $voice_id' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    speed_factor:" "$CONFIG_FILE"; then
+        sed -i '/^  ACGNTTS:/a\    speed_factor: $speed_factor' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    pitch_factor:" "$CONFIG_FILE"; then
+        sed -i '/^  ACGNTTS:/a\    pitch_factor: $pitch_factor' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    volume_change_dB:" "$CONFIG_FILE"; then
+        sed -i '/^  ACGNTTS:/a\    volume_change_dB: $volume_change_dB' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    to_lang:" "$CONFIG_FILE"; then
+        sed -i '/^  ACGNTTS:/a\    to_lang: $to_lang' "$CONFIG_FILE"
+    fi
+    if ! grep -q "^    emotion:" "$CONFIG_FILE"; then
+        sed -i '/^  ACGNTTS:/a\    emotion: $emotion' "$CONFIG_FILE"
+    fi
 EOF
     echo -e "${GREEN}✅ ACGN TTS配置完成${RESET}"
 }
