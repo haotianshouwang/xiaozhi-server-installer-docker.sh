@@ -7,61 +7,6 @@ trap exit_confirm SIGINT
 # 新功能：端口检测 一键更新 docker管理等等 新bug
 # 作者：昊天兽王
 # 版本：1.2.83（删除配置文件不存在的LLM配置项）
-# 修复内容（V1.2.83）：
-# - 删除配置文件不存在的LLM配置项：KimiLLM、SparkLLM、WenxinLLM、OpenaiLLM、GroqLLM
-# - 重新调整LLM菜单选项和case语句编号，从15个减少到10个
-# - 更新高级LLM配置函数，删除无效配置项
-# 修复内容（V1.2.82）：
-# - 优化ASR服务商菜单顺序，将FunASRServer放在FunASR后面
-# - 调整菜单顺序：FunASR、FunASRServer、SherpaASR、SherpaParaformerASR、VoskASR
-# - 同步调整所有case语句编号，确保菜单选项与功能对应正确
-# 修复内容（V1.2.81）：
-# - 修复ASR服务商菜单显示顺序问题
-# - 调整本地模型排列顺序：FunASR、SherpaASR、SherpaParaformerASR、VoskASR
-# - 将VoskASR从第13位移动到第4位，确保本地模型连续显示
-# - 更新相关case语句编号，确保菜单选项与功能对应正确
-# - 修复重复main函数调用语法错误
-# 修复内容（V1.2.80）：
-# - 修复配置文件管理菜单返回逻辑，使用continue而非return
-# - 修复人设配置空输入处理，自动使用现有默认配置
-# - 修复Memory配置返回逻辑，正确返回TTS配置
-# 修复内容（V1.2.76）：
-# - 修复人设配置函数返回语句缺失问题
-# - 新增阿里云配置智能共享功能
-# - 实现Access Key ID和Access Key Secret在阿里云服务间共享
-# - 优化阿里云ASR和TTS配置流程，避免重复输入
-# - 添加配置检测和复用机制
-# V1.2.75:
-# - 修复config_asr_advanced函数中缺失的本地ASR模型部署功能
-# - 恢复FunASR本地模型下载和配置
-# - 添加SherpaASR、SherpaParaformerASR、VoskASR本地模型配置
-# - 实现智能内存检查和用户确认
-# - 支持模型自动下载和手动下载模式
-# - 完善配置文件自动更新机制
-# V1.2.80:
-# - 修正配置文件管理菜单返回逻辑，返回到配置文件管理菜单而非主菜单
-# - 区分配置文件管理菜单和脚本配置流程的不同返回逻辑
-# V1.2.79:
-# - 修复配置文件管理菜单逻辑，每个配置项完成后直接返回主菜单
-# - 修复人设配置，用户未输入时使用现有默认配置
-# - 修复Memory配置返回上一步逻辑，避免循环
-# V1.2.78:
-# - 修复ASR配置菜单函数调用，防止服务器卡死
-# - 修正配置步骤显示一致性（1/7-7/7）
-# V1.2.77:
-# - 新增阿里云配置共享功能
-# - 人设配置功能完善
-# V1.2.76:
-# - 实现智能内存检查和用户确认
-# - 支持模型自动下载和手动下载模式
-# - 完善配置文件自动更新机制
-# V1.2.75:
-# - 修复语法错误
-# V1.2.74:
-# - 新增百炼API密钥智能填充功能
-# - 修正人设配置字符限制从4000字到2000字
-# V1.2.73:
-# - 修正人设配置字符限制错误
 # 新增功能：1) 固定显示框，只更新内容不改变位置 2) 自定义刷新时间功能（按C键设置）3) 改进公网IP获取算法 4) Docker安装/卸载管理工具
 # 因为看到很多小白都不会部署小智服务器，所以写了这个sh。前前后后改了3天，终于写出一个像样的、可以用的版本（豆包和MINIMAX是MVP）
 AUTHOR="昊天兽王" 
@@ -8618,16 +8563,17 @@ config_management_menu() {
         echo "1) TTS配置 (文本转语音服务)"
         echo "2) ASR配置 (语音识别服务)"
         echo "3) LLM配置 (大语言模型)"
-        echo "4) 人设配置 (角色人格设定)"
-        echo "5) 服务器配置 (基础服务器设置)"
-        echo "6) 插件配置 (天气/音乐等插件)"
-        echo "7) 检查配置文件"
-        echo "8) 备份/恢复配置"
-        echo "9) 转换本地ASR为云服务"
+        echo "4) VLLM配置 (视觉大语言模型)"
+        echo "5) 人设配置 (角色人格设定)"
+        echo "6) 服务器配置 (基础服务器设置)"
+        echo "7) 插件配置 (天气/音乐等插件)"
+        echo "8) 检查配置文件"
+        echo "9) 备份/恢复配置"
+        echo "10) 转换本地ASR为云服务"
         echo "0) 返回主菜单"
         echo -e "${PURPLE}==================================================${RESET}"
         
-        read -r -p "请选择配置文件操作 (0-9): " config_choice < /dev/tty
+        read -r -p "请选择配置文件操作 (0-10): " config_choice < /dev/tty
         
         case $config_choice in
             1)
@@ -8649,40 +8595,44 @@ config_management_menu() {
                 continue
                 ;;
             4)
-                configure_persona_settings
+                configure_vllm_service
                 echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
                 sleep 1
                 continue
                 ;;
             5)
-                configure_server_settings
+                configure_persona_settings
                 echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
                 sleep 1
                 continue
                 ;;
             6)
-                configure_plugins
+                configure_server_settings
                 echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
                 sleep 1
                 continue
                 ;;
             7)
-                check_config_file_status
+                configure_plugins
                 echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
                 sleep 1
                 continue
                 ;;
             8)
-                backup_restore_config
+                check_config_file_status
                 echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
                 sleep 1
                 continue
                 ;;
             9)
-                convert_local_to_cloud_asr
+                backup_restore_config
                 echo -e "${CYAN}🔙 返回配置文件管理菜单${RESET}"
                 sleep 1
                 continue
+                ;;
+            10)
+                convert_local_to_cloud_asr
+                return 0
                 ;;
             0)
                 echo -e "${CYAN}🔙 返回主菜单${RESET}"
@@ -8705,172 +8655,115 @@ configure_tts_service() {
     echo -e "${CYAN}🎙️ TTS服务配置 🎙️${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     
-    echo "请选择TTS服务商："
-    echo "1) EdgeTTS (微软边缘TTS，免费推荐)"
-    echo "2) 阿里云TTS"
-    echo "3) 腾讯云TTS"
-    echo "4) 火山引擎TTS (豆包)"
-    echo "5) OpenAI TTS"
-    echo "6) 百度TTS"
-    echo "7) 科大讯飞TTS"
-    echo "8) 自定义TTS服务"
-    echo "Q) 返回配置菜单"
+    echo -e "${YELLOW}请选择TTS服务商（共23个）：${RESET}"
+    echo " 1) EdgeTTS (微软) [推荐免费]"
+    echo " 2) DoubaoTTS (火山引擎语音，需要购买)"
+    echo " 3) HuoshanDoubleStreamTTS (火山大模型语音)"
+    echo " 4) CosyVoiceSiliconflow (硅基流动)"
+    echo " 5) CozeCnTTS (Coze中国)"
+    echo " 6) VolcesAiGatewayTTS (火山网关)"
+    echo " 7) MinimaxTTSHTTPStream (MiniMax流式TTS)"
+    echo " 8) AliyunStreamTTS (阿里云流式CosyVoice)"
+    echo " 9) TencentTTS (腾讯云智能语音)"
+    echo "10) GPT_SOVITS_V2 (自定义声音克隆)"
+    echo "11) GPT_SOVITS_V3 (GPT-SoVITS v3版本)"
+    echo "12) TTS302AI (302AI语音合成)"
+    echo "13) GizwitsTTS (机智云TTS)"
+    echo "14) OpenAITTS (OpenAI官方语音)"
+    echo "15) 阿里云TTS (传统TTS)"
+    echo "16) 讯飞TTS (传统TTS)"
+    echo "17) AliBLTTS (阿里百炼CosyVoice)"
+    echo "18) CustomTTS (自定义TTS接口)"
+    echo "19) LinkeraiTTS (Linker AI TTS)"
+    echo "20) PaddleSpeechTTS (百度飞桨本地TTS)"
+    echo "21) IndexStreamTTS (Index-TTS-vLLM)"
+    echo "22) ACGNTTS (ACGN角色TTS)"
+    echo "23) 本地FishSpeech (需要独立部署)"
+    echo "0) 返回配置菜单"
     echo -e "${PURPLE}==================================================${RESET}"
     
-    read -r -p "请选择TTS服务商 (1-8,Q): " tts_choice < /dev/tty
+    read -r -p "请选择TTS服务商 (0-23，默认1): " tts_choice < /dev/tty
+    tts_choice=${tts_choice:-1}
     
     case $tts_choice in
-        1)
-            # EdgeTTS (微软边缘TTS)
-            echo -e "${CYAN}配置EdgeTTS服务...${RESET}"
-            echo -e "${GREEN}✅ EdgeTTS已选择，该服务免费且稳定${RESET}"
-            echo -e "${YELLOW}💡 建议使用默认音色：zh-CN-XiaoxiaoNeural${RESET}"
-            
-            # 备份配置文件
-            [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-            
-            # 配置TTS为Edge类型
-            if grep -q "^tts:" "$CONFIG_FILE"; then
-                sed -i 's/^tts:$//' "$CONFIG_FILE"
-                sed -i 's/^tts:/tts:/' "$CONFIG_FILE"
-            fi
-            
-            # 添加或更新TTS配置
-            if grep -q "^tts:" "$CONFIG_FILE"; then
-                sed -i 's/type:.*/type: "edge"/' "$CONFIG_FILE"
-            else
-                cat >> "$CONFIG_FILE" << EOF
-
-tts:
-  type: "edge"
-  voice: "zh-CN-XiaoxiaoNeural"
-  speed: 1.0
-EOF
-            fi
-            ;;
-        2)
-            # 阿里云TTS
-            echo -e "${CYAN}配置阿里云TTS服务...${RESET}"
-            read -r -p "请输入阿里云AppKey: " ali_appkey
-            
-            # 使用共享配置函数检查Access Key
-            local access_key_id=""
-            local access_key_secret=""
-            if ! check_and_share_aliyun_credentials "TTS"; then
-                echo -e "${YELLOW}💡 请配置长期使用的Access Key：${RESET}"
-                read -r -p "请输入阿里云AccessKeyId: " access_key_id
-                read -r -p "请输入阿里云AccessKeySecret: " access_key_secret
-            else
-                # 从配置文件获取已存在的配置
-                if [ -f "$CONFIG_FILE" ]; then
-                    access_key_id=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_id:" | sed 's/.*access_key_id: *"\?\([^"]*\)".*/\1/' | head -1)
-                    access_key_secret=$(grep -A 10 "^  AliyunStreamASR:" "$CONFIG_FILE" | grep "access_key_secret:" | sed 's/.*access_key_secret: *"\?\([^"]*\)".*/\1/' | head -1)
-                fi
-            fi
-            
-            if [ -n "$access_key_id" ] && [ -n "$access_key_secret" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "aliyun"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 阿里云TTS配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供完整的阿里云认证信息${RESET}"
-                return 1
-            fi
-            ;;
-        3)
-            # 腾讯云TTS
-            echo -e "${CYAN}配置腾讯云TTS服务...${RESET}"
-            read -r -p "请输入腾讯云SecretId: " tx_secret_id
-            read -r -p "请输入腾讯云SecretKey: " tx_secret_key
-            read -r -p "请输入腾讯云AppId: " tx_appid
-            
-            if [ -n "$tx_secret_id" ] && [ -n "$tx_secret_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "tencent"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 腾讯云TTS配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供完整的腾讯云认证信息${RESET}"
-                return 1
-            fi
-            ;;
-        4)
-            # 火山引擎TTS
-            echo -e "${CYAN}配置火山引擎TTS服务...${RESET}"
-            read -r -p "请输入火山引擎AppId: " huoshan_appid
-            read -r -p "请输入火山引擎AccessToken: " huoshan_access_token
-            
-            if [ -n "$huoshan_appid" ] && [ -n "$huoshan_access_token" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "doubao"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 火山引擎TTS配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供完整的火山引擎认证信息${RESET}"
-                return 1
-            fi
-            ;;
-        5)
-            # OpenAI TTS
-            echo -e "${CYAN}配置OpenAI TTS服务...${RESET}"
-            read -r -p "请输入OpenAI API Key: " openai_api_key
-            
-            if [ -n "$openai_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "openai"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ OpenAI TTS配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供OpenAI API Key${RESET}"
-                return 1
-            fi
-            ;;
-        6)
-            # 百度TTS
-            echo -e "${CYAN}配置百度TTS服务...${RESET}"
-            echo -e "${YELLOW}💡 百度TTS已集成到配置文件中${RESET}"
-            [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-            sed -i 's/type:.*/type: "baidu"/' "$CONFIG_FILE"
-            ;;
-        7)
-            # 科大讯飞TTS
-            echo -e "${CYAN}配置科大讯飞TTS服务...${RESET}"
-            read -r -p "请输入讯飞APP ID: " xunfei_app_id
-            read -r -p "请输入讯飞API Key: " xunfei_api_key
-            read -r -p "请输入讯飞API Secret: " xunfei_api_secret
-            
-            if [ -n "$xunfei_app_id" ] && [ -n "$xunfei_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "xunfei"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 科大讯飞TTS配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供完整的讯飞认证信息${RESET}"
-                return 1
-            fi
-            ;;
-        8)
-            # 自定义TTS
-            echo -e "${CYAN}配置自定义TTS服务...${RESET}"
-            read -r -p "请输入TTS服务URL: " custom_tts_url
-            read -r -p "请输入API Key (可选): " custom_tts_key
-            
-            if [ -n "$custom_tts_url" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "custom"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 自定义TTS配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供自定义TTS服务URL${RESET}"
-                return 1
-            fi
-            ;;
-        Q|q)
+        0)
+            echo -e "${CYAN}🔙 返回配置菜单${RESET}"
             return 0
             ;;
+        1)
+            config_edge_tts
+            ;;
+        2)
+            config_doubao_tts
+            ;;
+        3)
+            config_huoshan_tts
+            ;;
+        4)
+            config_cosyvoice_siliconflow
+            ;;
+        5)
+            config_cozecn_tts
+            ;;
+        6)
+            config_volces_aigateway_tts
+            ;;
+        7)
+            config_minimax_tts
+            ;;
+        8)
+            config_aliyun_stream_tts
+            ;;
+        9)
+            config_tencent_tts
+            ;;
+        10)
+            config_gpt_sovits_v2
+            ;;
+        11)
+            config_gpt_sovits_v3
+            ;;
+        12)
+            config_tts_302ai
+            ;;
+        13)
+            config_gizwits_tts
+            ;;
+        14)
+            config_openai_tts
+            ;;
+        15)
+            config_aliyun_tts
+            ;;
+        16)
+            config_xunfei_tts
+            ;;
+        17)
+            config_alibl_tts
+            ;;
+        18)
+            config_custom_tts
+            ;;
+        19)
+            config_linkerai_tts
+            ;;
+        20)
+            config_paddle_speech_tts
+            ;;
+        21)
+            config_index_stream_tts
+            ;;
+        22)
+            config_acgn_tts
+            ;;
+        23)
+            config_fish_speech
+            ;;
         *)
-            echo -e "${RED}❌ 无效选择${RESET}"
-            return 1
+            echo -e "${YELLOW}⚠️ 无效选择，使用默认EdgeTTS${RESET}"
+            config_edge_tts
             ;;
     esac
-    
-    echo -e "${GREEN}✅ TTS服务配置完成！配置文件已更新${RESET}"
-    echo -e "${CYAN}📝 配置文件位置: $CONFIG_FILE${RESET}"
 }
 
 # ========================= ASR配置函数 =========================
@@ -8880,66 +8773,92 @@ configure_asr_service() {
     echo -e "${CYAN}🎤 ASR服务配置 🎤${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     
-    echo "请选择ASR服务商："
-    echo "1) 本地ASR (FunASR/Sherpa等)"
-    echo "2) 阿里云ASR"
-    echo "3) 腾讯云ASR"
-    echo "4) 火山引擎ASR (豆包)"
-    echo "5) OpenAI Whisper"
-    echo "6) 百度ASR"
-    echo "7) 科大讯飞ASR"
-    echo "8) Groq Whisper"
-    echo "Q) 返回配置菜单"
+    echo "请选择ASR服务商（共15个）："
+    echo " 1) FunASR (本地SenseVoiceSmall，推荐)"
+    echo " 2) FunASRServer (独立部署服务)"
+    echo " 3) SherpaASR (本地多语言)"
+    echo " 4) SherpaParaformerASR (本地中文专用)"
+    echo " 5) VoskASR (本地离线)"
+    echo " 6) AliyunStreamASR (阿里云流式，推荐)"
+    echo " 7) AliyunASR (阿里云批量)"
+    echo " 8) DoubaoStreamASR (火山引擎流式)"
+    echo " 9) DoubaoASR (火山引擎批量)"
+    echo "10) TencentASR (腾讯云)"
+    echo "11) BaiduASR (百度智能云)"
+    echo "12) OpenaiASR (OpenAI)"
+    echo "13) GroqASR (Groq)"
+    echo "14) Qwen3ASRFlash (通义千问)"
+    echo "15) XunfeiStreamASR (讯飞流式)"
+    echo " 0) 返回配置菜单"
     echo -e "${PURPLE}==================================================${RESET}"
     
-    read -r -p "请选择ASR服务商 (1-8,Q): " asr_choice < /dev/tty
+    read -r -p "请选择ASR服务商 (0-15，默认6): " asr_choice < /dev/tty
+    asr_choice=${asr_choice:-6}
     
     case $asr_choice in
+        0)
+            echo -e "${CYAN}🔄 取消配置，返回配置菜单${RESET}"
+            return 0
+            ;;
         1)
-            # 本地ASR - 使用现有的config_asr函数进行选择
-            echo -e "${CYAN}配置本地ASR服务...${RESET}"
-            config_asr
+            echo -e "${CYAN}配置FunASR本地模型...${RESET}"
+            config_asr_advanced
             ;;
         2)
-            # 阿里云ASR - 调用现有的详细配置函数
-            config_aliyun_asr
+            echo -e "${CYAN}配置FunASRServer独立服务...${RESET}"
+            config_asr_advanced
             ;;
         3)
-            # 腾讯云ASR - 暂时使用config_asr进行配置
-            echo -e "${CYAN}配置腾讯云ASR服务...${RESET}"
-            echo "正在调用详细配置..."
-            config_asr
+            echo -e "${CYAN}配置SherpaASR本地模型...${RESET}"
+            config_asr_advanced
             ;;
         4)
-            # 火山引擎ASR - 暂时使用config_asr进行配置
-            echo -e "${CYAN}配置火山引擎ASR服务...${RESET}"
-            echo "正在调用详细配置..."
-            config_asr
+            echo -e "${CYAN}配置SherpaParaformerASR本地模型...${RESET}"
+            config_asr_advanced
             ;;
         5)
-            # OpenAI Whisper - 暂时使用config_asr进行配置
-            echo -e "${CYAN}配置OpenAI Whisper服务...${RESET}"
-            echo "正在调用详细配置..."
-            config_asr
+            echo -e "${CYAN}配置VoskASR本地模型...${RESET}"
+            config_asr_advanced
             ;;
         6)
-            # 百度ASR - 暂时使用config_asr进行配置
-            echo -e "${CYAN}配置百度ASR服务...${RESET}"
-            echo "正在调用详细配置..."
-            config_asr
+            echo -e "${CYAN}配置AliyunStreamASR阿里云流式...${RESET}"
+            config_asr_advanced
             ;;
         7)
-            # 科大讯飞ASR - 调用现有的详细配置函数
-            config_xunfei_stream_asr
+            echo -e "${CYAN}配置AliyunASR阿里云批量...${RESET}"
+            config_asr_advanced
             ;;
         8)
-            # Groq Whisper - 暂时使用config_asr进行配置
-            echo -e "${CYAN}配置Groq Whisper服务...${RESET}"
-            echo "正在调用详细配置..."
-            config_asr
+            echo -e "${CYAN}配置DoubaoStreamASR火山引擎流式...${RESET}"
+            config_asr_advanced
             ;;
-        Q|q)
-            return 0
+        9)
+            echo -e "${CYAN}配置DoubaoASR火山引擎批量...${RESET}"
+            config_asr_advanced
+            ;;
+        10)
+            echo -e "${CYAN}配置TencentASR腾讯云...${RESET}"
+            config_asr_advanced
+            ;;
+        11)
+            echo -e "${CYAN}配置BaiduASR百度智能云...${RESET}"
+            config_asr_advanced
+            ;;
+        12)
+            echo -e "${CYAN}配置OpenaiASR OpenAI...${RESET}"
+            config_asr_advanced
+            ;;
+        13)
+            echo -e "${CYAN}配置GroqASR Groq...${RESET}"
+            config_asr_advanced
+            ;;
+        14)
+            echo -e "${CYAN}配置Qwen3ASRFlash通义千问...${RESET}"
+            config_asr_advanced
+            ;;
+        15)
+            echo -e "${CYAN}配置XunfeiStreamASR讯飞流式...${RESET}"
+            config_asr_advanced
             ;;
         *)
             echo -e "${RED}❌ 无效选择${RESET}"
@@ -8958,130 +8877,92 @@ configure_llm_service() {
     echo -e "${CYAN}🧠 LLM服务配置 🧠${RESET}"
     echo -e "${PURPLE}==================================================${RESET}"
     
-    echo "请选择LLM服务商："
-    echo "1) 阿里云通义千问"
-    echo "2) 智谱ChatGLM"
-    echo "3) DeepSeek"
-    echo "4) 火山引擎豆包"
-    echo "5) OpenAI"
-    echo "6) 腾讯混元"
-    echo "7) 百度文心一言"
-    echo "8) 本地Ollama"
-    echo "Q) 返回配置菜单"
+    echo "请选择LLM服务商（共15个）："
+    echo " 1) ChatGLMLLM (智谱清言) [推荐]"
+    echo " 2) DoubaoLLM (火山引擎豆包)"
+    echo " 3) AliLLM (阿里云)"
+    echo " 4) AliAppLLM (阿里百炼应用型)"
+    echo " 5) DeepSeekLLM (DeepSeek)"
+    echo " 6) GeminiLLM (谷歌Gemini)"
+    echo " 7) DifyLLM (Dify)"
+    echo " 8) CozeLLM (Coze个人令牌)"
+    echo " 9) VolcesAiGatewayLLM (火山网关)"
+    echo "10) OllamaLLM (Ollama本地)"
+    echo "11) LMStudioLLM (LM Studio本地)"
+    echo "12) XinferenceLLM (Xinference)"
+    echo "13) XinferenceSmallLLM (轻量级Xinference)"
+    echo "14) FastgptLLM (FastGPT)"
+    echo "15) HomeAssistant (家庭助手集成)"
+    echo " 0) 返回配置菜单"
     echo -e "${PURPLE}==================================================${RESET}"
     
-    read -r -p "请选择LLM服务商 (1-8,Q): " llm_choice < /dev/tty
+    read -r -p "请选择LLM服务商 (0-15，默认1): " llm_choice < /dev/tty
+    llm_choice=${llm_choice:-1}
     
     case $llm_choice in
+        0)
+            echo -e "${CYAN}🔄 取消配置，返回配置菜单${RESET}"
+            return 0
+            ;;
         1)
-            # 阿里云通义千问
-            echo -e "${CYAN}配置阿里云通义千问服务...${RESET}"
-            read -r -p "请输入阿里云API Key: " ali_llm_api_key
-            
-            if [ -n "$ali_llm_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "aliyun"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 阿里云通义千问配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供阿里云API Key${RESET}"
-                return 1
-            fi
+            echo -e "${CYAN}配置ChatGLMLLM智谱清言...${RESET}"
+            config_llm_advanced
             ;;
         2)
-            # 智谱ChatGLM
-            echo -e "${CYAN}配置智谱ChatGLM服务...${RESET}"
-            read -r -p "请输入智谱API Key: " chatglm_api_key
-            
-            if [ -n "$chatglm_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "chatglm"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 智谱ChatGLM配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供智谱API Key${RESET}"
-                return 1
-            fi
+            echo -e "${CYAN}配置DoubaoLLM火山引擎豆包...${RESET}"
+            config_llm_advanced
             ;;
         3)
-            # DeepSeek
-            echo -e "${CYAN}配置DeepSeek服务...${RESET}"
-            read -r -p "请输入DeepSeek API Key: " deepseek_api_key
-            
-            if [ -n "$deepseek_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "deepseek"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ DeepSeek配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供DeepSeek API Key${RESET}"
-                return 1
-            fi
+            echo -e "${CYAN}配置AliLLM阿里云...${RESET}"
+            config_llm_advanced
             ;;
         4)
-            # 火山引擎豆包
-            echo -e "${CYAN}配置火山引擎豆包服务...${RESET}"
-            read -r -p "请输入火山引擎API Key: " huoshan_llm_api_key
-            
-            if [ -n "$huoshan_llm_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "doubao"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 火山引擎豆包配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供火山引擎API Key${RESET}"
-                return 1
-            fi
+            echo -e "${CYAN}配置AliAppLLM阿里百炼应用型...${RESET}"
+            config_llm_advanced
             ;;
         5)
-            # OpenAI
-            echo -e "${CYAN}配置OpenAI服务...${RESET}"
-            read -r -p "请输入OpenAI API Key: " openai_llm_api_key
-            
-            if [ -n "$openai_llm_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "openai"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ OpenAI配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供OpenAI API Key${RESET}"
-                return 1
-            fi
+            echo -e "${CYAN}配置DeepSeekLLM DeepSeek...${RESET}"
+            config_llm_advanced
             ;;
         6)
-            # 腾讯混元
-            echo -e "${CYAN}配置腾讯混元服务...${RESET}"
-            read -r -p "请输入腾讯云API Key: " tx_llm_api_key
-            
-            if [ -n "$tx_llm_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "tencent"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 腾讯混元配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供腾讯云API Key${RESET}"
-                return 1
-            fi
+            echo -e "${CYAN}配置GeminiLLM谷歌Gemini...${RESET}"
+            config_llm_advanced
             ;;
         7)
-            # 百度文心一言
-            echo -e "${CYAN}配置百度文心一言服务...${RESET}"
-            read -r -p "请输入百度API Key: " baidu_llm_api_key
-            
-            if [ -n "$baidu_llm_api_key" ]; then
-                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-                sed -i 's/type:.*/type: "baidu"/' "$CONFIG_FILE"
-                echo -e "${GREEN}✅ 百度文心一言配置完成${RESET}"
-            else
-                echo -e "${RED}❌ 请提供百度API Key${RESET}"
-                return 1
-            fi
+            echo -e "${CYAN}配置DifyLLM Dify...${RESET}"
+            config_llm_advanced
             ;;
         8)
-            # 本地Ollama
-            echo -e "${CYAN}配置本地Ollama服务...${RESET}"
-            echo -e "${YELLOW}💡 请确保Ollama已安装并运行在localhost:11434${RESET}"
-            
-            [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-            sed -i 's/type:.*/type: "ollama"/' "$CONFIG_FILE"
-            echo -e "${GREEN}✅ 本地Ollama配置完成${RESET}"
+            echo -e "${CYAN}配置CozeLLM Coze...${RESET}"
+            config_llm_advanced
             ;;
-        Q|q)
-            return 0
+        9)
+            echo -e "${CYAN}配置VolcesAiGatewayLLM火山网关...${RESET}"
+            config_llm_advanced
+            ;;
+        10)
+            echo -e "${CYAN}配置OllamaLLM本地Ollama...${RESET}"
+            config_llm_advanced
+            ;;
+        11)
+            echo -e "${CYAN}配置LMStudioLLM本地LM Studio...${RESET}"
+            config_llm_advanced
+            ;;
+        12)
+            echo -e "${CYAN}配置XinferenceLLM Xinference...${RESET}"
+            config_llm_advanced
+            ;;
+        13)
+            echo -e "${CYAN}配置XinferenceSmallLLM轻量级Xinference...${RESET}"
+            config_llm_advanced
+            ;;
+        14)
+            echo -e "${CYAN}配置FastgptLLM FastGPT...${RESET}"
+            config_llm_advanced
+            ;;
+        15)
+            echo -e "${CYAN}配置HomeAssistant家庭助手集成...${RESET}"
+            config_llm_advanced
             ;;
         *)
             echo -e "${RED}❌ 无效选择${RESET}"
@@ -9090,6 +8971,89 @@ configure_llm_service() {
     esac
     
     echo -e "${GREEN}✅ LLM服务配置完成！配置文件已更新${RESET}"
+    echo -e "${CYAN}📝 配置文件位置: $CONFIG_FILE${RESET}"
+}
+
+# ========================= VLLM配置函数 =========================
+configure_vllm_service() {
+    clear
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}👁️ VLLM服务配置 👁️${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    echo "请选择VLLM服务商（共3个）："
+    echo " 1) ChatGLMVLLM (智谱清言) [推荐]"
+    echo " 2) QwenVLVLLM (通义千问)"
+    echo " 3) XunfeiSparkVLLM (讯飞星火)"
+    echo " 0) 返回配置菜单"
+    echo -e "${PURPLE}==================================================${RESET}"
+    
+    read -r -p "请选择VLLM服务商 (0-3，默认1): " vllm_choice < /dev/tty
+    vllm_choice=${vllm_choice:-1}
+    
+    case $vllm_choice in
+        0)
+            echo -e "${CYAN}🔄 取消配置，返回配置菜单${RESET}"
+            return 0
+            ;;
+        1)
+            echo -e "${CYAN}配置ChatGLMVLLM智谱清言...${RESET}"
+            vllm_provider_key="ChatGLMVLLM"
+            echo -e "\n${YELLOW}⚠️ 您选择了智谱清言 ChatGLM VLLM。${RESET}"
+            echo -e "${CYAN}🔑 密钥获取地址：https://open.bigmodel.cn/usercenter/apikeys${RESET}"
+            read -r -p "请输入 API Key: " api_key < /dev/tty
+            
+            if [ -n "$api_key" ]; then
+                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                echo -e "${GREEN}✅ 智谱清言VLLM配置完成${RESET}"
+            else
+                echo -e "${YELLOW}⚠️ 未输入API Key，使用默认配置${RESET}"
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
+            fi
+            ;;
+        2)
+            echo -e "${CYAN}配置QwenVLVLLM通义千问...${RESET}"
+            vllm_provider_key="QwenVLVLLM"
+            echo -e "\n${YELLOW}⚠️ 您选择了通义千问 Qwen VLLM。${RESET}"
+            echo -e "${CYAN}🔑 密钥获取地址：https://dashscope.console.aliyun.com/apiKey${RESET}"
+            read -r -p "请输入 API Key: " api_key < /dev/tty
+            
+            if [ -n "$api_key" ]; then
+                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                echo -e "${GREEN}✅ 通义千问VLLM配置完成${RESET}"
+            else
+                echo -e "${YELLOW}⚠️ 未输入API Key，使用默认配置${RESET}"
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
+            fi
+            ;;
+        3)
+            echo -e "${CYAN}配置XunfeiSparkVLLM讯飞星火...${RESET}"
+            vllm_provider_key="XunfeiSparkVLLM"
+            echo -e "\n${YELLOW}⚠️ 您选择了讯飞星火 Xunfei Spark VLLM。${RESET}"
+            echo -e "${CYAN}🔑 密钥获取地址：https://www.xfyun.cn/${RESET}"
+            read -r -p "请输入 API Key: " api_key < /dev/tty
+            
+            if [ -n "$api_key" ]; then
+                [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
+                sed -i "/^  $vllm_provider_key:/,/^  [A-Za-z]/ s/^    api_key: .*/    api_key: \"$api_key\"/" "$CONFIG_FILE"
+                echo -e "${GREEN}✅ 讯飞星火VLLM配置完成${RESET}"
+            else
+                echo -e "${YELLOW}⚠️ 未输入API Key，使用默认配置${RESET}"
+                sed -i "/^  VLLM: /c\  VLLM: $vllm_provider_key" "$CONFIG_FILE"
+            fi
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选择${RESET}"
+            return 1
+            ;;
+    esac
+    
+    echo -e "${GREEN}✅ VLLM服务配置完成！配置文件已更新${RESET}"
     echo -e "${CYAN}📝 配置文件位置: $CONFIG_FILE${RESET}"
 }
 
