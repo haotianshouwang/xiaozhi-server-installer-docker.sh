@@ -11147,11 +11147,13 @@ configure_server_settings() {
             read -r -p "请选择日志等级 (1-2): " log_level_choice
             echo -e "${GREEN}✅ 日志配置完成${RESET}"
             ;;
-        Q|q)
+        0)
             return 0
             ;;
         *)
             echo -e "${RED}❌ 无效选择${RESET}"
+            echo
+            read -r -p "按回车键继续..." < /dev/tty
             return 1
             ;;
     esac
@@ -11217,11 +11219,13 @@ configure_plugins() {
             read -r -p "请输入声纹接口地址: " voiceprint_url
             echo -e "${GREEN}✅ 声纹识别插件配置完成${RESET}"
             ;;
-        Q|q)
+        0)
             return 0
             ;;
         *)
             echo -e "${RED}❌ 无效选择${RESET}"
+            echo
+            read -r -p "按回车键继续..." < /dev/tty
             return 1
             ;;
     esac
@@ -11263,6 +11267,9 @@ check_config_file_status() {
     else
         echo -e "${RED}❌ 未找到任何配置文件${RESET}"
     fi
+    
+    echo
+    read -r -p "按回车键返回..." < /dev/tty
 }
 
 # ========================= 备份/恢复配置函数 =========================
@@ -11275,10 +11282,10 @@ backup_restore_config() {
     echo "请选择操作："
     echo "1) 备份当前配置"
     echo "2) 从备份恢复配置"
-    echo "Q) 返回配置菜单"
+    echo "0) 返回配置菜单"
     echo -e "${PURPLE}==================================================${RESET}"
     
-    read -r -p "请选择操作 (1-2,Q): " backup_choice < /dev/tty
+    read -r -p "请选择操作 (0-2): " backup_choice < /dev/tty
     
     case $backup_choice in
         1)
@@ -11308,6 +11315,9 @@ backup_restore_config() {
                 echo -e "${YELLOW}⚠️ 没有找到需要备份的配置文件${RESET}"
                 rmdir "$BACKUP_DIR" 2>/dev/null
             fi
+            
+            echo
+            read -r -p "按回车键继续..." < /dev/tty
             ;;
         2)
             # 恢复配置
@@ -11345,8 +11355,11 @@ backup_restore_config() {
             else
                 echo -e "${YELLOW}⚠️ 备份目录中没有找到配置文件${RESET}"
             fi
+            
+            echo
+            read -r -p "按回车键继续..." < /dev/tty
             ;;
-        Q|q)
+        0)
             return 0
             ;;
         *)
@@ -11366,6 +11379,15 @@ convert_local_to_cloud_asr() {
     echo "此功能将帮助您将现有的本地ASR配置转换为云服务ASR"
     echo -e "${YELLOW}⚠️ 注意：修改配置文件前请确保已备份${RESET}"
     
+    # 检查配置文件是否存在
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo -e "${RED}❌ 配置文件不存在: $CONFIG_FILE${RESET}"
+        echo -e "${CYAN}💡 请先部署服务器或创建配置文件${RESET}"
+        echo
+        read -r -p "按回车键返回..." < /dev/tty
+        return 1
+    fi
+    
     echo
     echo "请选择要转换的目标云服务："
     echo "1) 阿里云ASR"
@@ -11373,10 +11395,14 @@ convert_local_to_cloud_asr() {
     echo "3) 火山引擎ASR"
     echo "4) OpenAI Whisper"
     echo "5) 百度ASR"
-    echo "Q) 返回配置菜单"
+    echo "0) 返回配置菜单"
     echo -e "${PURPLE}==================================================${RESET}"
     
-    read -r -p "请选择云服务 (1-5,Q): " convert_choice < /dev/tty
+    read -r -p "请选择云服务 (0-5): " convert_choice < /dev/tty
+    
+    # 定义变量
+    local asr_provider_key
+    local selected_asr
     
     case $convert_choice in
         1)
@@ -11385,7 +11411,22 @@ convert_local_to_cloud_asr() {
             read -r -p "请输入阿里云AccessKeyId: " convert_ali_access_key_id
             read -r -p "请输入阿里云AccessKeySecret: " convert_ali_access_key_secret
             read -r -p "请输入阿里云AppKey: " convert_ali_appkey
-            echo -e "${GREEN}✅ 将转换为阿里云ASR配置${RESET}"
+            
+            # 设置ASR提供者和selected_module中的ASR值
+            asr_provider_key="AliyunStreamASR"
+            selected_asr="AliyunStreamASR"
+            
+            # 更新配置文件
+            echo -e "${CYAN}🔧 更新配置文件...${RESET}"
+            # 更新selected_module中的ASR字段
+            sed -i "/^  ASR: /c\  ASR: $selected_asr" "$CONFIG_FILE"
+            
+            # 更新阿里云ASR配置块
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s/appkey: .*/appkey: \"$convert_ali_appkey\"/" "$CONFIG_FILE"
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s|access_key_id: .*|access_key_id: \"$convert_ali_access_key_id\"|" "$CONFIG_FILE"
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s|access_key_secret: .*|access_key_secret: \"$convert_ali_access_key_secret\"|" "$CONFIG_FILE"
+            
+            echo -e "${GREEN}✅ 已转换为阿里云ASR配置${RESET}"
             ;;
         2)
             # 腾讯云ASR
@@ -11393,20 +11434,62 @@ convert_local_to_cloud_asr() {
             read -r -p "请输入腾讯云SecretId: " convert_tx_secret_id
             read -r -p "请输入腾讯云SecretKey: " convert_tx_secret_key
             read -r -p "请输入腾讯云AppId: " convert_tx_appid
-            echo -e "${GREEN}✅ 将转换为腾讯云ASR配置${RESET}"
+            
+            # 设置ASR提供者和selected_module中的ASR值
+            asr_provider_key="TencentASR"
+            selected_asr="TencentASR"
+            
+            # 更新配置文件
+            echo -e "${CYAN}🔧 更新配置文件...${RESET}"
+            # 更新selected_module中的ASR字段
+            sed -i "/^  ASR: /c\  ASR: $selected_asr" "$CONFIG_FILE"
+            
+            # 更新腾讯云ASR配置块
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s/appid: .*/appid: \"$convert_tx_appid\"/" "$CONFIG_FILE"
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s/secret_id: .*/secret_id: \"$convert_tx_secret_id\"/" "$CONFIG_FILE"
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s/secret_key: .*/secret_key: \"$convert_tx_secret_key\"/" "$CONFIG_FILE"
+            
+            echo -e "${GREEN}✅ 已转换为腾讯云ASR配置${RESET}"
             ;;
         3)
             # 火山引擎ASR
             echo -e "${CYAN}准备转换为火山引擎ASR...${RESET}"
             read -r -p "请输入火山引擎AppId: " convert_huoshan_appid
             read -r -p "请输入火山引擎AccessToken: " convert_huoshan_access_token
-            echo -e "${GREEN}✅ 将转换为火山引擎ASR配置${RESET}"
+            
+            # 设置ASR提供者和selected_module中的ASR值
+            asr_provider_key="DoubaoStreamASR"
+            selected_asr="DoubaoStreamASR"
+            
+            # 更新配置文件
+            echo -e "${CYAN}🔧 更新配置文件...${RESET}"
+            # 更新selected_module中的ASR字段
+            sed -i "/^  ASR: /c\  ASR: $selected_asr" "$CONFIG_FILE"
+            
+            # 更新火山引擎ASR配置块
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s/appid: .*/appid: \"$convert_huoshan_appid\"/" "$CONFIG_FILE"
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s|access_token: .*|access_token: \"$convert_huoshan_access_token\"|" "$CONFIG_FILE"
+            
+            echo -e "${GREEN}✅ 已转换为火山引擎ASR配置${RESET}"
             ;;
         4)
             # OpenAI Whisper
             echo -e "${CYAN}准备转换为OpenAI Whisper...${RESET}"
             read -r -p "请输入OpenAI API Key: " convert_openai_api_key
-            echo -e "${GREEN}✅ 将转换为OpenAI Whisper配置${RESET}"
+            
+            # 设置ASR提供者和selected_module中的ASR值
+            asr_provider_key="OpenaiASR"
+            selected_asr="OpenaiASR"
+            
+            # 更新配置文件
+            echo -e "${CYAN}🔧 更新配置文件...${RESET}"
+            # 更新selected_module中的ASR字段
+            sed -i "/^  ASR: /c\  ASR: $selected_asr" "$CONFIG_FILE"
+            
+            # 更新OpenAI Whisper配置块
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s/api_key: .*/api_key: \"$convert_openai_api_key\"/" "$CONFIG_FILE"
+            
+            echo -e "${GREEN}✅ 已转换为OpenAI Whisper配置${RESET}"
             ;;
         5)
             # 百度ASR
@@ -11414,21 +11497,47 @@ convert_local_to_cloud_asr() {
             read -r -p "请输入百度AppId: " convert_baidu_app_id
             read -r -p "请输入百度API Key: " convert_baidu_api_key
             read -r -p "请输入百度Secret Key: " convert_baidu_secret_key
-            echo -e "${GREEN}✅ 将转换为百度ASR配置${RESET}"
+            
+            # 设置ASR提供者和selected_module中的ASR值
+            asr_provider_key="BaiduASR"
+            selected_asr="BaiduASR"
+            
+            # 更新配置文件
+            echo -e "${CYAN}🔧 更新配置文件...${RESET}"
+            # 更新selected_module中的ASR字段
+            sed -i "/^  ASR: /c\  ASR: $selected_asr" "$CONFIG_FILE"
+            
+            # 更新百度ASR配置块
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s/appid: .*/appid: \"$convert_baidu_app_id\"/" "$CONFIG_FILE"
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s/api_key: .*/api_key: \"$convert_baidu_api_key\"/" "$CONFIG_FILE"
+            sed -i "/^  $asr_provider_key:/,/^  [A-Z]/ s/secret_key: .*/secret_key: \"$convert_baidu_secret_key\"/" "$CONFIG_FILE"
+            
+            echo -e "${GREEN}✅ 已转换为百度ASR配置${RESET}"
             ;;
-        Q|q)
+        0)
             return 0
             ;;
         *)
             echo -e "${RED}❌ 无效选择${RESET}"
+            echo
+            read -r -p "按回车键继续..." < /dev/tty
             return 1
             ;;
     esac
     
-    echo -e "${YELLOW}🔄 转换操作将修改配置文件中的ASR设置${RESET}"
-    echo -e "${CYAN}💡 建议在转换前手动备份配置文件${RESET}"
-    echo -e "${GREEN}✅ 转换配置准备完成！${RESET}"
-    echo -e "${CYAN}💡 请在部署时选择相应配置选项以应用更改${RESET}"
+    echo -e "${YELLOW}🔄 转换操作已修改配置文件中的ASR设置${RESET}"
+    echo -e "${GREEN}✅ 转换配置完成！${RESET}"
+    echo -e "${CYAN}💡 已更新selected_module中的ASR为: $selected_asr${RESET}"
+    echo -e "${CYAN}💡 已更新$asr_provider_key的配置信息${RESET}"
+    
+    # 显示更新后的selected_module信息
+    echo -e "\n${PURPLE}==================================================${RESET}"
+    echo -e "${CYAN}📋 更新后的selected_module信息${RESET}"
+    echo -e "${PURPLE}==================================================${RESET}"
+    grep -A5 "selected_module:" "$CONFIG_FILE" 2>/dev/null || echo -e "${YELLOW}⚠️ 未找到selected_module配置${RESET}"
+    
+    echo
+    read -r -p "按回车键返回..." < /dev/tty
 }
 
 # ========================= 配置文件操作函数 =========================
