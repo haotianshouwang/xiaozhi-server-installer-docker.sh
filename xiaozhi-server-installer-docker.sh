@@ -10286,6 +10286,32 @@ config_management_menu() {
         echo -e "${CYAN}这个工具有很大的逻辑问题，懒得修了，有能力的大佬PR${RESET}"
         echo -e "${PURPLE}==================================================${RESET}"
         
+        # 检查配置文件是否存在
+        if [ ! -f "$CONFIG_FILE" ]; then
+            echo -e "${YELLOW}⚠️ 配置文件不存在: $CONFIG_FILE${RESET}"
+            echo -e "${CYAN}💡 正在创建基础配置文件结构...${RESET}"
+            
+            # 创建目录
+            mkdir -p "$(dirname "$CONFIG_FILE")"
+            
+            # 下载默认配置文件
+            echo -e "${CYAN}🔄 正在下载默认配置文件...${RESET}"
+            if curl -s -o "$CONFIG_FILE" "$CONFIG_FILE_URL" 2>/dev/null; then
+                echo -e "${GREEN}✅ 默认配置文件下载成功${RESET}"
+            else
+                echo -e "${YELLOW}⚠️ 下载失败，使用备用配置文件${RESET}"
+                if curl -s -o "$CONFIG_FILE" "$CONFIG_FILE_URL_BACKUP" 2>/dev/null; then
+                    echo -e "${GREEN}✅ 备用配置文件下载成功${RESET}"
+                else
+                    echo -e "${RED}❌ 配置文件下载失败${RESET}"
+                    echo -e "${CYAN}💡 请先部署服务器或手动创建配置文件${RESET}"
+                    echo
+                    read -r -p "按回车键返回..." < /dev/tty
+                    return 1
+                fi
+            fi
+        fi
+        
         echo -e "\n${WHITE_RED}配置文件管理选项:${RESET}"
         echo "1) TTS配置 (文本转语音服务)"
         echo "2) ASR配置 (语音识别服务)"
