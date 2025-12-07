@@ -8022,10 +8022,10 @@ docker_operation_tool_menu() {
             6)
                 docker_network_port_management
                 ;;
-            6)
+            7)
                 docker_log_management
                 ;;
-            14)
+            8)
                 docker_installation_management
                 ;;
             0)
